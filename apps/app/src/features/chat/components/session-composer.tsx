@@ -63,6 +63,7 @@ export function SessionComposer({
 
   return (
     <ChatComposerFrame
+      className="mt-2 mb-4 shrink-0"
       controller={controller}
       footer={
         <CardFrameFooter className="px-3 py-2">

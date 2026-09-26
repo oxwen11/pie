@@ -292,7 +292,9 @@ export function entriesToUIMessages(
         | "session_info"
         | "compaction"
         | "branch_summary"
-        | "custom_message");
+        | "custom_message"
+        | "context_edit"
+        | "usage");
       continue;
     }
     const message = entry.message;
@@ -312,7 +314,8 @@ export function entriesToUIMessages(
           | "bashExecution"
           | "custom"
           | "branchSummary"
-          | "compactionSummary");
+          | "compactionSummary"
+          | "system");
     }
   }
 

@@ -50,7 +50,7 @@ function CollapsibleAssistantMessage({
   return (
     <div>
       <Collapsible
-        className="not-prose w-full py-1"
+        className="not-prose w-full py-1.5"
         open={isStreaming ? openWhileStreaming : openWhenSettled}
         onOpenChange={isStreaming ? setOpenWhileStreaming : setOpenWhenSettled}
       >
@@ -58,7 +58,7 @@ function CollapsibleAssistantMessage({
         {/* Flush left, unlike a tool card's body: what folds here is whole
             messages, so indenting them behind a rule would nest the whole
             transcript one level in. */}
-        <CollapsibleContent className="mt-2 space-y-2 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
+        <CollapsibleContent className="mt-2 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
           <AssistantMessage
             parts={summary.workParts}
             isStreaming={isStreaming && summary.answerParts.length === 0}

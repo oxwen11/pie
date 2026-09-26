@@ -20,7 +20,7 @@ export function ChatInput({ className, minRows, style, ...props }: ChatInputProp
       data-slot="chat-input"
       editor={editor}
       className={cn(
-        "chat-input-scroll-fade max-h-[25dvh] w-full min-w-0 overflow-y-auto text-sm leading-5 font-medium pointer-coarse:text-base [&_.tiptap]:px-3 [&_.tiptap]:pt-3 [&_.tiptap]:outline-none",
+        "chat-input-scroll-fade max-h-[25dvh] w-full min-w-0 overflow-y-auto text-sm leading-5 pointer-coarse:text-base [&_.tiptap]:px-3 [&_.tiptap]:pt-3 [&_.tiptap]:outline-none",
         className,
       )}
       style={{ ...style, minHeight: rowsHeight(minRows ?? 1) }}

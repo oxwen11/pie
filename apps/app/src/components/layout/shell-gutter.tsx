@@ -1,6 +1,9 @@
 import { cn } from "@getpie/ui/lib/utils";
 import { type PointerEvent as ReactPointerEvent, type ReactNode, useRef } from "react";
 
+const lineBackground =
+  "linear-gradient(to bottom, transparent, currentColor var(--gutter-y, 50%), transparent)";
+
 export function ShellGutter({
   className,
   disabled = false,
@@ -16,19 +19,18 @@ export function ShellGutter({
   onPointerMove: (event: ReactPointerEvent<HTMLDivElement>) => void;
   onPointerUp: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }): ReactNode {
-  const grip = useRef<HTMLSpanElement>(null);
+  const line = useRef<HTMLSpanElement>(null);
 
-  const placeGrip = (event: ReactPointerEvent<HTMLDivElement>): void => {
-    const mark = grip.current;
+  const placeLine = (event: ReactPointerEvent<HTMLDivElement>): void => {
+    const mark = line.current;
     if (mark === null || disabled) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    mark.style.left = `${event.clientX - rect.left}px`;
-    mark.style.top = `${event.clientY - rect.top}px`;
+    mark.style.setProperty("--gutter-y", `${event.clientY - rect.top}px`);
     mark.style.opacity = "1";
   };
-  const hideGrip = (event: ReactPointerEvent<HTMLDivElement>): void => {
+  const hideLine = (event: ReactPointerEvent<HTMLDivElement>): void => {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) return;
-    if (grip.current !== null) grip.current.style.opacity = "0";
+    if (line.current !== null) line.current.style.opacity = "0";
   };
 
   return (
@@ -44,10 +46,10 @@ export function ShellGutter({
       data-slot="shell-gutter"
       onLostPointerCapture={onPointerUp}
       onPointerDown={onPointerDown}
-      onPointerEnter={placeGrip}
-      onPointerLeave={hideGrip}
+      onPointerEnter={placeLine}
+      onPointerLeave={hideLine}
       onPointerMove={(event) => {
-        placeGrip(event);
+        placeLine(event);
         onPointerMove(event);
       }}
       onPointerUp={onPointerUp}
@@ -55,17 +57,15 @@ export function ShellGutter({
     >
       <div className={cn("absolute inset-y-0 -right-8 left-0", disabled && "hidden")} />
       <span
-        className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 opacity-0"
-        ref={grip}
-      >
-        <svg aria-hidden className="size-7 drop-shadow" fill="none" viewBox="0 0 28 28">
-          <g stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.75">
-            <path d="M14 4v20" />
-            <path d="M14 14H4.5M4.5 14l4.5-4.5M4.5 14l4.5 4.5" />
-            <path d="M14 14h9.5M23.5 14l-4.5-4.5M23.5 14l-4.5 4.5" />
-          </g>
-        </svg>
-      </span>
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 right-0 w-px opacity-0"
+        ref={line}
+        style={{
+          background: lineBackground,
+          transform: "scaleX(0.5)",
+          transformOrigin: "right center",
+        }}
+      />
     </div>
   );
 }
