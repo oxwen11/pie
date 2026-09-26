@@ -15,7 +15,7 @@ import {
 } from "@getpie/ui/components/empty";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { FolderPlusIcon } from "lucide-react";
+import { FolderPlusIcon, KeyRoundIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -186,6 +186,16 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
     );
   }
 
+  // Do not expose the composer until Pi confirms at least one usable model.
+  // On an unconfigured machine the first prompt would fail after creating a session.
+  if (modelsQuery.isPending) return <Loader />;
+  if (modelsQuery.isError) {
+    return <DraftModelsError onRetry={() => void modelsQuery.refetch()} />;
+  }
+  if (modelsQuery.data.models.length === 0) {
+    return <DraftNoModels onRetry={() => void modelsQuery.refetch()} />;
+  }
+
   return (
     <DraftComposer
       draftModel={draftModel}
@@ -224,6 +234,44 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
       selected={selected}
       startPending={startSession.isPending}
     />
+  );
+}
+
+function DraftModelsError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
+      <p className="text-muted-foreground text-sm">
+        Couldn&apos;t check available models. Retry before starting a session.
+      </p>
+      <Button onClick={onRetry} size="sm" variant="outline">
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function DraftNoModels({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <KeyRoundIcon aria-hidden="true" />
+        </EmptyMedia>
+        <EmptyTitle>
+          <h1>No model provider connected</h1>
+        </EmptyTitle>
+        <EmptyDescription>
+          pie needs a model with working credentials before you can start a session. Run{" "}
+          <code>pi</code> in a terminal and use <code>/login</code> to connect a provider via OAuth
+          or an API key, then retry.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={onRetry} variant="outline">
+          Retry
+        </Button>
+      </EmptyContent>
+    </Empty>
   );
 }
 
