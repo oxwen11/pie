@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import path from "node:path";
 
 import { layer } from "@effect/vitest";
 import { isSessionScopedEvent, type SessionRef, type PieUIMessage } from "@getpie/contract";
 import { Effect, Fiber, FileSystem, Layer, Logger, References, Stream } from "effect";
 
+import { piSessionDir } from "../../src/harness/pi/transcript-path";
 import { structured, type LogRecord } from "../log-record";
 import { NodePlatformLayer } from "../platform";
 import { type Fixture, run, UUID_RE } from "./session-service-fixture";
@@ -30,6 +32,52 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
       assert.equal(result.stored.projectId, "proj-a");
       assert.equal(result.stored.cwd, "/tmp/pie-app");
       assert.equal(result.stored.archived, false);
+    }),
+  );
+
+  it.effect("transcript path resolves a symlinked cwd without opening Pi", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const root = yield* fileSystem.makeTempDirectoryScoped({ prefix: "pie-transcript-" });
+      const canonical = path.join(root, "canonical");
+      const alias = path.join(root, "alias");
+      yield* fileSystem.makeDirectory(canonical);
+      yield* fileSystem.symlink(canonical, alias);
+      const previous = process.env.PI_CODING_AGENT_DIR;
+      process.env.PI_CODING_AGENT_DIR = path.join(root, "agent");
+      const result = yield* run({}, (fixture) =>
+        Effect.gen(function* () {
+          const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: alias });
+          assert.deepEqual(yield* fixture.service.transcriptPath(ref), {});
+          const wrongProject = yield* Effect.exit(
+            fixture.service.transcriptPath({
+              projectId: "another-project",
+              sessionId: ref.sessionId,
+            }),
+          );
+          assert.equal(wrongProject._tag, "Failure");
+          const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+          yield* fixture.repo.write({ ...stored, agentSessionId: "native-1" });
+          const dir = piSessionDir(yield* fileSystem.realPath(canonical));
+          yield* fileSystem.makeDirectory(dir, { recursive: true });
+          const file = path.join(dir, "2026_native-1.jsonl");
+          yield* fileSystem.writeFileString(file, "");
+          return {
+            found: yield* fixture.service.transcriptPath(ref),
+            file,
+            opened: fixture.spy.open,
+          };
+        }),
+      ).pipe(
+        Effect.ensuring(
+          Effect.sync(() => {
+            if (previous === undefined) delete process.env.PI_CODING_AGENT_DIR;
+            else process.env.PI_CODING_AGENT_DIR = previous;
+          }),
+        ),
+      );
+      assert.deepEqual(result.found, { path: result.file });
+      assert.deepEqual(result.opened, []);
     }),
   );
 

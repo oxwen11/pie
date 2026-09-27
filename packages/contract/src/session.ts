@@ -43,6 +43,7 @@ export const sessionContract = {
   archive: base.input(ArchiveSessionInputSchema),
   delete: base.input(RefInputSchema),
   getMessages: base.input(RefInputSchema).output(type<SessionMessages>()),
+  transcriptPath: base.input(RefInputSchema).output(type<{ readonly path?: string }>()),
   resolveRef: base.input(ResolveRefInputSchema).output(SessionRefSchema),
 
   prompt: base.input(PromptInputSchema).output(PromptOutputSchema),

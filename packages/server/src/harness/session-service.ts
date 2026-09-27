@@ -27,7 +27,7 @@ import {
   type SessionNotFound,
   SessionNotWorktree,
   type SessionRefNotFound,
-  type StoreReadError,
+  StoreReadError,
   type StoreWriteError,
   WorkspaceReadError,
   WorktreeCheckoutMissing,
@@ -52,6 +52,7 @@ import { PiAgent } from "./pi/agent";
 import { persistDefaultPiModel } from "./pi/resolve-default-model";
 import type { PiAgentRuntime } from "./pi/runtime";
 import { PiSessionTools } from "./pi/session-tools";
+import { piSessionDir, transcriptPathIn } from "./pi/transcript-path";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
 import type { PromptReceipt, RuntimePromptReceipt, UserInput } from "./session-io";
@@ -201,6 +202,12 @@ export type PiAgentSessionServiceShape = {
   ) => Effect.Effect<
     SessionInfoResult,
     SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError | AgentOperationError
+  >;
+  readonly transcriptPath: (
+    ref: SessionRef,
+  ) => Effect.Effect<
+    { readonly path?: string },
+    SessionNotFound | ProjectNotFound | StoreReadError
   >;
   readonly getStatus: (ref: SessionRef) => Effect.Effect<SessionStatus>;
   readonly getSnapshot: (ref: SessionRef) => Effect.Effect<SessionRuntimeSnapshot>;
@@ -813,6 +820,45 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
             const agentSessionId = metadata.agentSessionId;
             return ensureCwd(metadata).pipe(
               Effect.flatMap((resolved) => pi.getSessionInfo(agentSessionId, resolved.cwd)),
+            );
+          }),
+          inSession(ref),
+        ),
+
+      transcriptPath: (ref: SessionRef) =>
+        readMetadata(ref).pipe(
+          Effect.flatMap((metadata) => {
+            if (metadata.agentSessionId === undefined) return Effect.succeed({});
+            const agentSessionId = metadata.agentSessionId;
+            const cwd =
+              metadata.cwd !== undefined
+                ? Effect.succeed(metadata.cwd)
+                : projects.findById(metadata.projectId).pipe(Effect.map((project) => project.path));
+            return cwd.pipe(
+              Effect.flatMap((resolved) =>
+                fs
+                  .realPath(resolved)
+                  .pipe(
+                    Effect.catch((error) =>
+                      error.reason._tag === "NotFound"
+                        ? Effect.succeed(resolved)
+                        : Effect.fail(new StoreReadError({ file: resolved, cause: error })),
+                    ),
+                  ),
+              ),
+              Effect.flatMap((canonical) => {
+                const dir = piSessionDir(canonical);
+                return fs.readDirectory(dir).pipe(
+                  Effect.matchEffect({
+                    onFailure: (error) =>
+                      error.reason._tag === "NotFound"
+                        ? Effect.succeed({})
+                        : Effect.fail(new StoreReadError({ file: dir, cause: error })),
+                    onSuccess: (names) =>
+                      Effect.succeed({ path: transcriptPathIn(dir, agentSessionId, names) }),
+                  }),
+                );
+              }),
             );
           }),
           inSession(ref),
