@@ -6,7 +6,8 @@ import {
   type SuggestionKeyDownProps,
   type SuggestionProps,
 } from "@tiptap/suggestion";
-import { useEffect, useId } from "react";
+import { BoxIcon, FileTextIcon, TerminalIcon } from "lucide-react";
+import { Fragment, useEffect, useId } from "react";
 
 import { useLatestRef } from "@/hooks/use-latest-ref";
 
@@ -16,10 +17,16 @@ import {
   insertSlashCommand,
   type SlashCommandState,
   type SlashCommandItem,
+  slashCommandLabel,
   slashCommandPluginKey,
 } from "./slash-command-suggestions";
 
 const SLASH_COMMAND_REFRESH_META = "chatSlashCommandsRefresh";
+const commandIcon = {
+  extension: TerminalIcon,
+  prompt: FileTextIcon,
+  skill: BoxIcon,
+} as const;
 const EDITOR_COMBOBOX_ATTRIBUTES = [
   "role",
   "aria-autocomplete",
@@ -59,7 +66,7 @@ function SlashCommandPopup({
 }: SlashCommandPopupProps) {
   return (
     <div
-      className="bg-popover text-popover-foreground w-full rounded-xl border p-1 shadow-lg"
+      className="bg-popover/95 text-popover-foreground w-full scrollbar-thin overflow-y-auto rounded-2xl border text-sm backdrop-blur-sm"
       style={{ maxHeight: "var(--slash-command-menu-max-height, 320px)" }}
     >
       {state.status === "loading" ? (
@@ -85,42 +92,50 @@ function SlashCommandPopup({
           No matching commands
         </div>
       ) : null}
-      <div
-        id={listboxId}
-        role="listbox"
-        aria-label="Commands"
-        className="flex max-h-[inherit] scrollbar-thin flex-col overflow-y-auto"
-      >
+      <div id={listboxId} role="listbox" aria-label="Commands" className="flex flex-col py-1">
         {state.status === "ready"
-          ? items.map((item, index) => (
-              <button
-                key={item.command.name}
-                id={`${listboxId}-option-${index}`}
-                type="button"
-                role="option"
-                tabIndex={-1}
-                aria-selected={index === selectedIndex}
-                data-selected={index === selectedIndex || undefined}
-                className="hover:bg-accent data-[selected]:bg-accent flex min-h-11 w-full items-center gap-2 rounded-lg px-2 py-2.5 text-left text-sm"
-                onPointerDown={(event) => {
-                  if (event.pointerType === "mouse" && event.button === 0) {
-                    event.preventDefault();
-                  }
-                }}
-                onClick={(event) => {
-                  if (event.button === 0) onSelect(item);
-                }}
-              >
-                <span className="flex min-w-0 flex-col">
-                  <span className="truncate font-medium">{item.title}</span>
-                  {item.description ? (
-                    <span className="text-muted-foreground truncate text-xs">
-                      {item.description}
-                    </span>
+          ? items.map((item, index) => {
+              const Icon = commandIcon[item.command.source];
+              return (
+                <Fragment key={item.command.name}>
+                  {item.command.source === "skill" &&
+                  items[index - 1]?.command.source !== "skill" ? (
+                    <div className="bg-popover text-muted-foreground sticky top-0 z-20 w-full shrink-0 px-2 py-1 text-sm leading-5">
+                      Skills
+                    </div>
                   ) : null}
-                </span>
-              </button>
-            ))
+                  <button
+                    id={`${listboxId}-option-${index}`}
+                    type="button"
+                    role="option"
+                    tabIndex={-1}
+                    aria-selected={index === selectedIndex}
+                    data-selected={index === selectedIndex || undefined}
+                    className="text-foreground/75 data-[selected]:text-foreground data-[selected]:bg-foreground/5 flex w-full shrink-0 scroll-mt-7 items-center gap-2 overflow-hidden rounded-lg px-2 py-1 text-start text-sm"
+                    onPointerDown={(event) => {
+                      if (event.pointerType === "mouse" && event.button === 0) {
+                        event.preventDefault();
+                      }
+                    }}
+                    onClick={(event) => {
+                      if (event.button === 0) onSelect(item);
+                    }}
+                  >
+                    <Icon className="size-3.5 shrink-0" aria-hidden />
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="max-w-[60%] shrink-0 truncate">
+                        {slashCommandLabel(item.command)}
+                      </span>
+                      {item.description ? (
+                        <span className="text-muted-foreground ms-auto min-w-0 flex-1 truncate">
+                          {item.description}
+                        </span>
+                      ) : null}
+                    </span>
+                  </button>
+                </Fragment>
+              );
+            })
           : null}
       </div>
     </div>
@@ -141,7 +156,7 @@ function preserveEditorAttributes(editorElement: HTMLElement): () => void {
 
 function positionPopup(anchor: HTMLElement, popup: HTMLElement): () => void {
   const ownerWindow = anchor.ownerDocument.defaultView;
-  if (!ownerWindow) return () => {};
+  if (!ownerWindow) return () => undefined;
 
   let active = true;
   const update = () => {
@@ -164,13 +179,14 @@ function positionPopup(anchor: HTMLElement, popup: HTMLElement): () => void {
         }),
       ],
     }).then(({ x, y }) => {
-      if (!active) return;
+      if (!active) return undefined;
       Object.assign(popup.style, {
         left: `${x}px`,
         top: `${y}px`,
         position: "fixed",
         zIndex: "50",
       });
+      return undefined;
     });
   };
 
@@ -196,7 +212,7 @@ export function SlashCommandMenu({ state }: SlashCommandMenuProps) {
   const listboxId = `slash-command-${reactId.replaceAll(":", "")}`;
 
   useEffect(() => {
-    if (!editor || editor.isDestroyed) return;
+    if (!editor || editor.isDestroyed) return () => undefined;
 
     let popup: ActivePopup | null = null;
 
@@ -213,9 +229,8 @@ export function SlashCommandMenu({ state }: SlashCommandMenuProps) {
     const renderPopup = (current: ActivePopup) => {
       const currentState = stateRef.current;
       const items = current.suggestion.items;
-      const selectedIndex = items.length
-        ? Math.min(Math.max(current.selectedIndex, 0), items.length - 1)
-        : -1;
+      const selectedIndex =
+        items.length > 0 ? Math.min(Math.max(current.selectedIndex, 0), items.length - 1) : -1;
       current.selectedIndex = selectedIndex;
 
       const editorElement = editor.view.dom;
@@ -266,7 +281,7 @@ export function SlashCommandMenu({ state }: SlashCommandMenuProps) {
         const preservedIndex = suggestion.items.findIndex(
           (item) => item.command.name === selectedName,
         );
-        current.selectedIndex = preservedIndex >= 0 ? preservedIndex : 0;
+        current.selectedIndex = Math.max(preservedIndex, 0);
       } else {
         current.selectedIndex = 0;
       }
@@ -283,29 +298,34 @@ export function SlashCommandMenu({ state }: SlashCommandMenuProps) {
     const handleKeyDown = ({ event }: SuggestionKeyDownProps): boolean => {
       const current = popup;
       if (!current || event.isComposing) return false;
-      if (event.shiftKey || event.altKey || event.metaKey || event.ctrlKey) {
-        if (event.key !== "Tab" || event.altKey || event.metaKey || event.ctrlKey) return false;
+      if (
+        event.altKey ||
+        event.metaKey ||
+        event.ctrlKey ||
+        (event.shiftKey && event.key !== "Tab")
+      ) {
+        return false;
       }
 
       const { items } = current.suggestion;
       switch (event.key) {
         case "ArrowUp":
-          if (!items.length) return false;
+          if (items.length === 0) return false;
           moveSelection((current.selectedIndex - 1 + items.length) % items.length);
           return true;
         case "ArrowDown":
-          if (!items.length) return false;
+          if (items.length === 0) return false;
           moveSelection((current.selectedIndex + 1) % items.length);
           return true;
         case "Tab":
           exitSuggestion(editor.view, slashCommandPluginKey);
           return false;
         case "Home":
-          if (!items.length) return false;
+          if (items.length === 0) return false;
           moveSelection(0);
           return true;
         case "End":
-          if (!items.length) return false;
+          if (items.length === 0) return false;
           moveSelection(items.length - 1);
           return true;
         case "Enter": {
@@ -354,7 +374,7 @@ export function SlashCommandMenu({ state }: SlashCommandMenuProps) {
               state: stateRef.current,
               items: suggestion.items,
               listboxId,
-              selectedIndex: suggestion.items.length ? 0 : -1,
+              selectedIndex: suggestion.items.length > 0 ? 0 : -1,
               onRetry: () => {
                 if (stateRef.current.status === "error") stateRef.current.retry();
               },
@@ -409,7 +429,7 @@ export function SlashCommandMenu({ state }: SlashCommandMenuProps) {
   }, [stateRef, editor, listboxId]);
 
   useEffect(() => {
-    if (!editor || editor.isDestroyed) return;
+    if (!editor || editor.isDestroyed) return () => undefined;
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled || editor.isDestroyed) return;

@@ -13,6 +13,7 @@ import { SlashCommandMenu } from "./slash-command-menu";
 import {
   allowSlashCommandSuggestion,
   createSlashCommandSuggestionItems,
+  filterSlashCommandItems,
   insertSlashCommand,
   type SlashCommandState,
 } from "./slash-command-suggestions";
@@ -60,7 +61,9 @@ async function createHarness(initialState: SlashCommandState): Promise<Harness> 
           </ChatInputProvider>
         </form>,
       );
-      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => {
+        setTimeout(resolve, 0);
+      });
     });
   };
   await render(initialState);
@@ -82,7 +85,9 @@ async function createHarness(initialState: SlashCommandState): Promise<Harness> 
 async function openSlash(harness: Harness, text = "/") {
   await act(async () => {
     harness.controller.editor.commands.setContent(text);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   });
 }
 
@@ -91,7 +96,9 @@ async function dispatchKey(harness: Harness, init: KeyboardEventInit): Promise<K
   if (init.isComposing) Object.defineProperty(event, "isComposing", { value: true });
   await act(async () => {
     harness.controller.editor.view.dom.dispatchEvent(event);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
   });
   return event;
 }
@@ -100,6 +107,12 @@ describe("slash command suggestions", () => {
   it("only activates for a slash at the beginning of the complete prompt", () => {
     expect(allowSlashCommandSuggestion({ range: { from: 1, to: 2 } })).toBe(true);
     expect(allowSlashCommandSuggestion({ range: { from: 8, to: 9 } })).toBe(false);
+    expect(
+      filterSlashCommandItems(
+        createSlashCommandSuggestionItems([commands[1] ?? commands[0], commands[0]]),
+        "",
+      ).map((item) => item.command.source),
+    ).toEqual(["prompt", "skill"]);
   });
 
   it("shows loading and refreshes when command data arrives after slash", async () => {
@@ -112,7 +125,8 @@ describe("slash command suggestions", () => {
       expect(document.querySelector('[role="listbox"]')?.childElementCount).toBe(0);
 
       await harness.render(readyState());
-      expect(document.body.textContent).toContain("/explain");
+      expect(document.body.textContent).toContain("Skills");
+      expect(document.querySelector('[role="option"]')?.textContent).toContain("explain");
       expect(document.querySelectorAll('[role="option"]')).toHaveLength(2);
     } finally {
       await harness.dispose();
@@ -154,7 +168,9 @@ describe("slash command suggestions", () => {
         document.body.dispatchEvent(
           new MouseEvent("pointerdown", { bubbles: true, cancelable: true }),
         );
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
       });
       expect(document.querySelector('[role="listbox"]')).toBeNull();
 
@@ -173,11 +189,14 @@ describe("slash command suggestions", () => {
       await dispatchKey(harness, { key: "ArrowDown" });
       expect(
         document.querySelector('[role="option"][aria-selected="true"]')?.textContent,
-      ).toContain("/skill:review");
+      ).toContain("review");
+      expect(
+        document.querySelector('[role="option"][aria-selected="true"]')?.textContent,
+      ).not.toContain("skill:");
 
-      await harness.render(readyState([commands[0]!]));
+      await harness.render(readyState([commands[0] ?? commands[1]]));
       expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
-      expect(document.querySelector('[role="option"]')?.textContent).toContain("/explain");
+      expect(document.querySelector('[role="option"]')?.textContent).toContain("explain");
       await dispatchKey(harness, { key: "Enter" });
       expect(harness.controller.editor.getHTML()).toBe("<p>/explain </p>");
       expect(harness.onSubmit).not.toHaveBeenCalled();
@@ -230,11 +249,11 @@ describe("slash command suggestions", () => {
       await dispatchKey(harness, { key: "End" });
       expect(
         document.querySelector('[role="option"][aria-selected="true"]')?.textContent,
-      ).toContain("/skill:review");
+      ).toContain("review");
       await dispatchKey(harness, { key: "Home" });
       expect(
         document.querySelector('[role="option"][aria-selected="true"]')?.textContent,
-      ).toContain("/explain");
+      ).toContain("explain");
 
       const tab = await dispatchKey(harness, { key: "Tab" });
       expect(tab.defaultPrevented).toBe(false);
@@ -266,7 +285,8 @@ describe("slash command suggestions", () => {
       await openSlash(harness);
       const scrollIntoView = vi.fn<(options?: boolean | ScrollIntoViewOptions) => void>();
       const lastOption = document.querySelector<HTMLElement>('[role="option"]:last-of-type');
-      Object.defineProperty(lastOption!, "scrollIntoView", {
+      if (!lastOption) throw new Error("missing option");
+      Object.defineProperty(lastOption, "scrollIntoView", {
         configurable: true,
         value: scrollIntoView,
       });
@@ -274,7 +294,7 @@ describe("slash command suggestions", () => {
       await dispatchKey(harness, { key: "End" });
       expect(
         document.querySelector('[role="option"][aria-selected="true"]')?.textContent,
-      ).toContain("/command-19");
+      ).toContain("command-19");
       expect(scrollIntoView).toHaveBeenLastCalledWith({ block: "nearest" });
     } finally {
       await harness.dispose();
@@ -287,7 +307,7 @@ describe("slash command suggestions", () => {
       await openSlash(harness, "/rev");
       const skillOption = Array.from(
         document.querySelectorAll<HTMLElement>('[role="option"]'),
-      ).find((option) => option.textContent?.includes("/skill:review"));
+      ).find((option) => option.textContent?.includes("Review the current changes"));
       const touchStart = new MouseEvent("pointerdown", { bubbles: true, cancelable: true });
       Object.defineProperty(touchStart, "pointerType", { value: "touch" });
       await act(async () => {
@@ -310,7 +330,9 @@ describe("slash command suggestions", () => {
         skillOption?.dispatchEvent(
           new MouseEvent("click", { button: 0, bubbles: true, cancelable: true }),
         );
-        await new Promise((resolve) => setTimeout(resolve, 0));
+        await new Promise((resolve) => {
+          setTimeout(resolve, 0);
+        });
       });
       expect(harness.controller.editor.getHTML()).toBe("<p>/skill:review </p>");
 
@@ -318,7 +340,7 @@ describe("slash command suggestions", () => {
       insertSlashCommand(
         harness.controller.editor,
         { from: 1, to: 5 },
-        createSlashCommandSuggestionItems(commands)[0]!,
+        createSlashCommandSuggestionItems(commands)[0] ?? commands[0],
       );
       expect(harness.controller.editor.getHTML()).toBe("<p>/explain </p>");
     } finally {

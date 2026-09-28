@@ -75,8 +75,9 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
         description: "Use review",
         source: "skill",
       });
-      assert.ok(commands.indexOf(explain!) < commands.indexOf(review!));
-      assert.equal("sourceInfo" in explain!, false);
+      assert.ok(explain !== undefined && review !== undefined);
+      assert.ok(commands.indexOf(explain) < commands.indexOf(review));
+      assert.equal("sourceInfo" in explain, false);
     }),
   );
 
@@ -127,25 +128,36 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
       const commands = yield* Effect.promise(() => listAvailablePiCommands(cwd, agentDir));
       assert.deepEqual(
         commands.filter((command) => command.name === "skill:review"),
-        [{ name: "skill:review", description: "Use review", source: "skill" }],
+        [
+          { name: "skill:review", description: "Run skill:review", source: "prompt" },
+          { name: "skill:review", description: "Use review", source: "skill" },
+        ],
       );
     }),
   );
 
-  it.effect("does not execute Project extensions during command discovery", () =>
+  it.effect("includes extension slash commands from get_commands", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-command-extension-" });
       const extensionDirectory = path.join(cwd, ".pi", "extensions");
-      const marker = path.join(cwd, "extension-loaded");
       yield* fs.makeDirectory(extensionDirectory, { recursive: true });
       yield* fs.writeFileString(
         path.join(extensionDirectory, "marker.ts"),
-        `import fs from "node:fs";\nfs.writeFileSync(${JSON.stringify(marker)}, "loaded");\nexport default function markerExtension() {}\n`,
+        `export default function markerExtension(pi) {
+  pi.registerCommand("marker", {
+    description: "Marker command",
+    handler: async () => {},
+  });
+}
+`,
       );
 
-      yield* Effect.promise(() => listAvailablePiCommands(cwd));
-      assert.equal(yield* fs.exists(marker), false);
+      const commands = yield* Effect.promise(() => listAvailablePiCommands(cwd));
+      assert.deepEqual(
+        commands.find((command) => command.name === "marker"),
+        { name: "marker", description: "Marker command", source: "extension" },
+      );
     }),
   );
 

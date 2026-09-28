@@ -105,7 +105,7 @@ describe("Agent commands", () => {
         supportsPermissions: false,
       }),
     ).toBe(true);
-    expect(accepts(AgentCommandSchema, { name: "reload", source: "extension" })).toBe(false);
+    expect(accepts(AgentCommandSchema, { name: "reload", source: "extension" })).toBe(true);
     expect(accepts(ListAgentCommandsInputSchema, {})).toBe(true);
   });
 });

@@ -21,6 +21,10 @@ export function allowSlashCommandSuggestion({ range }: { range: Range }): boolea
   return range.from === 1;
 }
 
+export function slashCommandLabel(command: AgentCommand): string {
+  return command.source === "skill" ? command.name.replace(/^skill:/, "") : command.name;
+}
+
 export function createSlashCommandSuggestionItems(
   commands: ReadonlyArray<AgentCommand>,
 ): SlashCommandItem[] {
@@ -37,18 +41,18 @@ export function filterSlashCommandItems(
   query: string,
 ): SlashCommandItem[] {
   const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return [...items];
-
-  return (
-    items
-      .filter(
+  const matched = normalizedQuery
+    ? items.filter(
         (item) =>
           item.title.toLowerCase().includes(normalizedQuery) ||
-          item.description?.toLowerCase().includes(normalizedQuery) ||
+          (item.description?.toLowerCase().includes(normalizedQuery) ?? false) ||
           item.keywords.some((keyword) => keyword.toLowerCase().includes(normalizedQuery)),
       )
-      // oxlint-disable-next-line unicorn/no-array-sort -- filter() returns a fresh array
-      .sort((a, b) => {
+    : [...items];
+
+  // oxlint-disable-next-line unicorn/no-array-sort -- matched is a fresh array
+  const ranked = normalizedQuery
+    ? matched.sort((a, b) => {
         const aTitle = a.title.slice(1).toLowerCase();
         const bTitle = b.title.slice(1).toLowerCase();
         if (aTitle === normalizedQuery && bTitle !== normalizedQuery) return -1;
@@ -57,7 +61,12 @@ export function filterSlashCommandItems(
         if (bTitle.startsWith(normalizedQuery) && !aTitle.startsWith(normalizedQuery)) return 1;
         return 0;
       })
-  );
+    : matched;
+
+  return [
+    ...ranked.filter((item) => item.command.source !== "skill"),
+    ...ranked.filter((item) => item.command.source === "skill"),
+  ];
 }
 
 export function insertSlashCommand(editor: Editor, range: Range, item: SlashCommandItem): void {

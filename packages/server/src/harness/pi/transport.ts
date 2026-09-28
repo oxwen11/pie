@@ -24,6 +24,8 @@ export interface PiTransportOptions {
   /** Passed as `--session-id` — pi loads the session, creating it if missing. */
   readonly sessionId?: string;
   readonly args?: ReadonlyArray<string>;
+  /** Overlay on the child env. `extendEnv` stays on, so this does not drop `PATH`. */
+  readonly env?: NodeJS.ProcessEnv;
   readonly queueCapacity?: number;
   readonly forceKillAfter?: Duration.Input;
 }
@@ -94,7 +96,9 @@ export const makePiTransport = (
           ],
           {
             ...(options.cwd ? { cwd: options.cwd } : undefined),
-            ...(fffEnv === undefined ? undefined : { env: fffEnv, extendEnv: true }),
+            ...(fffEnv === undefined && options.env === undefined
+              ? undefined
+              : { env: { ...fffEnv, ...options.env }, extendEnv: true }),
             forceKillAfter: options.forceKillAfter ?? DEFAULT_FORCE_KILL_AFTER,
           },
         ),

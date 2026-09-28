@@ -470,11 +470,11 @@ export type ReplaceQueueInput = typeof ReplaceQueueInputSchema.Type;
 // Agent commands and session capabilities
 // ---------------------------------------------------------------------------
 
-/** Pi prompt templates and skills that are safe to submit as model turns. */
+/** Slash commands returned by Pi `get_commands`. */
 export const AgentCommandSchema = Schema.Struct({
   name: Schema.NonEmptyString,
   description: Schema.optionalKey(Schema.String),
-  source: Schema.Literals(["prompt", "skill"]),
+  source: Schema.Literals(["extension", "prompt", "skill"]),
 });
 export type AgentCommand = typeof AgentCommandSchema.Type;
 
