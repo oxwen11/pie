@@ -84,7 +84,8 @@ export function SessionPullRequestIndicator({
   const { Icon, color, badge, href, description } = view;
   return (
     <SidebarMenuAction
-      className="w-auto max-w-24 px-1 text-xs"
+      // aspect-square would make a wide badge as tall as it is wide, below the title.
+      className="aspect-auto h-5 w-auto max-w-24 gap-1 px-1 text-xs"
       render={
         <a
           aria-label={description}
