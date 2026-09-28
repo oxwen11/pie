@@ -4,7 +4,7 @@ import {
   TokenUsageSchema,
   TurnErrorSchema,
 } from "@getpie/contract";
-import type { UIMessageChunk } from "ai";
+import type { PieUIMessageChunk } from "@getpie/contract";
 import { Schema } from "effect";
 
 /**
@@ -119,7 +119,7 @@ export const GlobalEventDefs = [
 ] as const;
 export type GlobalEvent = EventValue<(typeof GlobalEventDefs)[number]>;
 
-export type SessionEnvelopeBody = UIMessageChunk | SessionEvent;
+export type SessionEnvelopeBody = PieUIMessageChunk | SessionEvent;
 export type SessionEnvelope = {
   readonly sessionId: string;
   readonly seq: number;

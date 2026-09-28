@@ -56,17 +56,9 @@ const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): Pie
 
 const retryNoticeFrom = (chunk: PieUIMessageChunk): string | undefined => {
   if (chunk.type !== "data-retry") return undefined;
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- data-retry payload is untyped JSON
-  const data = chunk.data as {
-    readonly errorMessage?: unknown;
-    readonly attempt?: unknown;
-    readonly maxAttempts?: unknown;
-  };
-  const errorMessage = typeof data.errorMessage === "string" ? data.errorMessage : "";
+  const { errorMessage, attempt, maxAttempts } = chunk.data;
   const reason =
     errorMessage === "Connection error." ? "Couldn't reach the model provider" : errorMessage;
-  const attempt = typeof data.attempt === "number" ? data.attempt : undefined;
-  const maxAttempts = typeof data.maxAttempts === "number" ? data.maxAttempts : undefined;
   const suffix =
     attempt !== undefined && maxAttempts !== undefined
       ? `Retrying (${attempt}/${maxAttempts})…`
@@ -575,7 +567,7 @@ export class Chat {
         // messageId would otherwise leave the reader's constant default id on
         // every folded message, and two turns would upsert into each other's
         // slot. A start chunk with one still overrides this seed.
-        const seed = { id: `turn-${turnId}`, role: "assistant", parts: [] } as PieUIMessage;
+        const seed: PieUIMessage = { id: `turn-${turnId}`, role: "assistant", parts: [] };
         for await (const message of readUIMessageStream({ message: seed, stream })) {
           this.#state.upsertMessage(message);
         }

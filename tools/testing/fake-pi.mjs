@@ -24,6 +24,21 @@ function log(value) {
 }
 
 const rl = readline.createInterface({ input: process.stdin });
+const entries = [];
+const state = { leafId: null, nextEntry: 1 };
+
+const bridge = process.env.PIE_SESSION_BRIDGE_URL;
+const bridgeToken = process.env.PIE_SESSION_BRIDGE_TOKEN;
+if (bridge && bridgeToken) {
+  fetch(`${bridge}/ready`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${bridgeToken}`,
+      "content-type": "application/json",
+    },
+    body: "{}",
+  }).catch(() => undefined);
+}
 
 process.stdout.write("pi startup banner (not json)\n");
 send({
@@ -67,16 +82,15 @@ rl.on("line", (line) => {
     return;
   }
 
-  // Instant turns never persist a session file. An empty tree is still a
-  // finished read — without this reply, attach waits forever on get_entries
-  // and live events stay queued behind the history floor.
+  // Persist entries so history reload after a live turn can decode Markdown
+  // images. An empty tree is still a finished read on first attach.
   if (msg.type === "get_entries") {
     send({
       id: msg.id,
       type: "response",
       command: "get_entries",
       success: true,
-      data: { entries: [], leafId: null },
+      data: { entries, leafId: state.leafId },
     });
     return;
   }
@@ -107,6 +121,29 @@ rl.on("line", (line) => {
 
   if (msg.type !== "prompt") return;
 
+  const now = Date.now();
+  const userId = `fake-user-${state.nextEntry++}`;
+  const assistantId = `fake-assistant-${state.nextEntry++}`;
+  entries.push({
+    type: "message",
+    id: userId,
+    parentId: state.leafId,
+    timestamp: new Date(now).toISOString(),
+    message: { role: "user", content: msg.message, timestamp: now },
+  });
+  const finalAssistant = assistant({
+    content: [{ type: "text", text: configuredResponse }],
+    timestamp: now + 1,
+  });
+  entries.push({
+    type: "message",
+    id: assistantId,
+    parentId: userId,
+    timestamp: new Date(now + 1).toISOString(),
+    message: finalAssistant,
+  });
+  state.leafId = assistantId;
+
   send({
     id: msg.id,
     type: "response",
@@ -119,6 +156,6 @@ rl.on("line", (line) => {
   upd({ type: "text_start", contentIndex: 0 });
   upd({ type: "text_delta", contentIndex: 0, delta: configuredResponse });
   upd({ type: "text_end", contentIndex: 0, content: configuredResponse });
-  send({ type: "message_end", message: assistant() });
-  settle();
+  send({ type: "message_end", message: finalAssistant });
+  settle(finalAssistant);
 });

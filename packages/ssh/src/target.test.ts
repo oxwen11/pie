@@ -9,6 +9,7 @@ import {
   parseRemoteLaunchOutput,
   parseSshInput,
   parseSshResolveOutput,
+  remoteDaemonCompatibilityMatches,
   remoteStateKey,
   targetConnectionKey,
 } from "./target";
@@ -152,6 +153,22 @@ describe("parseRemoteLaunchOutput", () => {
       remotePort: 41234,
       token: "secret-token",
     });
+    expect(
+      parseRemoteLaunchOutput(
+        '{"remotePort":41234,"token":"secret-token","compatibilityKey":"githash:aaaaaaaa"}',
+      ),
+    ).toEqual({
+      remotePort: 41234,
+      token: "secret-token",
+      compatibilityKey: "githash:aaaaaaaa",
+    });
+  });
+
+  it("treats a missing or different compatibility key as a mismatch", () => {
+    expect(remoteDaemonCompatibilityMatches("githash:aaaaaaaa", "githash:aaaaaaaa")).toBe(true);
+    expect(remoteDaemonCompatibilityMatches("githash:bbbbbbbb", "githash:aaaaaaaa")).toBe(false);
+    expect(remoteDaemonCompatibilityMatches(undefined, "githash:aaaaaaaa")).toBe(false);
+    expect(remoteDaemonCompatibilityMatches("githash:aaaaaaaa", "")).toBe(false);
   });
 
   it("rejects a payload without a daemon token or port", () => {

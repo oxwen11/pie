@@ -4,11 +4,6 @@ export type AgentSessionInfo = {
   readonly updatedAt?: number;
 };
 
-export type AvailabilityResult = {
-  readonly available: boolean;
-  readonly reason?: string;
-};
-
 /**
  * Result of looking up a persisted session's Pi backend info:
  * - `found`       — Pi still has it; `info` carries display fields

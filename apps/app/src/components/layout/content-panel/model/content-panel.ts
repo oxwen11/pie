@@ -256,6 +256,7 @@ export class ContentPanel<View = unknown> {
     // Closing the active tab lands on its neighbour, the way an editor does.
     const fallback = panels[Math.min(index, panels.length - 1)] ?? null;
     this.#writeSession(sessionRef, {
+      ...session,
       presentation: panels.length === 0 ? "hidden" : session.presentation,
       activeId: session.activeId === id ? (fallback?.id ?? null) : session.activeId,
       panels,
@@ -401,6 +402,7 @@ export class ContentPanel<View = unknown> {
     const session = this.#sessionOf(sessionRef);
     const isOpen = session.panels.some((panel) => panel.id === id);
     this.#writeSession(sessionRef, {
+      ...session,
       presentation: session.presentation === "hidden" ? "docked" : session.presentation,
       activeId: id,
       panels: isOpen

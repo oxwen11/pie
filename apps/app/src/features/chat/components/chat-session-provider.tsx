@@ -44,6 +44,7 @@ export function ChatSessionProvider({
 
   const value = useMemo<ChatSessionValue>(
     () => ({
+      sessionRef,
       sessionId: sessionRef.ref.sessionId,
       store: chat.store,
       prompt,
@@ -52,15 +53,7 @@ export function ChatSessionProvider({
       respondToRequest,
       turnInProgress,
     }),
-    [
-      sessionRef.ref.sessionId,
-      chat,
-      prompt,
-      interrupt,
-      replaceQueue,
-      respondToRequest,
-      turnInProgress,
-    ],
+    [sessionRef, chat, prompt, interrupt, replaceQueue, respondToRequest, turnInProgress],
   );
 
   return <ChatSessionContext.Provider value={value}>{children}</ChatSessionContext.Provider>;

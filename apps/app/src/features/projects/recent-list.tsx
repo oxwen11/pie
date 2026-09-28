@@ -6,18 +6,30 @@ import {
   SidebarGroupLabel,
   SidebarMenu,
 } from "@getpie/ui/components/sidebar";
+import { useQueries } from "@tanstack/react-query";
 import { ChevronRight } from "lucide-react";
 
 import { KeepMountedCollapsiblePanel } from "@/features/projects/panel-motion";
 import { ProjectSessionRow } from "@/features/projects/project-session-row";
 import { useProjectSessionRows } from "@/features/projects/use-project-session-rows";
 import { useChatProjects } from "@/features/projects/use-projects";
+import { useCatalogOrpc } from "@/lib/environment-orpc";
 
 /** Chat projects (`type: "chat"`), listed as session rows — not under Projects. */
 export function RecentList() {
   const chatProjects = useChatProjects();
   const projects = chatProjects.data ?? [];
-  if (projects.length === 0) return null;
+  const orpcQueryUtils = useCatalogOrpc();
+  // Same query keys as useProjectSessionRows below — cache-shared, so this only
+  // subscribes; it exists so the header can hide when every chat project is empty.
+  const sessions = useQueries({
+    queries: projects.map((project) =>
+      orpcQueryUtils.agent.session.list.queryOptions({
+        input: { projectId: project.id, archived: false },
+      }),
+    ),
+  });
+  if (sessions.every((list) => (list.data ?? []).length === 0)) return null;
 
   return (
     <Collapsible defaultOpen>

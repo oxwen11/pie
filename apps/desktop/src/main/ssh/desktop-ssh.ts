@@ -26,6 +26,7 @@ import {
   FileSystem,
   Layer,
   Ref,
+  Scope,
   Semaphore,
   type PlatformError,
 } from "effect";
@@ -264,9 +265,10 @@ export function makeDesktopSsh(input: {
 }): Effect.Effect<
   DesktopSsh["Service"],
   never,
-  FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
+  Scope.Scope | FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
 > {
   return Effect.gen(function* () {
+    const ownerScope = yield* Scope.Scope;
     const platform = yield* Effect.context<
       FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
     >();
@@ -325,7 +327,9 @@ export function makeDesktopSsh(input: {
               return next;
             }),
           ),
-          Effect.forkDetach,
+          // The handler scope ends when connect returns. The watcher has to
+          // live on the layer scope so a dead tunnel still leaves the snapshot.
+          Effect.forkIn(ownerScope),
         );
       });
 

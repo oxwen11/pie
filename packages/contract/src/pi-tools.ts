@@ -14,13 +14,7 @@ import type {
   ReadToolInput,
   WriteToolInput,
 } from "@earendil-works/pi-coding-agent";
-import type {
-  DynamicToolUIPart,
-  InferUIMessageChunk,
-  ToolUIPart,
-  UIDataTypes,
-  UIMessage,
-} from "ai";
+import type { DynamicToolUIPart, InferUIMessageChunk, ToolUIPart, UIMessage } from "ai";
 
 type ReadToolOutput = Omit<
   AgentToolResult<
@@ -45,10 +39,41 @@ export type PiTools = {
   ls: { input: LsToolInput; output: AgentToolResult<LsToolDetails> };
 };
 
-// The message shapes that carry typed tool parts on the session wire (history
-// reads and `session.message.chunk` events). Metadata stays loose: the server
-// stamps richer PiMetadata and clients read it defensively.
-export type PieUIMessage = UIMessage<unknown, UIDataTypes, PiTools>;
+export type PieUserMetadata = {
+  /** Pi session id (a uuid we assign via `--session-id`). */
+  sessionId: string;
+  /** JSONL entry time. Not the worked-for span. */
+  timestamp?: string;
+};
+
+export type PieAssistantMetadata = {
+  /** Pi session id (a uuid we assign via `--session-id`). */
+  sessionId: string;
+  messageStartTimestamp?: string;
+  messageEndTimestamp?: string;
+};
+
+// SDK default `UIDataTypes` is `Record<string, unknown>`.
+export type PieDataTypes = {
+  retry: {
+    errorMessage: string;
+    attempt?: number;
+    maxAttempts?: number;
+  };
+  inspector: ReadonlyArray<{
+    file: string;
+    line: number;
+    column: number;
+  }>;
+};
+
+export type PieUserUIMessage = UIMessage<PieUserMetadata, PieDataTypes, PiTools> & {
+  role: "user";
+};
+export type PieAssistantUIMessage = UIMessage<PieAssistantMetadata, PieDataTypes, PiTools> & {
+  role: "assistant";
+};
+export type PieUIMessage = PieUserUIMessage | PieAssistantUIMessage;
 export type PieUIMessageChunk = InferUIMessageChunk<PieUIMessage>;
 
 /** Pi's seven static tool parts plus extension/custom dynamic tools. */

@@ -255,17 +255,17 @@ carries identity survives.
 
 #### Typography and rhythm
 
-Use Inter Variable (`--font-sans`) for everything the operator reads: headings,
-labels, controls, prose, counts, session names. Use Geist Mono (`--font-mono`)
-only for code, commands, file paths, diffs, and short operational identifiers.
-Set only the identifier in mono, not its sentence or its whole row.
+Use the system text face (`--font-sans`, `-apple-system-body`) for everything
+the operator reads: headings, labels, controls, prose, counts, session names.
+Use Geist Mono (`--font-mono`) only for code, commands, file paths, diffs, and
+short operational identifiers. Set only the identifier in mono, not its sentence
+or its whole row.
 
-The interface baseline is `text-sm`; the transcript reads at `text-sm`, and
-`text-xs` is for genuinely subordinate metadata. Emphasis is `font-medium`;
-heavier weights belong to a surface-defining title only. Do not create arbitrary
-font sizes or numeric weights. Equivalent peers always share role, size, weight,
-and line height; never resize one because its string is longer or its number is
-larger.
+The interface baseline is `text-sm` at weight 430, with weight synthesis off.
+Emphasis is `font-medium`; heavier weights belong to a surface-defining title
+only. Do not create arbitrary font sizes or numeric weights. Equivalent peers
+always share role, size, weight, and line height; never resize one because its
+string is longer or its number is larger.
 
 Build vertical rhythm from relationships:
 

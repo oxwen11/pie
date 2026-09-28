@@ -11,7 +11,7 @@ import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { filePanel } from "./file-panel";
 import { FileState } from "./file-state";
-import { FileWorkspaceLayout } from "./file-workspace-layout";
+import { FileWorkspace } from "./file-workspace";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export const filesPanel = definePanel({
@@ -72,14 +72,14 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
   );
 
   return (
-    <FileWorkspaceLayout
+    <FileWorkspace
+      label={workspaceName}
       preview={
         <FileState icon={FileTextIcon} prominentIcon title="打开文件">
           从工作区目录树中选择文件
         </FileState>
       }
       tree={treePane}
-      treeLabel={workspaceName}
     />
   );
 }

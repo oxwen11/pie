@@ -66,7 +66,7 @@ function SlashCommandPopup({
 }: SlashCommandPopupProps) {
   return (
     <div
-      className="bg-popover/95 text-popover-foreground w-full scrollbar-thin overflow-y-auto rounded-2xl border text-sm backdrop-blur-sm"
+      className="bg-popover/95 text-popover-foreground w-full scrollbar-thin overflow-y-auto rounded-2xl border p-2 text-sm backdrop-blur-sm"
       style={{ maxHeight: "var(--slash-command-menu-max-height, 320px)" }}
     >
       {state.status === "loading" ? (

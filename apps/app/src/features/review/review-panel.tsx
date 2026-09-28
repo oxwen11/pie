@@ -16,6 +16,13 @@ import { useCallback, useState, type ReactNode } from "react";
 import { asRecord, type PanelHandle } from "@/components/layout/content-panel/model/panel";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import { definePanel } from "@/components/layout/content-panel/react/view";
+import {
+  WorkspaceSplit,
+  WorkspaceSplitPanels,
+  WorkspaceSplitPrimary,
+  WorkspaceSplitSecondary,
+  WorkspaceSplitTrigger,
+} from "@/components/layout/workspace-split";
 import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { ReviewDiffPane } from "./review-diff-pane";
@@ -23,7 +30,6 @@ import { isReviewMode, reviewHeading } from "./review-file-status";
 import { ReviewState } from "./review-state";
 import { ReviewToolbar } from "./review-toolbar";
 import { ReviewTreePane } from "./review-tree-pane";
-import { ReviewWorkspaceLayout } from "./review-workspace-layout";
 
 export interface ReviewPayload {
   readonly mode?: GitReviewMode;
@@ -161,28 +167,8 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
   if (placeholder !== null) return placeholder;
 
   return (
-    <ReviewWorkspaceLayout
-      files={
-        <ReviewTreePane
-          files={review.data?.files ?? []}
-          onSelectFile={selectFile}
-          sessionId={panel.sessionKey}
-          tree={tree}
-          workspaceName={workspaceName}
-          workspacePath={tree.data?.cwd ?? ""}
-        />
-      }
-      filesLabel={workspaceName}
-      preview={
-        <ReviewDiffPane
-          diffs={diffs}
-          key={`${mode}:${other ?? ""}`}
-          locateRequest={locateRequest}
-          path={selectedPath}
-          review={review}
-        />
-      }
-      toolbar={
+    <WorkspaceSplit label={workspaceName}>
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b px-2">
         <ReviewToolbar
           branch={repositoryBranch}
           heading={review.data === undefined ? "" : reviewHeading(review.data)}
@@ -200,8 +186,30 @@ function ReviewPanelView({ instance }: { instance: PanelHandle<ReviewPayload> })
           other={other}
           refreshing={review.isFetching || branch.isFetching || tree.isFetching}
         />
-      }
-    />
+        <WorkspaceSplitTrigger />
+      </div>
+      <WorkspaceSplitPanels>
+        <WorkspaceSplitPrimary>
+          <ReviewDiffPane
+            diffs={diffs}
+            key={`${mode}:${other ?? ""}`}
+            locateRequest={locateRequest}
+            path={selectedPath}
+            review={review}
+          />
+        </WorkspaceSplitPrimary>
+        <WorkspaceSplitSecondary>
+          <ReviewTreePane
+            files={review.data?.files ?? []}
+            onSelectFile={selectFile}
+            sessionId={panel.sessionKey}
+            tree={tree}
+            workspaceName={workspaceName}
+            workspacePath={tree.data?.cwd ?? ""}
+          />
+        </WorkspaceSplitSecondary>
+      </WorkspaceSplitPanels>
+    </WorkspaceSplit>
   );
 }
 

@@ -1,12 +1,11 @@
-import { Effect, FileSystem } from "effect";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { Effect } from "effect";
 
 import {
   runTailscaleCommand,
   TAILSCALE_SERVE_TIMEOUT_MS,
   type FindTailscaleCommandOptions,
 } from "./command";
-import { TailscaleCommandError, type TailscaleClientMissingError } from "./errors";
+import { TailscaleCommandError } from "./errors";
 
 export const DEFAULT_TAILSCALE_SERVE_PORT = 443;
 
@@ -48,8 +47,6 @@ export function decodeTailscaleServeOwnership(
   return "foreign";
 }
 
-type TailscaleCli = ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem;
-
 export function tailscaleServeEnableArgs(input: {
   readonly localPort: number;
   readonly servePort?: number;
@@ -78,71 +75,65 @@ export function buildTailscaleHttpsBaseUrl(input: {
   return url.toString();
 }
 
-export const readTailscaleServeOwnership = (input: {
-  readonly localPort: number;
-  readonly env?: NodeJS.ProcessEnv;
-}): Effect.Effect<
-  TailscaleServeOwnership,
-  TailscaleCommandError | TailscaleClientMissingError,
-  TailscaleCli
-> =>
-  runTailscaleCommand(["serve", "status", "--json"], TAILSCALE_SERVE_TIMEOUT_MS, {
-    env: input.env,
-  }).pipe(
-    Effect.map((result) => decodeTailscaleServeOwnership(result.stdout, input.localPort)),
-    Effect.catchTag("TailscaleCommandError", (error) =>
-      error.stderrDiagnostic === "no-existing-handler"
-        ? Effect.succeed("empty" as const)
-        : Effect.fail(error),
-    ),
-  );
+export const readTailscaleServeOwnership = Effect.fn("readTailscaleServeOwnership")(
+  function* (input: { readonly localPort: number; readonly env?: NodeJS.ProcessEnv }) {
+    return yield* runTailscaleCommand(["serve", "status", "--json"], TAILSCALE_SERVE_TIMEOUT_MS, {
+      env: input.env,
+    }).pipe(
+      Effect.map((result) => decodeTailscaleServeOwnership(result.stdout, input.localPort)),
+      Effect.catchTag("TailscaleCommandError", (error) =>
+        error.stderrDiagnostic === "no-existing-handler"
+          ? Effect.succeed("empty" as const)
+          : Effect.fail(error),
+      ),
+    );
+  },
+);
 
-export const ensureTailscaleServe = (input: {
+export const ensureTailscaleServe = Effect.fn("ensureTailscaleServe")(function* (input: {
   readonly localPort: number;
   readonly servePort?: number;
   readonly localHost?: string;
   readonly env?: NodeJS.ProcessEnv;
-}): Effect.Effect<void, TailscaleCommandError | TailscaleClientMissingError, TailscaleCli> =>
-  Effect.gen(function* () {
-    const ownership = yield* readTailscaleServeOwnership({
-      localPort: input.localPort,
+}) {
+  const ownership = yield* readTailscaleServeOwnership({
+    localPort: input.localPort,
+    env: input.env,
+  });
+  if (ownership === "ours") return;
+  if (ownership === "foreign") {
+    yield* new TailscaleCommandError({
+      message: "Tailscale Serve HTTPS is already in use by another handler",
+      command: tailscaleServeEnableArgs(input),
+      exitCode: 1,
+    });
+  } else {
+    yield* runTailscaleCommand(tailscaleServeEnableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS, {
       env: input.env,
     });
-    if (ownership === "ours") return;
-    if (ownership === "foreign") {
-      yield* new TailscaleCommandError({
-        message: "Tailscale Serve HTTPS is already in use by another handler",
-        command: tailscaleServeEnableArgs(input),
-        exitCode: 1,
-      });
-    } else {
-      yield* runTailscaleCommand(tailscaleServeEnableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS, {
-        env: input.env,
-      });
-    }
-  });
+  }
+});
 
-export const disableTailscaleServe = (
+export const disableTailscaleServe = Effect.fn("disableTailscaleServe")(function* (
   input: {
     readonly servePort?: number;
     readonly localPort?: number;
     readonly env?: NodeJS.ProcessEnv;
   } = {},
-): Effect.Effect<void, TailscaleCommandError | TailscaleClientMissingError, TailscaleCli> =>
-  Effect.gen(function* () {
-    if (input.localPort !== undefined) {
-      const ownership = yield* readTailscaleServeOwnership({
-        localPort: input.localPort,
-        env: input.env,
-      });
-      if (ownership !== "ours") return;
-    }
-    yield* runTailscaleCommand(tailscaleServeDisableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS, {
+) {
+  if (input.localPort !== undefined) {
+    const ownership = yield* readTailscaleServeOwnership({
+      localPort: input.localPort,
       env: input.env,
-    } satisfies FindTailscaleCommandOptions).pipe(
-      Effect.asVoid,
-      Effect.catchTag("TailscaleCommandError", (error) =>
-        error.stderrDiagnostic === "no-existing-handler" ? Effect.void : Effect.fail(error),
-      ),
-    );
-  });
+    });
+    if (ownership !== "ours") return;
+  }
+  yield* runTailscaleCommand(tailscaleServeDisableArgs(input), TAILSCALE_SERVE_TIMEOUT_MS, {
+    env: input.env,
+  } satisfies FindTailscaleCommandOptions).pipe(
+    Effect.asVoid,
+    Effect.catchTag("TailscaleCommandError", (error) =>
+      error.stderrDiagnostic === "no-existing-handler" ? Effect.void : Effect.fail(error),
+    ),
+  );
+});

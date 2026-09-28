@@ -11,7 +11,7 @@ import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 import { createFileNavigationTracker, type FileNavigationTracker } from "./file-navigation";
 import { FilePreviewPane } from "./file-preview-pane";
 import { FileState } from "./file-state";
-import { FileWorkspaceLayout } from "./file-workspace-layout";
+import { FileWorkspace } from "./file-workspace";
 import { WorkspaceTreePane } from "./workspace-tree-pane";
 
 export interface FilePayload {
@@ -121,5 +121,5 @@ function FilePanelView({ instance }: { instance: FilePanelHandle }) {
     />
   );
 
-  return <FileWorkspaceLayout preview={preview} tree={treePane} treeLabel={path} />;
+  return <FileWorkspace label={path} preview={preview} tree={treePane} />;
 }

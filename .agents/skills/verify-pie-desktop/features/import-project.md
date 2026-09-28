@@ -4,7 +4,7 @@ Same SPA flow as `.cursor/skills/verify-pie/features/import-project.md`. Drive t
 
 ## How to get to it
 
-Real launch (not Playwright e2e — e2e seeds a project and uses fake-pi):
+Real launch (preferred product proof). Playwright also covers empty-home Import in `apps/desktop/e2e/tests/import-project.spec.ts` (no seeded projects, browse root confined):
 
 ```bash
 pnpm exec pie-verify desktop launch --replace --empty-projects
@@ -17,7 +17,7 @@ pnpm exec pie-verify desktop doctor
 
 ```bash
 # doctor already attached; if not: agent-browser connect 9223
-agent-browser wait --text "Ask Pi anything..."
+agent-browser wait --text "Do Anything, / for skills, @ for context"
 agent-browser find role button --name "Import project" click
 ```
 

@@ -100,8 +100,6 @@ export function ModelSelectorPicker({
     [filter],
   );
 
-  if (models.length === 0) return null;
-
   return (
     <Combobox
       autoHighlight

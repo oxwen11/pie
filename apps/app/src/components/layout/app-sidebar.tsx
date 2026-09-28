@@ -115,25 +115,31 @@ export function AppSidebar() {
       className="w-full [&_[data-slot=scroll-area-scrollbar][data-orientation=vertical]]:mx-0"
     >
       {/* Desktop collapsed panel width is 0, so this spacer can stay mounted. */}
-      <SidebarHeader
-        className={cn(
-          // Keep this literal so require-static-classes can validate it.
-          "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
-          desktop && "px-0",
-        )}
-        data-drag-region=""
-      >
-        {isDesktopMacosHost(platform) ? null : (
-          <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
-        )}
-        {!desktop && expanded ? <SidebarTrigger /> : null}
+      <SidebarHeader className="p-0" data-drag-region="">
+        <div
+          className={cn(
+            // Keep this literal so require-static-classes can validate it.
+            "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4",
+            desktop && "px-0",
+          )}
+        >
+          {isDesktopMacosHost(platform) ? null : (
+            <BrandMark className={desktop ? "ms-[var(--shell-sidebar-brand-inset)]" : undefined} />
+          )}
+          {!desktop && expanded ? <SidebarTrigger /> : null}
+        </div>
+        {/* Pinned here, outside SidebarContent's ScrollArea, so New chat stays
+          visible while the session list scrolls. pb-1 + the group's pt-0 below
+          keeps the 4px row rhythm, so the pinned row reads as part of the list. */}
+        <SidebarMenu className="px-2 pb-1">
+          <NewChatNavItem />
+        </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent className="[-webkit-app-region:no-drag]">
-        <SidebarGroup>
+      <SidebarContent>
+        <SidebarGroup className="pt-0">
           <SidebarGroupContent>
             <SidebarMenu>
-              <NewChatNavItem />
               <SchedulesNavItem />
               <PullRequestsNavItem />
               <PluginsNavItem />

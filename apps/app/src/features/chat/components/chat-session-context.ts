@@ -4,8 +4,10 @@ import type { StoreApi } from "zustand/vanilla";
 
 import type { AgentResponse } from "@/features/chat/runtime/agent-requests";
 import type { ChatStoreState } from "@/features/chat/runtime/chat-state";
+import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 export type ChatSessionValue = {
+  sessionRef: EnvironmentSessionRef;
   sessionId: string;
   store: StoreApi<ChatStoreState>;
   prompt: (text: string, delivery?: "steer" | "followUp") => void;

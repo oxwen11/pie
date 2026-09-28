@@ -17,10 +17,10 @@ layer(NodeServices.layer, { excludeTestServices: true })("bundled Pi host module
       const server = yield* fs.readFileString(serverBundle);
       const piProcess = yield* fs.readFileString(piProcessBundle);
 
-      // tsdown folds PI_BUNDLED_NODE so the alias fallback is dead code.
-      assert.match(server, /virtualModules: VIRTUAL_MODULES/);
+      // tsdown folds PI_BUNDLED_NODE so the embedded-module branch is always selected.
+      assert.match(server, /usesEmbeddedModules = [^;]+ \|\| true/);
+      assert.match(server, /virtualModules: await getVirtualModules\(\)/);
       assert.match(server, /tryNative: false/);
-      assert.doesNotMatch(server, /getAliases/);
       assert.doesNotMatch(server, /typeof PI_BUNDLED_NODE/);
 
       assert.match(piProcess, /isBundledNode = true/);

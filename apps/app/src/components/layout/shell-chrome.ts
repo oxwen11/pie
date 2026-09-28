@@ -3,7 +3,7 @@ import type { CSSProperties } from "react";
 import type { Platform } from "@/platform";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
-/** Matches `ShellSidebarPanel` / `ShellMainPanel` `md:py-1` and `md:ps-1`. */
+/** Matches shell column `md:py-1` / `md:ps-1`. */
 const SHELL_GUTTER_PX = 4;
 
 /** Electron `trafficLightPosition.x` (see `main-window.ts`). */

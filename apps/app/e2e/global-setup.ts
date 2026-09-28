@@ -4,17 +4,18 @@ import os from "node:os";
 import path from "node:path";
 import url from "node:url";
 
+import { DEFAULT_E2E_REPLY, e2ePiProcessEnv } from "../../../tools/testing/seed-e2e-pi-agent.mts";
+
 const fromHere = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
 const repoRoot = fromHere("../../..");
 const cliEntry = fromHere("../../../packages/pie/src/node/cli.ts");
 const tsx = path.join(repoRoot, "node_modules/.bin/tsx");
-const fakePi = path.join(repoRoot, "tools/testing/fake-pi.mjs");
 const fakeGh = path.join(repoRoot, "tools/testing/fake-gh.mjs");
 
 const SAMPLE = "sample";
 const SAMPLE_GIT = "sample-git";
-const FAKE_REPLY = "E2E fake Pi reply";
+const FAKE_REPLY = DEFAULT_E2E_REPLY;
 
 function writeSample(workspace: string): void {
   const sample = path.join(workspace, SAMPLE);
@@ -84,8 +85,7 @@ export default async function setup({
     PIE_HOME: home,
     PIE_PORT: "0",
     PIE_E2E: "1",
-    PIE_E2E_PI_EXECUTABLE: fakePi,
-    PIE_E2E_PI_RESPONSE: FAKE_REPLY,
+    ...e2ePiProcessEnv(home),
     PIE_PROJECT_BROWSE_ROOT: workspace,
     PIE_DAEMON_COMPATIBILITY_KEY: "githash:00000000",
   };

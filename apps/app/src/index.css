@@ -1,4 +1,5 @@
 @import "@getpie/ui/globals.css";
+@import "react-medium-image-zoom/dist/styles.css";
 @import "tw-shimmer";
 
 /* PieLoader mark size. Relative to the surrounding text size; 0.7em ≈ 10px at
@@ -123,6 +124,20 @@
   }
 }
 
+/* Theme the image-zoom library through Pie's semantic tokens. */
+.chat-image-preview-dialog [data-rmiz-modal-overlay="visible"] {
+  background-color: var(--background);
+}
+
+[data-rmiz-btn-zoom],
+[data-rmiz-btn-unzoom] {
+  width: 44px;
+  height: 44px;
+  background-color: var(--foreground);
+  color: var(--background);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
 /* TipTap Placeholder extension renders via ::before on the empty first paragraph. */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
@@ -132,10 +147,15 @@
   height: 0;
 }
 
-form:has(> [data-slot="chat-input"]) {
+/* Session one-line row. Draft (no data-layout) stays a column. */
+form[data-layout="inline"]:has(> [data-slot="chat-input"]) {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: end;
+
+  [data-slot="chat-input"] .tiptap {
+    padding-bottom: 0.75rem;
+  }
 }
 
 [data-slot="card-frame"]:has([data-slot="chat-input"]) {

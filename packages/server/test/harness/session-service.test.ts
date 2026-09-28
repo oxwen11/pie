@@ -86,7 +86,10 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
         }),
       );
       assert.deepEqual(result.listed, [first, second]);
-      assert.deepEqual(result.stored.pullRequestRefs, [first, second]);
+      assert.deepEqual(
+        result.stored.pullRequests?.map((link) => link.ref),
+        [first, second],
+      );
     }),
   );
 

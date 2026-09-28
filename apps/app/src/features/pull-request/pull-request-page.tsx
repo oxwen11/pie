@@ -1,6 +1,5 @@
 import type {
   PullRequestAction,
-  PullRequestActionInput,
   PullRequestDiff,
   PullRequestListItem,
   PullRequestRef,
@@ -15,19 +14,16 @@ import {
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@getpie/ui/components/input-group";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
-import { ORPCError } from "@orpc/client";
-import { skipToken, useMutation, useQuery, type UseQueryResult } from "@tanstack/react-query";
+import { skipToken, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { ChevronRight, SearchIcon } from "lucide-react";
 import { useState } from "react";
-import { Group, Separator } from "react-resizable-panels";
-import { toast } from "sonner";
+import { Group } from "react-resizable-panels";
 
+import { PanelSeparator } from "@/components/layout/panel-separator";
 import { ResizablePanel } from "@/components/layout/resizable-panel";
-import Loader from "@/components/loader";
 import { useLocalOrpc } from "@/lib/environment-orpc";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
-import { pullRequestActionError } from "./pull-request-action-error";
 import { PullRequestInspect } from "./pull-request-inspect";
 import { PullRequestPanelState } from "./pull-request-panel-state";
 import {
@@ -37,6 +33,7 @@ import {
   pullRequestRepositoryLabel,
   samePullRequestRef,
 } from "./pull-request-presentation";
+import { usePullRequestAction } from "./use-pull-request-action";
 
 export function PullRequestPage() {
   const orpcQueryUtils = useLocalOrpc();
@@ -57,39 +54,18 @@ export function PullRequestPage() {
       input: selected === undefined ? skipToken : { pullRequest: selected.ref },
     }),
   );
-  const [intent, setIntent] = useState<PullRequestActionInput | null>(null);
-  const [postActionRefreshFailed, setPostActionRefreshFailed] = useState(false);
-  const refresh = (): void => {
-    void detail.refetch().then((result) => {
-      if (!result.isError) setPostActionRefreshFailed(false);
-      return undefined;
+  const { intent, pending, postActionRefreshFailed, refresh, run, setIntent } =
+    usePullRequestAction({
+      mutationFn: (input) => orpcQueryUtils.pullRequest.runAction.call(input),
+      mutationKey: orpcQueryUtils.pullRequest.runAction.key(),
+      onApplied: () => {
+        void list.refetch();
+      },
+      refetchDetail: () => detail.refetch(),
+      refetchDiff: () => diff.refetch(),
     });
-    void diff.refetch();
-  };
-  const action = useMutation({
-    mutationKey: orpcQueryUtils.pullRequest.runAction.key(),
-    mutationFn: (input: PullRequestActionInput) => orpcQueryUtils.pullRequest.runAction.call(input),
-    onMutate: () => setPostActionRefreshFailed(false),
-    onSuccess: () => {
-      setIntent(null);
-      toast.success("Pull request action applied");
-      void list.refetch();
-      void detail.refetch().then(
-        (result) => setPostActionRefreshFailed(result.isError),
-        () => setPostActionRefreshFailed(true),
-      );
-      void diff.refetch();
-    },
-    onError: (error) => {
-      toast.error(pullRequestActionError(error));
-      if (error instanceof ORPCError && error.code === "STALE_CONTEXT") refresh();
-    },
-  });
 
-  if (list.isPending && list.data === undefined) {
-    return <Loader />;
-  }
-
+  const listLoading = list.isPending && list.data === undefined;
   const listError = list.isError ? list.error.message : null;
 
   return (
@@ -108,17 +84,15 @@ export function PullRequestPage() {
           <PullRequestListPane
             error={listError}
             items={items}
+            loading={listLoading}
             onSelect={setSelectedRef}
             selected={selected}
           />
         </ResizablePanel>
-        <Separator
-          aria-label="Resize pull request list"
-          className="after:bg-border hover:after:bg-foreground/30 data-[separator=active]:after:bg-primary relative w-1.5 bg-transparent after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 data-[separator=active]:after:w-0.5"
-        />
+        <PanelSeparator label="Resize pull request list" />
         <ResizablePanel className="flex min-w-0 flex-col" minSize="18rem">
           <PullRequestPageDetail
-            actionPending={action.isPending}
+            actionPending={pending}
             diff={diff}
             error={detail.error}
             onAction={(next) => {
@@ -138,9 +112,9 @@ export function PullRequestPage() {
       {intent !== null ? (
         <ConfirmPullRequestAction
           input={intent}
-          loading={action.isPending}
+          loading={pending}
           onCancel={() => setIntent(null)}
-          onConfirm={() => action.mutate(intent)}
+          onConfirm={() => run(intent)}
         />
       ) : null}
     </>
@@ -150,11 +124,13 @@ export function PullRequestPage() {
 function PullRequestListPane({
   error,
   items,
+  loading,
   onSelect,
   selected,
 }: {
   error: string | null;
   items: ReadonlyArray<PullRequestListItem>;
+  loading: boolean;
   onSelect: (ref: PullRequestRef) => void;
   selected: PullRequestListItem | undefined;
 }) {
@@ -185,7 +161,7 @@ function PullRequestListPane({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-3">
         {error !== null ? (
           <p className="text-muted-foreground px-2 py-6 text-sm">{error}</p>
-        ) : visible.length === 0 ? (
+        ) : loading ? null : visible.length === 0 ? (
           <p className="text-muted-foreground px-2 py-6 text-sm">
             {query.trim().length > 0 ? "No matching pull requests." : "No open pull requests."}
           </p>

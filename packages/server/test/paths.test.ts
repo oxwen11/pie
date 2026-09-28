@@ -1,3 +1,4 @@
+import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -8,6 +9,7 @@ import {
   defaultPieHomeDir,
   logsDirectory,
   resolveDaemonDirectory,
+  resolveChatProjectsDir,
   resolvePieHome,
   resolveProjectBrowseRoot,
   resourceSourceDirectory,
@@ -38,6 +40,16 @@ describe("resolvePieHome", () => {
   it("treats an empty PIE_HOME as unset", () => {
     expect(resolvePieHome({ PIE_HOME: "" })).toBe(resolvePieHome({}));
     expect(resolvePieHome({ PIE_HOME: "   " })).toBe(resolvePieHome({}));
+  });
+});
+
+describe("resolveChatProjectsDir", () => {
+  it("stays ~/Pie unless a verify run sets an isolated directory", () => {
+    expect(resolveChatProjectsDir({})).toBe(path.join(os.homedir(), "Pie"));
+    expect(resolveChatProjectsDir({ PIE_CHAT_PROJECTS_DIR: "  " })).toBe(
+      path.join(os.homedir(), "Pie"),
+    );
+    expect(resolveChatProjectsDir({ PIE_CHAT_PROJECTS_DIR: "/tmp/run/Pie" })).toBe("/tmp/run/Pie");
   });
 });
 

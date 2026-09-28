@@ -102,11 +102,6 @@ export function resolvePiExecutable(
   };
 }
 
-/** What `availability` should stat or PATH-search. */
-export function piAvailabilityTarget(executable: PiExecutable): string {
-  return executable.prefixArgs.at(-1) ?? executable.command;
-}
-
 const BUN_MISSING_REASON = "Bun was not found. Install Bun.";
 const BUN_PROCESS_MISSING_REASON = "pie-pi-process entry was not found.";
 

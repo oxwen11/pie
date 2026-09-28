@@ -28,7 +28,7 @@
     "clean": "git clean -xdf node_modules dist .turbo"
   },
   "dependencies": {
-    "@earendil-works/pi-coding-agent": "0.85.1",
+    "@earendil-works/pi-coding-agent": "catalog:pi",
     "@effect/platform-node": "catalog:effect",
     "@ff-labs/pi-fff": "0.10.6",
     "@getpie/contract": "workspace:*",
@@ -38,6 +38,7 @@
     "@orpc/server": "catalog:orpc",
     "ai": "catalog:",
     "effect": "catalog:effect",
+    "mdast-util-from-markdown": "2.0.2",
     "node-pty": "1.1.0",
     "simple-git": "catalog:",
     "uuid": "catalog:",

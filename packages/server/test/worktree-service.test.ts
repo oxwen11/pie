@@ -56,6 +56,32 @@ layer(NodePlatformLayer)("WorktreeService", (it) => {
     }).pipe(Effect.provide(GitLayer), Effect.provide(WorktreeLayer)),
   );
 
+  it.effect("cleans up through a symlinked home without permitting a symlink escape", () =>
+    Effect.gen(function* () {
+      const fileSystem = yield* FileSystem.FileSystem;
+      const home = yield* fileSystem.makeTempDirectoryScoped({ prefix: "pie-home-alias-" });
+      const actualHome = path.join(home, "actual");
+      const aliasHome = path.join(home, "alias");
+      yield* fileSystem.makeDirectory(actualHome);
+      yield* fileSystem.symlink(actualHome, aliasHome);
+      const services = yield* Layer.build(
+        WorktreeServiceLayer.pipe(Layer.provide(layerPaths(aliasHome))),
+      );
+      const dir = yield* repo;
+      yield* Effect.gen(function* () {
+        const worktrees = yield* WorktreeService;
+        const created = yield* worktrees.create(dir);
+        const escape = path.join(aliasHome, "worktrees", "escape");
+        yield* fileSystem.symlink(dir, escape);
+        const failure = yield* worktrees.remove(escape).pipe(Effect.flip);
+        assert.equal(failure._tag, "WorkspacePathEscape");
+        assert.equal(yield* fileSystem.exists(dir), true);
+        yield* worktrees.remove(created.path);
+        assert.equal(yield* fileSystem.exists(created.path), false);
+      }).pipe(Effect.provide(services));
+    }),
+  );
+
   it.effect("creates a worktree from a specified base ref", () =>
     Effect.gen(function* () {
       const dir = yield* repo;

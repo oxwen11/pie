@@ -2,7 +2,7 @@ import { definePlugin, defineRule } from "@oxlint/plugins";
 import type { ESTree } from "@oxlint/plugins";
 
 // Enforces TanStack Query cache-policy conventions in
-// .agents/rules/frontend-state.md: do not repeat QueryClient defaults.
+// .agents/rules/topics/frontend-state.md: do not repeat QueryClient defaults.
 // Per-query capabilities (select, enabled, retry, placeholderData, or a
 // cache option that actually differs) stay at the call site.
 

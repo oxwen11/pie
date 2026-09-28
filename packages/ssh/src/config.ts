@@ -4,7 +4,6 @@ import path from "node:path";
 import { Effect, FileSystem, type PlatformError } from "effect";
 
 import { SshHostDiscoveryError } from "./errors";
-import type { DiscoveredSshHost } from "./target";
 
 const NO_HOSTS: ReadonlyArray<string> = [];
 
@@ -53,29 +52,26 @@ function globToRegExp(pattern: string): RegExp {
   );
 }
 
-const expandGlob = (
-  pattern: string,
-): Effect.Effect<ReadonlyArray<string>, PlatformError.PlatformError, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    if (!pattern.includes("*") && !pattern.includes("?")) {
-      return (yield* fs.exists(pattern)) ? [pattern] : NO_HOSTS;
-    }
+const expandGlob = Effect.fn("expandGlob")(function* (pattern: string) {
+  const fs = yield* FileSystem.FileSystem;
+  if (!pattern.includes("*") && !pattern.includes("?")) {
+    return (yield* fs.exists(pattern)) ? [pattern] : NO_HOSTS;
+  }
 
-    const directory = path.dirname(pattern);
-    const basePattern = path.basename(pattern);
-    if (!(yield* fs.exists(directory))) return NO_HOSTS;
+  const directory = path.dirname(pattern);
+  const basePattern = path.basename(pattern);
+  if (!(yield* fs.exists(directory))) return NO_HOSTS;
 
-    const matcher = globToRegExp(basePattern);
-    const entries = yield* fs.readDirectory(directory);
-    const matchedPaths: string[] = [];
-    for (const entry of entries) {
-      if (!matcher.test(entry)) continue;
-      const entryPath = path.join(directory, entry);
-      if (yield* fs.exists(entryPath)) matchedPaths.push(entryPath);
-    }
-    return Array.from(matchedPaths).sort((left, right) => left.localeCompare(right));
-  });
+  const matcher = globToRegExp(basePattern);
+  const entries = yield* fs.readDirectory(directory);
+  const matchedPaths: string[] = [];
+  for (const entry of entries) {
+    if (!matcher.test(entry)) continue;
+    const entryPath = path.join(directory, entry);
+    if (yield* fs.exists(entryPath)) matchedPaths.push(entryPath);
+  }
+  return Array.from(matchedPaths).sort((left, right) => left.localeCompare(right));
+});
 
 export const collectSshConfigAliasesFromFile = (
   filePath: string,
@@ -124,10 +120,8 @@ export const collectSshConfigAliasesFromFile = (
     return Array.from(aliases).sort((left, right) => left.localeCompare(right));
   });
 
-export const discoverSshHosts = (
-  input: { readonly homeDir?: string } = {},
-): Effect.Effect<ReadonlyArray<DiscoveredSshHost>, SshHostDiscoveryError, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
+export const discoverSshHosts = Effect.fn("discoverSshHosts")(
+  function* (input: { readonly homeDir?: string } = {}) {
     const homeDir = input.homeDir ?? os.homedir();
     if (homeDir.trim().length === 0) return [];
 
@@ -142,12 +136,15 @@ export const discoverSshHosts = (
       port: null,
       source: "ssh-config" as const,
     }));
-  }).pipe(
-    Effect.mapError(
-      (cause) =>
-        new SshHostDiscoveryError({
-          message: "Failed to discover SSH hosts.",
-          cause,
-        }),
+  },
+  (effect) =>
+    effect.pipe(
+      Effect.mapError(
+        (cause) =>
+          new SshHostDiscoveryError({
+            message: "Failed to discover SSH hosts.",
+            cause,
+          }),
+      ),
     ),
-  );
+);

@@ -7,3 +7,10 @@ A monorepo for building in-browser developer tooling around AI coding agents. It
 
 > [!NOTE]
 > This project is in active development. Feedback and pull requests are welcome!
+
+## Documentation
+
+Start with the [documentation index](docs/README.md) for architecture decisions,
+open proposals, and operational references.
+See [CONTEXT.md](CONTEXT.md) for domain terminology and [AGENTS.md](AGENTS.md) for
+contributor commands and repository rules.

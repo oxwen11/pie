@@ -5,7 +5,7 @@ import type {
   SessionSummary,
   SessionWorkspace,
 } from "@getpie/contract";
-import type { PullRequestRef } from "@getpie/contract/pull-request";
+import { normalizePullRequestRef, type PullRequestRef } from "@getpie/contract/pull-request";
 import { Context, Effect, Layer } from "effect";
 
 import type { ProjectNotFound, SessionNotFound, StoreReadError, StoreWriteError } from "../errors";
@@ -178,7 +178,7 @@ export const SessionMetadataLayer: Layer.Layer<
         ref: SessionRef,
       ) {
         return yield* readMetadata(ref).pipe(
-          Effect.map((metadata) => metadata.pullRequestRefs ?? []),
+          Effect.map((metadata) => (metadata.pullRequests ?? []).map((link) => link.ref)),
           inSession(ref),
         );
       }),
@@ -191,13 +191,25 @@ export const SessionMetadataLayer: Layer.Layer<
           ref,
           readMetadata(ref).pipe(
             Effect.flatMap((metadata) => {
-              const existing = metadata.pullRequestRefs ?? [];
-              if (existing.some((candidate) => samePullRequestRef(candidate, pullRequest))) {
+              const normalized = normalizePullRequestRef(pullRequest);
+              const existing = metadata.pullRequests ?? [];
+              if (existing.some((link) => samePullRequestRef(link.ref, normalized))) {
                 return Effect.void;
               }
               return repo.write({
                 ...metadata,
-                pullRequestRefs: [...existing, pullRequest],
+                pullRequests: [
+                  ...existing,
+                  {
+                    ref: normalized,
+                    source: "agent",
+                    linkedAt: new Date().toISOString(),
+                    excluded: false,
+                    snapshot: null,
+                    stack: null,
+                    stackCheckedAt: null,
+                  },
+                ],
               });
             }),
           ),

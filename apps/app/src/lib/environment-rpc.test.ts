@@ -34,6 +34,7 @@ describe("createEnvironmentRpc", () => {
     const remote = connection(5001);
     const rpc = createEnvironmentRpc({
       localId: "env-local",
+      localHttpBaseUrl: "http://127.0.0.1:4000",
       localLink: recordingLink(calls),
       queryClient,
       resolveRemote: (id) => (id === "env-remote" ? remote : undefined),
@@ -42,6 +43,8 @@ describe("createEnvironmentRpc", () => {
 
     const local = rpc.for("env-local");
     const firstRemote = rpc.for("env-remote");
+    expect(rpc.httpBaseUrl("env-local")).toBe("http://127.0.0.1:4000");
+    expect(rpc.httpBaseUrl("env-remote")).toBe(remote.httpBaseUrl);
     expect(rpc.for("env-remote")).toBe(firstRemote);
     expect(local.project.list.key()[0]).toBe("env-local");
     expect(firstRemote.project.list.key()[0]).toBe("env-remote");

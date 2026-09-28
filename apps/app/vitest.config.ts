@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-import { appAlias, appDir, browserTsTests } from "./vitest.shared";
+import { appAlias, appDir, browserTsTests } from "./vitest-shared";
 
 export default defineConfig({
   ...appAlias,

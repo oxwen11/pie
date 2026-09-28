@@ -33,6 +33,7 @@ export function SettingsPage(): ReactElement {
 
   return (
     <div className="flex max-w-lg flex-col gap-6 p-6">
+      <h1 className="text-sm font-medium">Settings</h1>
       <section className="flex flex-col gap-3">
         <h2 className="text-sm font-medium">Appearance</h2>
         <RadioGroup
