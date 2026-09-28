@@ -70,6 +70,7 @@ const retryNoticeFrom = (chunk: PieUIMessageChunk): string | undefined => {
 // own reducer (readUIMessageStream — the same machinery the server-side
 // history folds use) turns them into evolving UIMessage snapshots.
 type TurnFold = {
+  messageId: string | undefined;
   readonly enqueue: (chunk: PieUIMessageChunk) => void;
   readonly close: () => void;
 };
@@ -168,7 +169,7 @@ export class Chat {
         if (event.chunk.type === "data-retry") break;
         if (!this.#recoverTurnIds.has(event.turnId)) {
           if (event.chunk.type === "error") this.#erroredTurnIds.add(event.turnId);
-          this.#turnFold(event.turnId).enqueue(event.chunk);
+          this.#foldChunk(event.turnId, event.chunk);
         }
         break;
       // Another client's prompt — or this client's own echoed back, whose
@@ -468,7 +469,7 @@ export class Chat {
     for (const chunk of chunks) {
       if (chunk.type === "data-retry") continue;
       if (chunk.type === "error") this.#erroredTurnIds.add(activeTurn.turnId);
-      this.#turnFold(activeTurn.turnId).enqueue(chunk);
+      this.#foldChunk(activeTurn.turnId, chunk);
     }
     if (activeTurn.complete) {
       this.#turnFolds.get(activeTurn.turnId)?.close();
@@ -552,6 +553,21 @@ export class Chat {
     }
   }
 
+  // `readUIMessageStream` keeps one message. A steered segment's `start`
+  // only swaps the id, so without a new reader the next text lands on the
+  // previous assistant parts.
+  #foldChunk(turnId: string, chunk: PieUIMessageChunk): void {
+    const started = chunk.type === "start" ? chunk.messageId : undefined;
+    const open = this.#turnFolds.get(turnId);
+    if (open?.messageId !== undefined && started !== undefined && started !== open.messageId) {
+      open.close();
+      this.#turnFolds.delete(turnId);
+    }
+    const fold = this.#turnFold(turnId);
+    if (started !== undefined) fold.messageId = started;
+    fold.enqueue(chunk);
+  }
+
   #turnFold(turnId: string): TurnFold {
     const existing = this.#turnFolds.get(turnId);
     if (existing) return existing;
@@ -577,6 +593,7 @@ export class Chat {
     })();
     let closed = false;
     const fold: TurnFold = {
+      messageId: undefined,
       enqueue: (chunk) => {
         if (!closed) controller?.enqueue(chunk);
       },
