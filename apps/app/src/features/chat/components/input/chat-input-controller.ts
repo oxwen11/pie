@@ -10,6 +10,8 @@ export interface ChatInputControllerOptions {
    * submit was not consumed (host is not accepting right now) — content stays.
    */
   onSubmit: (text: string) => void | boolean | Promise<void | boolean>;
+  /** Enter on an empty editor. Session composer steers the first follow-up. */
+  onEmptySubmit?: () => void;
   /** TipTap JSON doc to seed the editor (per-session draft restore). */
   initialContent?: JSONContent;
 }
@@ -71,7 +73,10 @@ export class ChatInputController {
   async submit() {
     if (this.#submitting) return;
     const text = this.getText();
-    if (!text.trim()) return;
+    if (!text.trim()) {
+      this.opts.onEmptySubmit?.();
+      return;
+    }
     this.#submitting = true;
     try {
       const consumed = await this.opts.onSubmit(text);
