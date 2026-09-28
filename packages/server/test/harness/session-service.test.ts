@@ -5,7 +5,6 @@ import { layer } from "@effect/vitest";
 import { isSessionScopedEvent, type SessionRef, type PieUIMessage } from "@getpie/contract";
 import { Effect, Fiber, FileSystem, Layer, Logger, References, Stream } from "effect";
 
-import { piSessionDir } from "../../src/harness/pi/transcript-path";
 import { structured, type LogRecord } from "../log-record";
 import { NodePlatformLayer } from "../platform";
 import { type Fixture, run, UUID_RE } from "./session-service-fixture";
@@ -49,6 +48,8 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
         Effect.gen(function* () {
           const { ref } = yield* fixture.service.create({ projectId: "proj-a", cwd: alias });
           assert.deepEqual(yield* fixture.service.transcriptPath(ref), {});
+          const sessionsRoot = path.join(root, "agent", "sessions");
+          assert.equal(yield* fileSystem.exists(sessionsRoot), false);
           const wrongProject = yield* Effect.exit(
             fixture.service.transcriptPath({
               projectId: "another-project",
@@ -58,11 +59,17 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           assert.equal(wrongProject._tag, "Failure");
           const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
           yield* fixture.repo.write({ ...stored, agentSessionId: "native-1" });
-          const dir = piSessionDir(yield* fileSystem.realPath(canonical));
-          assert.deepEqual(yield* fixture.service.transcriptPath(ref), {});
-          assert.equal(yield* fileSystem.exists(dir), false);
-          yield* fileSystem.makeDirectory(dir, { recursive: true });
-          const file = path.join(dir, "session-without-id-in-filename.jsonl");
+          assert.deepEqual(yield* fixture.service.transcriptPath(ref), { path: undefined });
+          const directories = yield* fileSystem.readDirectory(sessionsRoot);
+          assert.equal(directories.length, 1);
+          const directoryName = directories[0];
+          assert.ok(directoryName);
+          assert.ok(directoryName.endsWith("canonical--"));
+          const file = path.join(
+            sessionsRoot,
+            directoryName,
+            "session-without-id-in-filename.jsonl",
+          );
           yield* fileSystem.writeFileString(
             file,
             `${JSON.stringify({

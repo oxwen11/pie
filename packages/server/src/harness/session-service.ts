@@ -53,7 +53,6 @@ import { PiAgent } from "./pi/agent";
 import { persistDefaultPiModel } from "./pi/resolve-default-model";
 import type { PiAgentRuntime } from "./pi/runtime";
 import { PiSessionTools } from "./pi/session-tools";
-import { piSessionDir } from "./pi/transcript-path";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
 import type { PromptReceipt, RuntimePromptReceipt, UserInput } from "./session-io";
@@ -847,21 +846,12 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                     ),
                   ),
               ),
-              Effect.flatMap((canonical) => {
-                const dir = piSessionDir(canonical);
-                return fs.readDirectory(dir).pipe(
-                  Effect.matchEffect({
-                    onFailure: (error) =>
-                      error.reason._tag === "NotFound"
-                        ? Effect.succeed({})
-                        : Effect.fail(new StoreReadError({ file: dir, cause: error })),
-                    onSuccess: () =>
-                      Effect.sync(() => ({
-                        path: SessionManager.findById(canonical, agentSessionId, dir),
-                      })),
-                  }),
-                );
-              }),
+              Effect.flatMap((canonical) =>
+                Effect.try({
+                  try: () => ({ path: SessionManager.findById(canonical, agentSessionId) }),
+                  catch: (cause) => new StoreReadError({ file: canonical, cause }),
+                }),
+              ),
             );
           }),
           inSession(ref),
