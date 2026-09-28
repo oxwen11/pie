@@ -15,9 +15,11 @@ import {
 export function ChatInputQueue({
   pending,
   onReplace,
+  onSteer,
 }: {
   pending: SessionPendingPrompt;
   onReplace: (next: SessionPendingPrompt) => void;
+  onSteer?: (index: number) => void;
 }) {
   const count = pending.steering.length + pending.followUp.length;
   if (count === 0) return null;
@@ -41,7 +43,9 @@ export function ChatInputQueue({
             key={queuedPromptKey("followUp", pending.followUp, position)}
             kind="followUp"
             text={text}
-            onPromote={() => onReplace(promoteQueuedFollowUp(pending, position))}
+            onPromote={() =>
+              onSteer ? onSteer(position) : onReplace(promoteQueuedFollowUp(pending, position))
+            }
             onRemove={() => onReplace(removeQueuedItem(pending, "followUp", position))}
             onSave={(next) => onReplace(replaceQueuedItem(pending, "followUp", position, next))}
           />

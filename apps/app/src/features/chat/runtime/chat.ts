@@ -54,6 +54,9 @@ const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): Pie
   ),
 });
 
+const promptText = (parts: ReadonlyArray<PromptPart>): string =>
+  parts.map((part) => (part.type === "text" ? part.text : "")).join("");
+
 const retryNoticeFrom = (chunk: PieUIMessageChunk): string | undefined => {
   if (chunk.type !== "data-retry") return undefined;
   const { errorMessage, attempt, maxAttempts } = chunk.data;
@@ -120,6 +123,10 @@ export class Chat {
   // queue_update from clear_queue before the remaining lines are rewritten.
   // Ignore those intermediates so the row the user just edited does not flash.
   #queueWritesInFlight = 0;
+  // Steer click shows the user message immediately. The server echo mints a
+  // new id when Pi actually injects it; claim that echo instead of appending
+  // a second bubble.
+  #optimisticSteers: Array<{ id: string; text: string }> = [];
   #cursor = 0;
   #historyLoaded = false;
   // Non-null while the history floor is loading: live events queue here so
@@ -179,6 +186,11 @@ export class Chat {
         // The sender already cleared its stale error synchronously in prompt().
         // Only a genuinely unseen prompt may clear here: a delayed self-echo
         // must not erase a newer prompt RPC failure.
+        if (this.#claimSteeredEcho(event.messageId, event.parts)) {
+          this.#state.retryNotice = undefined;
+          this.#state.error = undefined;
+          break;
+        }
         if (this.#pushUserMessage(event.messageId, event.parts)) {
           this.#state.retryNotice = undefined;
           this.#state.error = undefined;
@@ -238,6 +250,7 @@ export class Chat {
         // left behind here could never be answered.
         this.#state.clearPendingRequests();
         this.#state.clearPendingPrompt();
+        this.#optimisticSteers = [];
         break;
     }
     // Status is copied off the event (the runtime stamps its post-event
@@ -273,6 +286,7 @@ export class Chat {
     this.#state.historyStatus = "settled";
     this.#state.clearPendingRequests();
     this.#state.clearPendingPrompt();
+    this.#optimisticSteers = [];
     this.#state.retryNotice = undefined;
     this.#state.error = new Error(
       reason === "session_deleted" ? "Session deleted" : "Session closed",
@@ -507,6 +521,19 @@ export class Chat {
     return true;
   }
 
+  #claimSteeredEcho(messageId: string, parts: ReadonlyArray<PromptPart>): boolean {
+    const text = promptText(parts);
+    const index = this.#optimisticSteers.findIndex((item) => item.text === text);
+    if (index === -1) return false;
+    const claimed = this.#optimisticSteers[index];
+    if (claimed === undefined) return false;
+    this.#optimisticSteers.splice(index, 1);
+    this.#state.messages = this.#state.messages.map((message) =>
+      message.id === claimed.id ? { ...message, id: messageId } : message,
+    );
+    return true;
+  }
+
   // Policy, not transport: an empty plan carries nothing to review, so it is
   // approved on sight instead of surfacing a blank card.
   #handleRequest(request: AgentRequest): void {
@@ -670,6 +697,28 @@ export class Chat {
       console.error("Failed to interrupt session", interruptError);
       this.#state.error =
         interruptError instanceof Error ? interruptError : new Error(String(interruptError));
+    }
+  };
+
+  // Codex-style: the clicked steer is a transcript message now, not a queue
+  // row that waits for Pi to inject it. The server queue still moves so the
+  // model receives it; the echo retargets this bubble instead of adding one.
+  steerFollowUp = async (index: number): Promise<void> => {
+    const pending = this.#state.pendingPrompt;
+    const text = pending.followUp[index];
+    if (text === undefined) return;
+    const messageId = generateId();
+    this.#state.pushMessage(toUserMessage(messageId, [{ type: "text", text }]));
+    this.#optimisticSteers.push({ id: messageId, text });
+    try {
+      await this.replaceQueue({
+        steering: [...pending.steering, text],
+        followUp: pending.followUp.filter((_, itemIndex) => itemIndex !== index),
+      });
+    } catch (steerError) {
+      this.#optimisticSteers = this.#optimisticSteers.filter((item) => item.id !== messageId);
+      this.#state.messages = this.#state.messages.filter((message) => message.id !== messageId);
+      throw steerError;
     }
   };
 

@@ -36,11 +36,24 @@ export function SessionComposer({
     branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
   const chat = useChatHandle(sessionRef);
-  const { prompt, interrupt, replaceQueue, store } = useChatSession();
+  const { prompt, interrupt, replaceQueue, steerFollowUp, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
+  const messages = useStore(store, (s) => s.messages);
   const canInterrupt = status === "streaming";
-  const hasQueued = pendingPrompt.steering.length > 0 || pendingPrompt.followUp.length > 0;
+  // A steer already in the transcript should not also sit in the queue.
+  const shownUserText = new Set(
+    messages.flatMap((message) =>
+      message.role === "user"
+        ? message.parts.flatMap((part) => (part.type === "text" ? [part.text] : []))
+        : [],
+    ),
+  );
+  const visiblePending = {
+    steering: pendingPrompt.steering.filter((text) => !shownUserText.has(text)),
+    followUp: pendingPrompt.followUp,
+  };
+  const hasQueued = visiblePending.steering.length > 0 || visiblePending.followUp.length > 0;
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
 
   const controller = useChatComposerController({
@@ -79,7 +92,11 @@ export function SessionComposer({
       header={
         hasQueued ? (
           <CardFrameHeader className="min-w-0 grid-rows-none gap-1 px-3 py-2">
-            <ChatInputQueue onReplace={replaceQueue} pending={pendingPrompt} />
+            <ChatInputQueue
+              onReplace={replaceQueue}
+              onSteer={steerFollowUp}
+              pending={visiblePending}
+            />
           </CardFrameHeader>
         ) : undefined
       }

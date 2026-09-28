@@ -238,7 +238,9 @@ describe("streaming queue", () => {
     await expect.element(page.getByText("queued while streaming")).toBeVisible();
 
     await page.getByRole("button", { name: "Steer queued message" }).click();
-    await waitForText("Steer", 10_000);
+    await expect
+      .element(page.getByRole("button", { name: "Steer queued message" }))
+      .not.toBeInTheDocument();
 
     // Optimistic UI updates before RPC — prove the server queue moved too.
     const sessionId = window.location.pathname.split("/").at(-1);
