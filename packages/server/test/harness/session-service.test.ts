@@ -59,9 +59,20 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
           const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
           yield* fixture.repo.write({ ...stored, agentSessionId: "native-1" });
           const dir = piSessionDir(yield* fileSystem.realPath(canonical));
+          assert.deepEqual(yield* fixture.service.transcriptPath(ref), {});
+          assert.equal(yield* fileSystem.exists(dir), false);
           yield* fileSystem.makeDirectory(dir, { recursive: true });
-          const file = path.join(dir, "2026_native-1.jsonl");
-          yield* fileSystem.writeFileString(file, "");
+          const file = path.join(dir, "session-without-id-in-filename.jsonl");
+          yield* fileSystem.writeFileString(
+            file,
+            `${JSON.stringify({
+              type: "session",
+              version: 3,
+              id: "native-1",
+              timestamp: "2026-01-01T00:00:00.000Z",
+              cwd: canonical,
+            })}\n`,
+          );
           return {
             found: yield* fixture.service.transcriptPath(ref),
             file,

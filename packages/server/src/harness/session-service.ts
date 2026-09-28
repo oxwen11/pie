@@ -1,3 +1,4 @@
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type {
   AgentModelState,
   AgentResponse,
@@ -52,7 +53,7 @@ import { PiAgent } from "./pi/agent";
 import { persistDefaultPiModel } from "./pi/resolve-default-model";
 import type { PiAgentRuntime } from "./pi/runtime";
 import { PiSessionTools } from "./pi/session-tools";
-import { piSessionDir, transcriptPathIn } from "./pi/transcript-path";
+import { piSessionDir } from "./pi/transcript-path";
 import type { SessionInfoResult } from "./pi/types";
 import { inSession } from "./session-identity";
 import type { PromptReceipt, RuntimePromptReceipt, UserInput } from "./session-io";
@@ -854,8 +855,10 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                       error.reason._tag === "NotFound"
                         ? Effect.succeed({})
                         : Effect.fail(new StoreReadError({ file: dir, cause: error })),
-                    onSuccess: (names) =>
-                      Effect.succeed({ path: transcriptPathIn(dir, agentSessionId, names) }),
+                    onSuccess: () =>
+                      Effect.sync(() => ({
+                        path: SessionManager.findById(canonical, agentSessionId, dir),
+                      })),
                   }),
                 );
               }),
