@@ -4,21 +4,21 @@ import path from "node:path";
 
 const here = import.meta.dirname;
 const root = path.resolve(here, "../../..");
-const manifest = path.resolve(root, "native/resource-monitor/Cargo.toml");
-const result = childProcess.spawnSync(
-  "cargo",
-  ["build", "--release", "--locked", "--manifest-path", manifest],
-  {
-    cwd: root,
-    stdio: "inherit",
-  },
-);
-if (result.status !== 0) throw new Error("Failed to build resource monitor");
-
-const source = path.resolve(
-  root,
-  `native/resource-monitor/target/release/pie-resource-monitor${process.platform === "win32" ? ".exe" : ""}`,
-);
+const executable = `pie-resource-monitor${process.platform === "win32" ? ".exe" : ""}`;
+// pie-resource-monitor#build writes the release binary. Rebuild only when this
+// script is invoked outside that task.
+const source = path.resolve(root, "target", "release", executable);
+if (!fs.existsSync(source)) {
+  const result = childProcess.spawnSync(
+    "cargo",
+    ["build", "--release", "--locked", "--package", "pie-resource-monitor"],
+    {
+      cwd: root,
+      stdio: "inherit",
+    },
+  );
+  if (result.status !== 0) throw new Error("Failed to build resource monitor");
+}
 const destination = path.resolve(
   here,
   `../dist/resources/resource-monitor${process.platform === "win32" ? ".exe" : ""}`,

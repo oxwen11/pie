@@ -28,6 +28,8 @@ coverage
 out/
 build
 dist
+# Cargo workspace target (virtual workspace root)
+/target/
 .vscode-test
 .tanstack
 .output
