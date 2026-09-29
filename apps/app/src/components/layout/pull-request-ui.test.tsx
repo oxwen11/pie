@@ -323,6 +323,9 @@ it("shows multiple unrelated PRs as an additional count and preserves neutral un
   await render(<SessionPullRequestIndicator status={current} />);
   const indicator = container.querySelector("a");
   expect(indicator?.textContent).toContain("#1 +1");
+  expect(indicator?.className).toContain("aspect-auto");
+  expect(indicator?.className).toContain("h-5");
+  expect(indicator?.className).not.toContain("aspect-square");
   expect(indicator?.getAttribute("aria-label")).toContain("status unknown");
   expect(indicator?.href).toBe("https://github.com/pie/pie/pull/1");
   expect(indicator?.textContent).not.toContain("Stack");
