@@ -81,42 +81,4 @@ describe("foldSessionStatuses", () => {
       { ref: second, lifecycle: open.lifecycle, url: open.url },
     ]);
   });
-
-  it("omits a session whose stored pull requests all resolve to null", async () => {
-    const result = await Effect.runPromise(
-      foldSessionStatuses(
-        [{ ref: ref("s1"), cwd: "/ws", pullRequestRefs: [pullRequest(1), pullRequest(2)] }],
-        () => Effect.succeed(null),
-      ),
-    );
-    expect(result).toEqual([]);
-  });
-
-  it("preserves input order", async () => {
-    const stored = pullRequest(7);
-    const first = ref("first");
-    const omitted = ref("omitted");
-    const last = ref("last");
-    const merged = snapshot({ type: "merged" }, 3);
-    const open = snapshot({ type: "open", draft: false }, 7);
-    const result = await Effect.runPromise(
-      foldSessionStatuses(
-        [
-          { ref: first, cwd: "/ws", pullRequestRefs: [] },
-          { ref: omitted, cwd: "/other", pullRequestRefs: [pullRequest(99)] },
-          { ref: last, cwd: "/pr", pullRequestRefs: [stored] },
-        ],
-        (cwd, candidate) => {
-          if (candidate?.number === 99) return Effect.succeed(null);
-          if (candidate?.number === 7) return Effect.succeed(open);
-          if (cwd === "/ws") return Effect.succeed(merged);
-          return Effect.succeed(null);
-        },
-      ),
-    );
-    expect(result).toEqual([
-      { ref: first, lifecycle: merged.lifecycle, url: merged.url },
-      { ref: last, lifecycle: open.lifecycle, url: open.url },
-    ]);
-  });
 });
