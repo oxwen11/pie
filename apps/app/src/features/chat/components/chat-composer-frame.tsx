@@ -12,6 +12,7 @@ import { ChatInputProvider } from "./input/chat-input-provider";
 
 /** Shared composer chrome. Callers fill the header, toolbar, submit control, and footer. */
 export function ChatComposerFrame({
+  children,
   className,
   controller,
   footer,
@@ -21,6 +22,7 @@ export function ChatComposerFrame({
   submit,
   toolbar,
 }: {
+  readonly children?: ReactNode;
   readonly className?: string;
   readonly controller: ChatInputController | null;
   readonly footer?: ReactNode;
@@ -47,6 +49,7 @@ export function ChatComposerFrame({
       >
         <ChatInputProvider controller={controller}>
           <ChatInput minRows={minRows} />
+          {children}
           <PromptInputToolbar>
             <PromptInputTools>{toolbar}</PromptInputTools>
             {submit}

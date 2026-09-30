@@ -16,5 +16,5 @@
   Discuss a bad rule instead of suppressing checks just to pass.
 
 For a request to review **and merge**, first follow
-[review-and-merge-pr.md](review-and-merge-pr.md), including its CI-first ordering
+[pull-requests.md](pull-requests.md), including its CI-first ordering
 and authorized scope. This guide does not grant merge permission.
