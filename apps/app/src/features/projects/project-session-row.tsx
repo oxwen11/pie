@@ -14,14 +14,12 @@ export type SessionPullRequest = PullRequestSessionStatus;
 /** One session row: open-session navigation plus composed session actions. */
 export function ProjectSessionRow({
   active,
-  createdBySchedule = false,
   environmentId,
   isActive,
   pullRequest,
   session,
 }: {
   readonly active: boolean;
-  readonly createdBySchedule?: boolean;
   readonly environmentId: string;
   readonly isActive: () => boolean;
   readonly pullRequest: SessionPullRequest | undefined;
@@ -60,12 +58,13 @@ export function ProjectSessionRow({
       >
         <SessionStatusIndicator phase={session.status?.phase} />
         <span className="min-w-0 flex-1 truncate">{session.title ?? "New chat"}</span>
-        {createdBySchedule ? (
+        {session.source?.kind === "schedule" ? (
           <span
             className="text-muted-foreground inline-flex shrink-0"
             title="Created by a schedule"
           >
             <Clock aria-hidden className="size-3.5 opacity-70" />
+            <span className="sr-only">Created by a schedule</span>
           </span>
         ) : null}
       </SessionActionsMenu>

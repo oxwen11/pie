@@ -41,6 +41,10 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
             projectId: "proj-a",
             cwd: "/tmp/pie-app",
             title: "Morning review",
+            source: {
+              kind: "schedule",
+              scheduleId: "11111111-1111-4111-8111-111111111111",
+            },
           });
           const stored = yield* fixture.repo.read(created.ref.projectId, created.ref.sessionId);
           const listed = yield* fixture.service.list("proj-a", false);
@@ -49,15 +53,15 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
       );
 
       assert.equal(result.stored.title, "Morning review");
-      assert.equal("schedule" in result.stored, false);
-      assert.equal("scheduleId" in result.stored, false);
-      assert.equal("automation" in result.stored, false);
-      assert.equal("automationId" in result.stored, false);
+      assert.deepEqual(result.stored.source, {
+        kind: "schedule",
+        scheduleId: "11111111-1111-4111-8111-111111111111",
+      });
       assert.equal(result.listed[0]?.title, "Morning review");
-      assert.equal("schedule" in result.listed[0], false);
-      assert.equal("scheduleId" in result.listed[0], false);
-      assert.equal("automation" in result.listed[0], false);
-      assert.equal("automationId" in result.listed[0], false);
+      assert.deepEqual(result.listed[0]?.source, {
+        kind: "schedule",
+        scheduleId: "11111111-1111-4111-8111-111111111111",
+      });
     }),
   );
 
