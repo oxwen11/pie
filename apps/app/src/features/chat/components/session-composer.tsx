@@ -1,5 +1,6 @@
 import { PromptInputButton, PromptInputSubmit } from "@getpie/ui/ai-elements/prompt-input";
 import { CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
+import { cn } from "@getpie/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { GitBranchIcon, SquareIcon } from "lucide-react";
 import { useEffect, useRef, type ReactNode } from "react";
@@ -23,9 +24,11 @@ import { useChatInputMultiline } from "./input/use-chat-input-multiline";
 // flight). Empty Enter steers the first follow-up. The header lists queued
 // prompts; the footer shows the workspace's git availability and branch.
 export function SessionComposer({
+  className,
   sessionRef,
   toolbar,
 }: {
+  className: string;
   sessionRef: EnvironmentSessionRef;
   toolbar?: ReactNode;
 }) {
@@ -109,7 +112,7 @@ export function SessionComposer({
 
   return (
     <ChatComposerFrame
-      className="mt-2 mb-4 shrink-0"
+      className={cn("mt-2 mb-4", className)}
       controller={controller}
       footer={
         <CardFrameFooter className="px-3 py-2">
