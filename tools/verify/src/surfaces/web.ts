@@ -82,7 +82,7 @@ async function startWeb(ctx: LaunchCtx): Promise<void> {
   console.log(`  sample  ${web.sample.path}`);
   console.log(`  logs    ${path.join(web.runDir, "logs")}`);
   console.log(`  doctor  ${WEB.bin} doctor`);
-  for (const line of driveHintLines(WEB)) {
+  for (const line of driveHintLines({ ...WEB, vitePort: web.vitePort })) {
     console.log(line);
   }
 }
@@ -136,7 +136,7 @@ async function inspectWeb(runDir: string, meta: RunMeta): Promise<ProbeOk> {
       `  vite    pid ${vitePid}`,
       `  node    v${process.versions.node}`,
       "  ticket  /api/ws-ticket 200",
-      ...driveHintLines(WEB),
+      ...driveHintLines({ ...WEB, vitePort: web.vitePort }),
       warn,
     ],
   };

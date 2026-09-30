@@ -256,14 +256,10 @@ export function driveHintLines(
   switch (identity.id) {
     case "web":
       return [
-        `  drive   agent-browser open http://localhost:${identity.vitePort}/`,
-        `          (or ${path.join(identity.root, "bin/agent-browser")})`,
+        `  drive   ${shellQuote(path.join(identity.root, "bin/agent-browser"))} open http://localhost:${identity.vitePort}/`,
       ];
     case "desktop":
-      return [
-        `  drive   agent-browser get title`,
-        `          (or ${path.join(identity.root, "bin/agent-browser")})`,
-      ];
+      return [`  drive   ${shellQuote(path.join(identity.root, "bin/agent-browser"))} get title`];
     default: {
       const exhaustive: never = identity;
       void exhaustive;

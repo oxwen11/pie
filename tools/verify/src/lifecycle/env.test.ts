@@ -390,10 +390,9 @@ describe("writeIsolationShim", () => {
 });
 
 describe("driveHintLines", () => {
-  it("teaches bare agent-browser for web", () => {
-    const lines = driveHintLines(WEB);
-    expect(lines.some((line) => line.includes("agent-browser open http://localhost:4190/"))).toBe(
-      true,
+  it("teaches the root-bound browser for web", () => {
+    expect(driveHintLines(WEB).join("\n")).toContain(
+      `'${path.join(WEB.root, "bin/agent-browser")}' open http://localhost:4190/`,
     );
   });
 
@@ -403,9 +402,10 @@ describe("driveHintLines", () => {
     );
   });
 
-  it("teaches bare agent-browser for desktop", () => {
-    const lines = driveHintLines(DESKTOP);
-    expect(lines.some((line) => line.includes("agent-browser get title"))).toBe(true);
+  it("teaches the root-bound browser for desktop", () => {
+    expect(driveHintLines(DESKTOP).join("\n")).toContain(
+      `'${path.join(DESKTOP.root, "bin/agent-browser")}' get title`,
+    );
   });
 });
 
