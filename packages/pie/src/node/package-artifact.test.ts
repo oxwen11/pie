@@ -41,7 +41,7 @@ layer(NodeFileSystem.layer)("published CLI bundle", (it) => {
         `expected one fff-bin-* package, got ${[...nativePackages].join(", ")}`,
       );
       const processJs = yield* fs.readFileString(
-        fromModuleUrl("../../dist/pi-process/pi-process.js"),
+        fromModuleUrl("../../dist/pi-process/pi-process.mjs"),
       );
       assert.ok(!processJs.includes("@ff-labs/fff-bun"));
       assert.ok(!processJs.includes("bun:ffi"));

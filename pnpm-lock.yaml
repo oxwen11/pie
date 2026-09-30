@@ -300,7 +300,7 @@ overrides:
 packageExtensionsChecksum: sha256-krQ8w+xxiZ9Mgc7ennDQqwconiHv6V6eTOTbkuDELx4=
 
 patchedDependencies:
-  '@earendil-works/pi-coding-agent@0.87.1': 691816f601356907950202e12f07df032b558a0f91aa05e85943f192a3f2cbad
+  '@earendil-works/pi-coding-agent@0.87.1': df2296be6a4dc7167e08fc59e77020364d6ebc40b50d965132d7f8f4a3a45df0
   '@shadcn/lint@0.1.0': 273b110768f4b3df665b11a0b5b87b5814ecc513382db2cc9647529606554bbf
   react-scan@0.5.7: 40dc21f57d476ff8623ca33e24df589d1e7ce31695648f2f80a72a3359a76b65
 
@@ -652,7 +652,7 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: catalog:pi
-        version: 0.87.1(patch_hash=691816f601356907950202e12f07df032b558a0f91aa05e85943f192a3f2cbad)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.87.1(patch_hash=df2296be6a4dc7167e08fc59e77020364d6ebc40b50d965132d7f8f4a3a45df0)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@orpc/contract':
         specifier: catalog:orpc
         version: 2.0.0-beta.35
@@ -724,7 +724,7 @@ importers:
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: catalog:pi
-        version: 0.87.1(patch_hash=691816f601356907950202e12f07df032b558a0f91aa05e85943f192a3f2cbad)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.87.1(patch_hash=df2296be6a4dc7167e08fc59e77020364d6ebc40b50d965132d7f8f4a3a45df0)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
@@ -746,7 +746,7 @@ importers:
     devDependencies:
       '@earendil-works/pi-coding-agent':
         specifier: catalog:pi
-        version: 0.87.1(patch_hash=691816f601356907950202e12f07df032b558a0f91aa05e85943f192a3f2cbad)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.87.1(patch_hash=df2296be6a4dc7167e08fc59e77020364d6ebc40b50d965132d7f8f4a3a45df0)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
@@ -803,13 +803,13 @@ importers:
     dependencies:
       '@earendil-works/pi-coding-agent':
         specifier: catalog:pi
-        version: 0.87.1(patch_hash=691816f601356907950202e12f07df032b558a0f91aa05e85943f192a3f2cbad)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+        version: 0.87.1(patch_hash=df2296be6a4dc7167e08fc59e77020364d6ebc40b50d965132d7f8f4a3a45df0)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
         specifier: 4.0.0-rc.115
         version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@ff-labs/pi-fff':
         specifier: 0.10.6
-        version: 0.10.6(@earendil-works/pi-coding-agent@0.87.1(patch_hash=691816f601356907950202e12f07df032b558a0f91aa05e85943f192a3f2cbad)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.87.1)(@sinclair/typebox@0.34.52)
+        version: 0.10.6(@earendil-works/pi-coding-agent@0.87.1(patch_hash=df2296be6a4dc7167e08fc59e77020364d6ebc40b50d965132d7f8f4a3a45df0)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.87.1)(@sinclair/typebox@0.34.52)
       '@getpie/contract':
         specifier: workspace:*
         version: link:../contract
@@ -9728,7 +9728,7 @@ snapshots:
       - ws
       - zod
 
-  '@earendil-works/pi-coding-agent@0.87.1(patch_hash=691816f601356907950202e12f07df032b558a0f91aa05e85943f192a3f2cbad)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)':
+  '@earendil-works/pi-coding-agent@0.87.1(patch_hash=df2296be6a4dc7167e08fc59e77020364d6ebc40b50d965132d7f8f4a3a45df0)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)':
     dependencies:
       '@earendil-works/chord': 0.87.1
       '@earendil-works/pi-agent-core': 0.87.1(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
@@ -10228,9 +10228,9 @@ snapshots:
       '@ff-labs/fff-bin-win32-arm64': 0.10.6
       '@ff-labs/fff-bin-win32-x64': 0.10.6
 
-  '@ff-labs/pi-fff@0.10.6(@earendil-works/pi-coding-agent@0.87.1(patch_hash=691816f601356907950202e12f07df032b558a0f91aa05e85943f192a3f2cbad)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.87.1)(@sinclair/typebox@0.34.52)':
+  '@ff-labs/pi-fff@0.10.6(@earendil-works/pi-coding-agent@0.87.1(patch_hash=df2296be6a4dc7167e08fc59e77020364d6ebc40b50d965132d7f8f4a3a45df0)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@0.87.1)(@sinclair/typebox@0.34.52)':
     dependencies:
-      '@earendil-works/pi-coding-agent': 0.87.1(patch_hash=691816f601356907950202e12f07df032b558a0f91aa05e85943f192a3f2cbad)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
+      '@earendil-works/pi-coding-agent': 0.87.1(patch_hash=df2296be6a4dc7167e08fc59e77020364d6ebc40b50d965132d7f8f4a3a45df0)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@earendil-works/pi-tui': 0.87.1
       '@ff-labs/fff-bun': 0.10.6
       '@ff-labs/fff-node': 0.10.6

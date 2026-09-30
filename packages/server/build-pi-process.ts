@@ -21,10 +21,13 @@ NodeRuntime.runMain(
     yield* fs.remove(outDir, { recursive: true, force: true });
     yield* fs.makeDirectory(outDir, { recursive: true });
 
-    for (const [name, entry] of Object.entries({
-      "pi-process": url.fileURLToPath(new URL("./src/harness/pi/rpc/entry.ts", import.meta.url)),
-      "image-resize-worker": path.join(piDir, "dist/utils/image-resize-worker.js"),
-    })) {
+    for (const [outfile, entry] of [
+      [
+        "pi-process.mjs",
+        url.fileURLToPath(new URL("./src/harness/pi/rpc/entry.ts", import.meta.url)),
+      ],
+      ["image-resize-worker.mjs", path.join(piDir, "dist/utils/image-resize-worker.js")],
+    ] as const) {
       const exitCode = yield* spawner.exitCode(
         ChildProcess.make(
           process.execPath,
@@ -37,12 +40,12 @@ NodeRuntime.runMain(
             "--define",
             "PI_BUNDLED_NODE=true",
             "--outfile",
-            path.join(outDir, `${name}.js`),
+            path.join(outDir, outfile),
           ],
           { stdout: "inherit", stderr: "inherit" },
         ),
       );
-      if (exitCode !== 0) yield* Effect.die(new Error(`Building ${name} failed: ${exitCode}`));
+      if (exitCode !== 0) yield* Effect.die(new Error(`Building ${outfile} failed: ${exitCode}`));
     }
 
     // Keep Pi's package layout so getPackageDir(), documentation and HTML export

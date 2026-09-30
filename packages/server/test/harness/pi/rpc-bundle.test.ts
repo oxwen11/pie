@@ -8,7 +8,7 @@ import { Deferred, Effect, FileSystem, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const bundle = url.fileURLToPath(
-  new URL("../../../dist/pi-process/pi-process.js", import.meta.url),
+  new URL("../../../dist/pi-process/pi-process.mjs", import.meta.url),
 );
 const builtIsland = url.fileURLToPath(new URL("../../../dist/fff", import.meta.url));
 
@@ -86,7 +86,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
         if (provider === "xai") {
           yield* fs.writeFileString(
             path.join(cwd, "worker-check.mjs"),
-            'import "./isolate-wasm.mjs"; await import("./runtime/image-resize-worker.js");',
+            'import "./isolate-wasm.mjs"; await import("./runtime/image-resize-worker.mjs");',
           );
           yield* fs.makeDirectory(path.join(cwd, "extensions"));
           yield* fs.writeFileString(
@@ -174,7 +174,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
               preload,
               "--preload",
               path.join(cwd, "isolate-wasm.mjs"),
-              path.join(runtimeDir, "pi-process.js"),
+              path.join(runtimeDir, "pi-process.mjs"),
               "--mode",
               "rpc",
               "--provider",
@@ -268,7 +268,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
           "bun",
           [
             "--no-install",
-            path.join(runtimeDir, "pi-process.js"),
+            path.join(runtimeDir, "pi-process.mjs"),
             "--mode",
             "rpc",
             "--provider",

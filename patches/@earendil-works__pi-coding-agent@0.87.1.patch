@@ -68,7 +68,9 @@ index 686c9f32ea6ae5858ab560014bdfe102edd78804..b07fabb23ea2ffa4db1d5896a609f357
  import { resizeImageInProcess } from "./image-resize-core.js";
  function toTransferableBytes(input) {
      // Transfer detaches the buffer, so transfer a worker-owned copy and leave the
-@@ -70,7 +71,7 @@ export async function resizeImage(inputBytes, mimeType, options) {
+@@ -69,8 +70,8 @@ export async function resizeImage(inputBytes, mimeType, options) {
+-    const workerUrl = new URL(isTypeScriptRuntime ? "./image-resize-worker.ts" : "./image-resize-worker.js", import.meta.url);
++    const workerUrl = new URL(isTypeScriptRuntime ? "./image-resize-worker.ts" : "./image-resize-worker.mjs", import.meta.url);
      // Bun compiled executables resolve worker entrypoints by string path, not via
      // new URL(..., import.meta.url). Try the string path first under Bun so the
      // release binary uses the embedded worker instead of falling back in-process.

@@ -49,10 +49,10 @@ The sole owner of live session state: the table of sessions keyed by ref (each `
 Effect Context service: availability check, create/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
 
 **PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
-`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned `pie-pi-process` (`dist/pi-process/pi-process.js`, JSONL over stdio, bun-build). The process hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
+`PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned `pie-pi-process` (`dist/pi-process/pi-process.mjs`, JSONL over stdio, bun-build). The process hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
 
 **pie-pi-process**:
-Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`) and prepends that directory to PATH; the entry is the `@getpie/server/pi-process` export, rewritten `app.asar` → `app.asar.unpacked` because Bun cannot read asar. Missing Bun fails availability.
+Always Bun: `bun <pi-process.mjs> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`) and prepends that directory to PATH; the entry is the `@getpie/server/pi-process` export, rewritten `app.asar` → `app.asar.unpacked` because Bun cannot read asar. Missing Bun fails availability.
 
 **Daemon**:
 Always Node. Desktop spawns Electron-as-Node (`Pie Helper` + asar `server.mjs`, `ELECTRON_RUN_AS_NODE`). CLI uses `process.execPath`. The live terminal is `node-pty`. Bun is only for pie-pi-process (PATH `bun` plus the package export).

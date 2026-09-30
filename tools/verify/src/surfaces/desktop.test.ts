@@ -22,7 +22,7 @@ async function fixture(overrides: NodeJS.ProcessEnv = {}) {
   fs.writeFileSync(path.join(root, "pnpm-workspace.yaml"), "packages: []\n");
   fs.mkdirSync(path.join(root, "packages/server/dist/pi-process"), { recursive: true });
   fs.writeFileSync(path.join(root, "packages/server/dist/server.mjs"), "");
-  fs.writeFileSync(path.join(root, "packages/server/dist/pi-process/pi-process.js"), "");
+  fs.writeFileSync(path.join(root, "packages/server/dist/pi-process/pi-process.mjs"), "");
   fs.writeFileSync(
     path.join(root, "bin/pnpm"),
     `#!${process.execPath}

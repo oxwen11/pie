@@ -510,7 +510,7 @@ removed by Desktop.
 
 ## Pi-owned and workspace writes
 
-Pie launches its `pie-pi-process` child (`dist/pi-process/pi-process.js`, Bun)
+Pie launches its `pie-pi-process` child (`dist/pi-process/pi-process.mjs`, Bun)
 with the session cwd and optionally `--session-id`. From that boundary onward there are two classes of
 writes which Pie intentionally does not own:
 

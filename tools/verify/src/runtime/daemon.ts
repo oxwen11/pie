@@ -82,7 +82,7 @@ export function ensureCoreBuilt(repo: string): void {
 
 export function ensureServerBuilt(repo: string): void {
   const server = path.join(repo, "packages/server/dist/server.mjs");
-  const piProcess = path.join(repo, "packages/server/dist/pi-process/pi-process.js");
+  const piProcess = path.join(repo, "packages/server/dist/pi-process/pi-process.mjs");
   if (fs.existsSync(server) && fs.existsSync(piProcess)) {
     return;
   }

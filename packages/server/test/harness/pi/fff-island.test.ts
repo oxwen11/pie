@@ -11,7 +11,7 @@ import { copyFffIsland } from "../../../scripts/copy-fff";
 import { fffNodePathEnv } from "../../../src/harness/pi/fff";
 
 const processBundle = url.fileURLToPath(
-  new URL("../../../dist/pi-process/pi-process.js", import.meta.url),
+  new URL("../../../dist/pi-process/pi-process.mjs", import.meta.url),
 );
 const builtIsland = url.fileURLToPath(new URL("../../../dist/fff", import.meta.url));
 const bun = process.env.PIE_BUN?.trim() ?? "bun";
@@ -148,7 +148,7 @@ export default function (pi) {
 `,
     );
 
-    const script = path.join(runtimeDir, "pi-process.js");
+    const script = path.join(runtimeDir, "pi-process.mjs");
     const child = childProcess.spawn(bun, ["--no-install", script, "--mode", "rpc"], {
       cwd: workspace,
       env: {
@@ -227,7 +227,7 @@ export default function (pi) {
     fs.cpSync(path.dirname(processBundle), runtimeDir, { recursive: true });
     const run = childProcess.spawnSync(
       bun,
-      ["--no-install", path.join(runtimeDir, "pi-process.js"), "--mode", "rpc"],
+      ["--no-install", path.join(runtimeDir, "pi-process.mjs"), "--mode", "rpc"],
       {
         cwd: root,
         encoding: "utf8",

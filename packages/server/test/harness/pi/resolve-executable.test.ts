@@ -7,7 +7,7 @@ import {
 } from "../../../src/harness/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
 
-const rpc = "/opt/pie/dist/pi-process/pi-process.js";
+const rpc = "/opt/pie/dist/pi-process/pi-process.mjs";
 
 describe("resolvePiExecutable", () => {
   it("prefers the E2E override when PIE_E2E=1", () => {
@@ -68,12 +68,12 @@ describe("resolvePiExecutable", () => {
   });
   it("rewrites a packaged asar pie-pi-process entry to asar.unpacked for bun", () => {
     const asarEntry =
-      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/pi-process/pi-process.js";
+      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/pi-process/pi-process.mjs";
     expect(resolvePiExecutable({}, { resolveBundledCli: () => asarEntry })).toEqual({
       command: "bun",
       prefixArgs: [
         "--no-install",
-        "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@getpie/server/dist/pi-process/pi-process.js",
+        "/Applications/Pie.app/Contents/Resources/app.asar.unpacked/node_modules/@getpie/server/dist/pi-process/pi-process.mjs",
       ],
     });
   });

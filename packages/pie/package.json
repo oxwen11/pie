@@ -16,7 +16,7 @@
   ],
   "type": "module",
   "exports": {
-    "./pi-process": "./dist/pi-process/pi-process.js",
+    "./pi-process": "./dist/pi-process/pi-process.mjs",
     "./resource-monitor": "./dist/resources/resource-monitor"
   },
   "publishConfig": {

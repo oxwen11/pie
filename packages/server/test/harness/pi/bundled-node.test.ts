@@ -7,7 +7,7 @@ import { Effect, FileSystem } from "effect";
 
 const serverBundle = url.fileURLToPath(new URL("../../../dist/server.mjs", import.meta.url));
 const piProcessBundle = url.fileURLToPath(
-  new URL("../../../dist/pi-process/pi-process.js", import.meta.url),
+  new URL("../../../dist/pi-process/pi-process.mjs", import.meta.url),
 );
 
 layer(NodeServices.layer, { excludeTestServices: true })("bundled Pi host modules", (it) => {

@@ -18,7 +18,7 @@
     "./observability": "./src/observability/index.ts",
     "./observability/resources": "./src/observability/resources/index.ts",
     "./resource-monitor": "./dist/resources/resource-monitor",
-    "./pi-process": "./dist/pi-process/pi-process.js"
+    "./pi-process": "./dist/pi-process/pi-process.mjs"
   },
   "scripts": {
     "build": "tsdown && bun --no-install build-pi-process.ts && node scripts/build-resource-monitor.mjs",
