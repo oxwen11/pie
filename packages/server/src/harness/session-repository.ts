@@ -45,7 +45,6 @@ const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
     agentSessionId !== undefined && agentSessionId !== parsed.sessionId
       ? agentSessionId
       : undefined;
-  const legacy = agentSessionId === undefined;
   const resolvedWorktree =
     worktree ??
     (ownsWorktree === false || gitBranch === undefined ? undefined : { branch: gitBranch });
@@ -78,9 +77,6 @@ const fromStorage = (parsed: typeof SessionSchema.Type): Session => {
     ...(keptBranch !== undefined ? { gitBranch: keptBranch } : undefined),
     ...(links.size > 0 || pullRequests !== undefined
       ? { pullRequests: [...links.values()] }
-      : undefined),
-    ...(legacy
-      ? { agentSessionId: parsed.sessionId, historyAvailable: false as const }
       : undefined),
     ...(opened !== undefined ? { agentSessionId: opened } : undefined),
     ...(resolvedWorktree !== undefined ? { worktree: resolvedWorktree } : undefined),

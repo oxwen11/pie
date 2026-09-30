@@ -229,10 +229,10 @@ describe("SessionRepository", () => {
     expect(listed).toEqual([
       expect.objectContaining({
         sessionId: "legacy",
-        agentSessionId: "legacy",
-        historyAvailable: false,
+        projectId: "proj-a",
       }),
     ]);
+    expect(listed[0]?.agentSessionId).toBeUndefined();
   });
 
   it("lists all sessions of a project", async () => {
