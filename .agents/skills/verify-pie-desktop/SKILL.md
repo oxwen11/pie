@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for Pie Desktop (Electron + to
 
 Desktop (`apps/desktop`, `@getpie/desktop`) hosts the **same SPA** as the web app via `@getpie/app`. It does **not** use Vite 4190. Main attach-or-spawns the **same token daemon** as the CLI (`makeDaemonServerProcess`). The daemon **outlives Electron** — closing the window is not teardown.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-desktop`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify desktop`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash. Not Bun.**
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-desktop`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify desktop`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash.** The helper is Node 24. The desktop daemon is Electron-as-Node. Source CLI stop uses Bun.
 
 Do **not** use `.cursor/skills/verify-pie` (web) or `.cursor/skills/verify-pie-cli` (CLI-only) as the launch recipe here. Do **not** share `/tmp/pie-verify-web/current` or `$HOME/.pie` / `$HOME/.pie_*`.
 
@@ -120,7 +120,7 @@ pnpm exec pie-verify desktop cleanup
 ```
 
 1. Stop and flush the automatic recording, close the owned agent-browser session, then stop the Desktop launch process tree (installer during preparation, electron-vite afterward). **This does not stop the daemon.**
-2. `pie daemon stop` with this run's `PIE_HOME` (via `tsx` CLI). If the recorded daemon pid is still alive, TERM/KILL **that pid only**.
+2. `pie daemon stop` with this run's `PIE_HOME` (via `bun --no-install src/node/cli.ts`). If the recorded daemon pid is still alive, TERM/KILL **that pid only**.
 3. Remove the run dir, the Electron `userData` temp (`pie-desktop-remote-debugging-<port>`), and the sample folder when it carries our marker.
 
 Never `pkill` electron / pie / vite.

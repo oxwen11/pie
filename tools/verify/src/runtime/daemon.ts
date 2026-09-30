@@ -105,7 +105,7 @@ export async function resolveCompatKey(repo: string): Promise<string> {
   return mod.resolveDaemonCompatibilityKey({ cwd: repo });
 }
 
-const pieArgv = ["exec", "tsx", "src/node/cli.ts"];
+const pieArgv = ["--no-install", "src/node/cli.ts"];
 
 export function invokePie(
   repo: string,
@@ -116,9 +116,9 @@ export function invokePie(
   const cwd = path.join(repo, "packages/pie");
   if (options.logPath !== undefined) {
     const fd = fs.openSync(options.logPath, "a");
-    return runCommand("pnpm", [...pieArgv, ...args], { cwd, env, stdio: ["ignore", fd, fd] });
+    return runCommand("bun", [...pieArgv, ...args], { cwd, env, stdio: ["ignore", fd, fd] });
   }
-  return runCommand("pnpm", [...pieArgv, ...args], {
+  return runCommand("bun", [...pieArgv, ...args], {
     cwd,
     env,
     stdio: options.inherit === true ? "inherit" : "pipe",
@@ -131,7 +131,7 @@ export function spawnPie(
   logPath: string,
   env: NodeJS.ProcessEnv,
 ): ChildProcess {
-  return spawnLogged("pnpm", [...pieArgv, ...args], logPath, {
+  return spawnLogged("bun", [...pieArgv, ...args], logPath, {
     cwd: path.join(repo, "packages/pie"),
     env,
   });

@@ -2,7 +2,8 @@ import childProcess from "node:child_process";
 import fs from "node:fs";
 
 import type { DaemonCompatibilityKey } from "@getpie/core/compatibility";
-import { Clock, Crypto, Effect, Encoding, FileSystem, type PlatformError } from "effect";
+import { Clock, Crypto, Effect, FileSystem, type PlatformError } from "effect";
+import { Hex } from "effect/encoding";
 
 import {
   daemonDirectory,
@@ -324,7 +325,7 @@ const spawnDaemon = (
     const crypto = yield* Crypto.Crypto;
     const port = yield* reservePort(options.port ?? DEFAULT_PORT);
     const token = yield* crypto.randomBytes(32).pipe(
-      Effect.map(Encoding.encodeHex),
+      Effect.map(Hex.encode),
       Effect.mapError(
         (cause) => new DaemonLaunchError({ message: "Unable to generate a daemon token", cause }),
       ),

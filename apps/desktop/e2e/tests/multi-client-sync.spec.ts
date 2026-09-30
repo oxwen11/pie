@@ -44,8 +44,8 @@ test.beforeAll(async ({}, testInfo) => {
   seedProject(home, testInfo.outputPath("workspace"));
 
   server = childProcess.spawn(
-    path.join(repoRoot, "node_modules/.bin/tsx"),
-    [path.join(repoRoot, "packages/pie/src/node/cli.ts"), "serve"],
+    "bun",
+    ["--no-install", path.join(repoRoot, "packages/pie/src/node/cli.ts"), "serve"],
     {
       env: {
         ...process.env,

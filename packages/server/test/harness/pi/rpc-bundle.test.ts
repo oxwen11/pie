@@ -5,7 +5,7 @@ import url from "node:url";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Deferred, Effect, FileSystem, Stream } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 const bundle = url.fileURLToPath(
   new URL("../../../dist/pi-process/pi-process.js", import.meta.url),
