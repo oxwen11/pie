@@ -6,6 +6,8 @@ import { cn } from "@getpie/ui/lib/utils";
 import { SearchIcon } from "lucide-react";
 import { useState } from "react";
 
+import { useShellTitlebar } from "@/components/layout/shell-chrome";
+
 import { formatSpec } from "./cadence";
 import { projectNameOf } from "./format";
 import { ScheduleCard } from "./schedule-card";
@@ -25,18 +27,23 @@ export function SchedulePageList() {
   const [filter, setFilter] = useState<ScheduleListFilter>("all");
   const panelOpen = meta.createOpen || meta.editing !== undefined || meta.selected !== undefined;
   const visible = visibleSchedules(meta.items, meta.projects, query, filter);
+  const titlebar = useShellTitlebar();
 
   return (
     <div
       className={cn(
         "mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden",
         panelOpen ? "px-3" : "max-w-3xl px-6",
+        titlebar.insetClassName,
       )}
     >
       {panelOpen ? (
-        <ScheduleFilterBar filter={filter} onFilter={setFilter} />
+        <ScheduleFilterBar dragRegion={titlebar.dragRegion} filter={filter} onFilter={setFilter} />
       ) : (
-        <div className="flex items-start justify-between gap-4 pt-8 pb-1">
+        <div
+          className="flex items-start justify-between gap-4 pb-1"
+          data-drag-region={titlebar.dragRegion}
+        >
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-tight">Scheduled</h1>
             <p className="text-muted-foreground mt-1 text-sm">
@@ -78,14 +85,19 @@ export function SchedulePageList() {
 }
 
 function ScheduleFilterBar({
+  dragRegion,
   filter,
   onFilter,
 }: {
+  readonly dragRegion?: "";
   readonly filter: ScheduleListFilter;
   readonly onFilter: (filter: ScheduleListFilter) => void;
 }) {
   return (
-    <div className="flex h-11 w-full shrink-0 items-center gap-0.5 text-sm font-medium">
+    <div
+      className="flex h-11 w-full shrink-0 items-center gap-0.5 text-sm font-medium"
+      data-drag-region={dragRegion}
+    >
       {FILTERS.map((item) => (
         <button
           className={cn(
