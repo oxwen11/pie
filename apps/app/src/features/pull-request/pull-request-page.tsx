@@ -21,6 +21,7 @@ import { Group } from "react-resizable-panels";
 
 import { PanelSeparator } from "@/components/layout/panel-separator";
 import { ResizablePanel } from "@/components/layout/resizable-panel";
+import { useShellTitlebar } from "@/components/layout/shell-chrome";
 import { useLocalOrpc } from "@/lib/environment-orpc";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
@@ -136,10 +137,17 @@ function PullRequestListPane({
 }) {
   const [query, setQuery] = useState("");
   const visible = filterPullRequestItems(items, query);
+  const titlebar = useShellTitlebar();
 
   return (
     <>
-      <div className="flex h-11 shrink-0 items-center gap-0.5 px-3 text-sm font-medium">
+      <div
+        className={cn(
+          "flex h-11 shrink-0 items-center gap-0.5 px-3 text-sm font-medium",
+          titlebar.insetClassName,
+        )}
+        data-drag-region={titlebar.dragRegion}
+      >
         <h1 className="sr-only">Pull requests</h1>
         <span className="bg-foreground/5 rounded-full px-2.5 py-1">All</span>
         <span className="text-muted-foreground px-2.5 py-1">Reviewing</span>
@@ -277,9 +285,13 @@ function PullRequestPageDetail({
   selected: boolean;
   snapshot: PullRequestSnapshot | null | undefined;
 }) {
+  const titlebar = useShellTitlebar();
   if (!selected) {
     return (
-      <div className="text-muted-foreground flex min-w-0 flex-1 items-center justify-center text-sm">
+      <div
+        className="text-muted-foreground flex min-w-0 flex-1 items-center justify-center text-sm"
+        data-drag-region={titlebar.dragRegion}
+      >
         Select pull request to view
       </div>
     );

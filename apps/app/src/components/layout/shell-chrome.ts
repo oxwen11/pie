@@ -1,6 +1,8 @@
+import { useSidebar } from "@getpie/ui/components/sidebar";
 import type { CSSProperties } from "react";
 
 import type { Platform } from "@/platform";
+import { usePlatform } from "@/platform-context";
 import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
 /** Matches shell column `md:py-1` / `md:ps-1`. */
@@ -60,6 +62,17 @@ export function shellProviderStyle(platform: Platform): ShellProviderStyle {
 /** Sidebar/card header row — reset `SidebarHeader` defaults and align with shell chrome. */
 export const SHELL_TITLEBAR_HEADER_CLASS =
   "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4" as const;
+
+/** Desktop: the page row is the drag strip, and must clear traffic lights when the sidebar is collapsed. */
+export function useShellTitlebar() {
+  const { isMobile, state } = useSidebar();
+  const desktop = isDesktopHost(usePlatform());
+  const collapsedDesktop = desktop && !isMobile && state === "collapsed";
+  return {
+    dragRegion: desktop ? ("" as const) : undefined,
+    insetClassName: collapsedDesktop ? ("ps-(--shell-titlebar-content-left)" as const) : false,
+  };
+}
 
 /** Card title cluster — matches `BrandMark` / toggle cap height. */
 export const SHELL_TITLEBAR_LABEL_CLASS = "flex h-7 min-w-0 items-center gap-2 text-sm" as const;
