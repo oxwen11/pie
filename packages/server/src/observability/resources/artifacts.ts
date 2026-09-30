@@ -36,7 +36,7 @@ export function resolveResourceArtifacts(
   return undefined;
 }
 
-/** The packaged daemon runs `Resources/server/server.mjs`; its native monitor sits in `Resources/resources/`. */
+/** The packaged daemon runs `Resources/server/server.js`; its native monitor sits in `Resources/resources/`. */
 function siblingResourceMonitor(suffix: string): string {
   const modulePath = asarUnpackedPath(import.meta.filename);
   return path.join(path.dirname(modulePath), "..", "resources", `resource-monitor${suffix}`);

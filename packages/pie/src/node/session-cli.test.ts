@@ -15,7 +15,7 @@ const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, 
 const repoRoot = fromModuleUrl("../../../..");
 const cliEntry = fromModuleUrl("./cli.ts");
 const tsx = path.join(repoRoot, "node_modules/.bin/tsx");
-const fakePi = path.join(repoRoot, "tools/testing/fake-pi.mjs");
+const fakePi = url.fileURLToPath(import.meta.resolve("@getpie/test/fake-pi"));
 const FAKE_REPLY = "CLI_FAKE_PI_REPLY";
 const TEST_KEY = "githash:00000000";
 

@@ -7,9 +7,10 @@ export default defineConfig({
   dts: false,
   clean: false,
   shims: true,
-  // The forkable server bundle. Emitted as `dist/server.mjs` (object entry key
-  // → output name) so the desktop supervisor and the daemon launcher can spawn
-  // a single self-contained file.
+  // Package is `"type": "module"`, so the forkable entry is `dist/server.js`.
+  fixedExtension: false,
+  // Object entry key → output name, so the desktop supervisor and the daemon
+  // launcher can spawn a single self-contained file.
   entry: { server: "src/http/main.ts" },
   deps: {
     // Inline everything so the forked artifact needs no node_modules resolution.
@@ -24,7 +25,7 @@ export default defineConfig({
     PIE_DAEMON_COMPATIBILITY_KEY: resolveDaemonCompatibilityKey(),
   },
   // Pi's extension loader uses VIRTUAL_MODULES only when this is true.
-  // listAvailablePiModels runs in the daemon (server.mjs), not pie-pi-process;
+  // listAvailablePiModels runs in the daemon (server.js), not pie-pi-process;
   // without it, user packages such as pi-cursor fail to import @earendil-works/pi-ai
   // and never appear in the model picker.
   define: {

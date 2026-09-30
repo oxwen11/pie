@@ -5,7 +5,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Effect, FileSystem } from "effect";
 
-const serverBundle = url.fileURLToPath(new URL("../../../dist/server.mjs", import.meta.url));
+const serverBundle = url.fileURLToPath(new URL("../../../dist/server.js", import.meta.url));
 const piProcessBundle = url.fileURLToPath(
   new URL("../../../dist/pi-process/pi-process.js", import.meta.url),
 );

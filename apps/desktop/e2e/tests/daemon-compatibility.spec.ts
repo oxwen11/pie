@@ -77,7 +77,7 @@ test("a new Desktop build replaces a legacy daemon once in an isolated home", as
   const daemonDir = path.join(pieHome, "daemon");
   const workspace = path.join(root, "workspace");
   const portFile = path.join(root, "legacy-port");
-  const legacyEntry = path.join(root, "legacy-server.mjs");
+  const legacyEntry = path.join(root, "legacy-server.js");
   const appPath = path.join(import.meta.dirname, "../../dist/main/index.js");
   fs.mkdirSync(daemonDir, { recursive: true });
   seedProject(pieHome, workspace);

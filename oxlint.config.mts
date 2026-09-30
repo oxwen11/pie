@@ -348,7 +348,13 @@ export default defineConfig({
       },
     },
     {
-      files: ["**/*.mjs", "tools/testing/**"],
+      files: [
+        "**/*.mjs",
+        "tools/test/**",
+        "tools/verify/bin/**",
+        "apps/desktop/scripts/**",
+        "packages/server/test/**/*.js",
+      ],
       rules: {
         "typescript/no-unsafe-argument": "off",
         "typescript/no-unsafe-assignment": "off",
