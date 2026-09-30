@@ -161,6 +161,7 @@ const stubSessions = (opts: {
     getModelState: unused,
     setModel: unused,
     getSessionInfo: unused,
+    transcriptPath: unused,
     getSnapshot: unused,
     resolveRef: unused,
   };

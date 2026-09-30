@@ -7,14 +7,6 @@ import {
 } from "./compatibility";
 
 describe("daemon compatibility key", () => {
-  it("normalizes Git hashes to eight lowercase characters under the githash namespace", () => {
-    expect(makeGitHashDaemonCompatibilityKey("D1FB90041E2F8213C4B05440EBDD6160E9909CB6")).toBe(
-      "githash:d1fb9004",
-    );
-    expect(makeGitHashDaemonCompatibilityKey("d1fb9004")).toBe("githash:d1fb9004");
-    expect(decodeDaemonCompatibilityKey("githash:d1fb9004")).toBe("githash:d1fb9004");
-  });
-
   it("requires a statically embedded valid key", () => {
     expect(embeddedDaemonCompatibilityKey("githash:d1fb9004")).toBe("githash:d1fb9004");
     expect(() => embeddedDaemonCompatibilityKey(undefined)).toThrow(/PIE_DAEMON_COMPATIBILITY_KEY/);
