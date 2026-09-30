@@ -68,7 +68,7 @@ export const create = (input: CreateScheduleInput) =>
       ...(input.provider !== undefined ? { provider: input.provider } : undefined),
       ...(input.modelId !== undefined ? { modelId: input.modelId } : undefined),
     };
-    yield* repo.write(schedule);
+    yield* repo.create(schedule);
     yield* logSchedule({
       event: "schedule.created",
       message: "schedule created",
@@ -159,7 +159,7 @@ export const update = (input: UpdateScheduleInput) =>
           pauseReason: "max_runs" as const,
         }
       : updated;
-    yield* repo.write(persisted);
+    yield* repo.replace(current, persisted);
     yield* logSchedule({
       event: atCapPause
         ? "schedule.paused"
@@ -232,7 +232,7 @@ export const recover = () =>
               : run,
           ),
         };
-        return releaseInFlight(schedule.id).pipe(Effect.andThen(repo.write(next)));
+        return releaseInFlight(schedule.id).pipe(Effect.andThen(repo.replace(schedule, next)));
       },
       { concurrency: 1, discard: true },
     );

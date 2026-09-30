@@ -84,7 +84,7 @@ const finishRun = (
           pauseReason: "max_runs" as const,
         }
       : settled;
-    yield* repo.write(next);
+    yield* repo.replace(current, next);
     yield* logSchedule({
       event: "schedule.settled",
       message: "schedule run settled",

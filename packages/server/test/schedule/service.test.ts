@@ -50,7 +50,7 @@ const captureLogs = <A, E, R>(
 
 const memoryRepo = (
   store: Map<string, Schedule>,
-  write: ScheduleRepository["Service"]["write"] = (schedule) =>
+  persist: (schedule: Schedule) => Effect.Effect<void, StoreWriteError> = (schedule) =>
     Effect.sync(() => {
       store.set(schedule.id, schedule);
     }),
@@ -62,7 +62,8 @@ const memoryRepo = (
       ? Effect.fail(new ScheduleNotFound({ scheduleId: id }))
       : Effect.succeed(found);
   },
-  write,
+  create: persist,
+  replace: (_current, next) => persist(next),
   remove: (id) =>
     Effect.sync(() => {
       store.delete(id);

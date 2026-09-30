@@ -81,7 +81,7 @@ const conclude = (
           false,
           decision.pauseReason,
         );
-        yield* repo.write(skipped);
+        yield* repo.replace(ctx.schedule, skipped);
         yield* logSchedule({
           event: "schedule.skipped",
           message: "schedule run skipped",
@@ -118,7 +118,7 @@ const conclude = (
           ctx.startedAt,
           false,
         );
-        yield* repo.write(missed);
+        yield* repo.replace(ctx.schedule, missed);
         yield* logSchedule({
           event: "schedule.missed",
           message: "schedule run missed",
@@ -146,7 +146,7 @@ const conclude = (
           ctx.startedAt,
           ctx.disableOnce,
         );
-        yield* repo.write(failed);
+        yield* repo.replace(ctx.schedule, failed);
         yield* logSchedule({
           event: "schedule.settled",
           message: "schedule run settled",
@@ -189,7 +189,7 @@ const conclude = (
           ctx.startedAt,
           ctx.disableOnce,
         );
-        yield* repo.write(started);
+        yield* repo.replace(ctx.schedule, started);
         yield* logSchedule({
           event: "schedule.fired",
           message: "schedule fired",
