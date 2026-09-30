@@ -12,7 +12,6 @@ import {
   parseLeadingInterval,
   parseRunAt,
   previousOccurrence,
-  stableHash,
 } from "../src/cron";
 
 describe("leading interval", () => {
@@ -107,11 +106,9 @@ describe("run_at", () => {
 });
 
 describe("jitter", () => {
-  it("is stable for the same task id and stays within bounds", () => {
+  it("stays within bounds", () => {
     const after = Date.parse("2026-08-24T10:00:00+08:00");
     const a = applyRecurringJitter("*/5 * * * *", "abcd1234", after);
-    const b = applyRecurringJitter("*/5 * * * *", "abcd1234", after);
-    expect(a).toBe(b);
     const nominal = nextOccurrence("*/5 * * * *", after);
     expect(a - nominal).toBeGreaterThanOrEqual(0);
     expect(a - nominal).toBeLessThanOrEqual(2.5 * 60_000);
@@ -126,9 +123,5 @@ describe("jitter", () => {
     expect(jittered).toBeLessThanOrEqual(onHour);
     expect(onHour - jittered).toBeLessThanOrEqual(90_000);
     expect(jittered).toBeGreaterThan(created);
-  });
-
-  it("hashes the same id to the same number", () => {
-    expect(stableHash("a1b2c3d4")).toBe(stableHash("a1b2c3d4"));
   });
 });

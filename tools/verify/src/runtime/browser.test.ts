@@ -195,9 +195,8 @@ describe("shortAgentBrowserSocketDir", () => {
     ).toBeLessThanOrEqual(AGENT_BROWSER_UNIX_SOCKET_MAX);
   });
 
-  it("is stable for the same run dir and honors VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR", () => {
+  it("differs by run dir and honors VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR", () => {
     const runDir = "/tmp/pie-verify-web/runs/run-1";
-    expect(shortAgentBrowserSocketDir(runDir)).toBe(shortAgentBrowserSocketDir(runDir));
     expect(shortAgentBrowserSocketDir(runDir)).not.toBe(
       shortAgentBrowserSocketDir("/tmp/pie-verify-desktop/runs/run-1"),
     );

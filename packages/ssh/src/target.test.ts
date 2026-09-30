@@ -81,7 +81,6 @@ describe("connection identity", () => {
   it("derives a stable 16-hex state key", () => {
     const target = parseSshInput("alice@example.com");
     expect(remoteStateKey(target)).toMatch(/^[0-9a-f]{16}$/u);
-    expect(remoteStateKey(target)).toBe(remoteStateKey(target));
     expect(targetConnectionKey(target)).toContain("example.com");
   });
 

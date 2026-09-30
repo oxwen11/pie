@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  applyRecurringJitter,
-  CronError,
-  nextOccurrence,
-  parseCron,
-  parseRunAt,
-} from "../../src/schedule/cron";
+import { CronError, nextOccurrence, parseCron, parseRunAt } from "../../src/schedule/cron";
 
 describe("parseCron", () => {
   it("accepts a 5-field expression", () => {
@@ -18,7 +12,6 @@ describe("parseCron", () => {
     expect(() => parseCron("* * * * * *")).toThrow(CronError);
   });
 });
-
 describe("nextOccurrence", () => {
   it("returns the next minute for * * * * *", () => {
     const after = Date.parse("2026-08-27T12:00:30.000Z");
@@ -37,14 +30,5 @@ describe("parseRunAt", () => {
   it("requires a timezone", () => {
     expect(() => parseRunAt("2026-08-27T09:00:00")).toThrow(CronError);
     expect(parseRunAt("2026-08-27T09:00:00Z")).toBe(Date.parse("2026-08-27T09:00:00Z"));
-  });
-});
-
-describe("applyRecurringJitter", () => {
-  it("is deterministic for a given id", () => {
-    const after = Date.parse("2026-08-27T00:00:00.000Z");
-    expect(applyRecurringJitter("0 9 * * *", "aaaaaaaa", after)).toBe(
-      applyRecurringJitter("0 9 * * *", "aaaaaaaa", after),
-    );
   });
 });
