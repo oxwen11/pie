@@ -35,10 +35,15 @@ export const webSurface: Surface = {
 
 async function startWeb(ctx: LaunchCtx): Promise<void> {
   const web = expectLaunch(ctx, "web");
-  const server = spawnLogged("pnpm", ["dev"], path.join(web.runDir, "logs/server.log"), {
-    cwd: path.join(web.repo, "packages/pie"),
-    env: web.env,
-  });
+  const server = spawnLogged(
+    "pnpm",
+    ["dev", "--port", String(web.piePort)],
+    path.join(web.runDir, "logs/server.log"),
+    {
+      cwd: path.join(web.repo, "packages/pie"),
+      env: web.env,
+    },
+  );
   if (server.pid === undefined) {
     throw new Error("failed to spawn pie serve");
   }
