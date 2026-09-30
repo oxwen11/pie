@@ -3,6 +3,7 @@ import { Effect } from "effect";
 
 import { AgentOperationError } from "../errors";
 import { toAgentModel } from "./model-mapping";
+import { PI_PROJECT_LOADER_OPTIONS, PI_PROJECT_SETTINGS_OPTIONS } from "./project-resource-policy";
 import { resolveDefaultPiModel } from "./resolve-default-model";
 
 const listModelsError = (cause: unknown) =>
@@ -21,12 +22,18 @@ export function listAvailablePiModels(
   cwd: string,
 ): Effect.Effect<ListAgentModelsOutput, AgentOperationError> {
   return Effect.gen(function* () {
-    const { createAgentSessionServices } = yield* Effect.tryPromise({
+    const { createAgentSessionServices, getAgentDir, SettingsManager } = yield* Effect.tryPromise({
       try: () => import("@earendil-works/pi-coding-agent"),
       catch: listModelsError,
     });
     const services = yield* Effect.tryPromise({
-      try: () => createAgentSessionServices({ cwd }),
+      try: () =>
+        createAgentSessionServices({
+          cwd,
+          agentDir: getAgentDir(),
+          settingsManager: SettingsManager.create(cwd, getAgentDir(), PI_PROJECT_SETTINGS_OPTIONS),
+          resourceLoaderOptions: PI_PROJECT_LOADER_OPTIONS,
+        }),
       catch: listModelsError,
     });
     const available = yield* Effect.tryPromise({

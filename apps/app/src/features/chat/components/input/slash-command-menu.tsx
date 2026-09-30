@@ -100,7 +100,7 @@ function SlashCommandPopup({
                 <Fragment key={item.command.name}>
                   {item.command.source === "skill" &&
                   items[index - 1]?.command.source !== "skill" ? (
-                    <div className="bg-popover text-muted-foreground sticky top-0 z-20 w-full shrink-0 px-2 py-2 text-sm leading-5">
+                    <div className="bg-popover text-muted-foreground sticky top-0 z-20 w-full shrink-0 p-2 text-sm leading-5">
                       Skills
                     </div>
                   ) : null}
