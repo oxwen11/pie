@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for the Pie CLI daemon and for
 
 The CLI (`packages/pie`, package `@getpie/cli`, bin `pie`) is a **different front door** from the Vite web UI. Bare `pie`, `pie daemon`, and `pie daemon start` attach-or-spawn a **detached daemon** that outlives the CLI process. `pie serve` is the **foreground** server (what `.cursor/skills/verify-pie` uses).
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-cli`. Cursor / Claude / Codex see the same tree via symlink (`.cursor/skills/verify-pie-cli`, …). The helper is **`pnpm exec pie-verify cli`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). **Not Bash.** The helper is Node 24. Source pie is `bun --no-install src/node/cli.ts`. Not `@getpie/cli` (that is `packages/pie`, bin `pie`).
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie-cli`. Cursor / Claude / Codex see the same tree via symlink (`.cursor/skills/verify-pie-cli`, …). The helper is **`pnpm exec pie-verify cli`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). **Not Bash.** The helper is Node 24. Source pie is Node: `node --experimental-transform-types --disable-warning=ExperimentalWarning --import ../../tools/node/register-ts-hook.mjs src/node/cli.ts` from `packages/pie`. Not `@getpie/cli` (that is `packages/pie`, bin `pie`).
 
 Do **not** use `.cursor/skills/verify-pie` (web 4180/4190) or `.cursor/skills/verify-pie-desktop` (Electron) for CLI proofs. Do **not** share `/tmp/pie-verify-web/current` or `$HOME/.pie` / `$HOME/.pie_*`.
 
@@ -29,7 +29,7 @@ What launch also does:
 - Requires **Node >= 24**. Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
 - Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing.
 - Sets `PIE_HOME=/tmp/pie-verify-cli/runs/<id>/pie-home`. Daemon state is `$PIE_HOME/daemon`.
-- Invokes source: `cd packages/pie && bun --no-install src/node/cli.ts …`. After a CLI build, `node dist/cli.mjs` is equivalent — do not assume `dist/cli.mjs` exists.
+- Invokes source: `cd packages/pie && node --experimental-transform-types --disable-warning=ExperimentalWarning --import ../../tools/node/register-ts-hook.mjs src/node/cli.ts …`. After a CLI build, `node dist/cli.mjs` is equivalent — do not assume `dist/cli.mjs` exists.
 - Sets `PIE_DAEMON_COMPATIBILITY_KEY` from `@getpie/core/compatibility` `resolveDaemonCompatibilityKey()`. tsdown injects that into `dist/cli.mjs`; **the source runner does not**. Daemon start throws without `githash:<8-hex>`. The key is not a secret.
 - Default mode is **daemon start**. The CLI process exits; the daemon stays. Cleanup is `pie daemon stop` with the **same** `PIE_HOME`, not killing the short-lived CLI pid.
 - `--serve` starts foreground `pie serve` instead (no token). Use that only for the serve-foreground feature.
@@ -72,7 +72,7 @@ pnpm exec pie-verify cli run daemon status
 pnpm exec pie-verify cli run --help
 ```
 
-`pie-verify cli run` injects the current run's `PIE_HOME` / `PIE_PORT` and runs `bun --no-install src/node/cli.ts` with the remaining args. Do not call a global `pie` — it may point at another home.
+`pie-verify cli run` injects the current run's `PIE_HOME` / `PIE_PORT` and runs the source CLI under Node with the remaining args. Do not call a global `pie` — it may point at another home.
 
 Commands:
 

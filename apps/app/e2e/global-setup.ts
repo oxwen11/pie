@@ -10,6 +10,7 @@ const fromHere = (relative: string) => url.fileURLToPath(new URL(relative, impor
 
 const repoRoot = fromHere("../../..");
 const cliEntry = fromHere("../../../packages/pie/src/node/cli.ts");
+const sourceHook = fromHere("../../../tools/node/register-ts-hook.mjs");
 const fakeGh = path.join(repoRoot, "tools/testing/fake-gh.mjs");
 
 const SAMPLE = "sample";
@@ -89,10 +90,21 @@ export default async function setup({
     PIE_DAEMON_COMPATIBILITY_KEY: "githash:00000000",
   };
 
-  const serve = childProcess.spawn("bun", ["--no-install", cliEntry, "serve"], {
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const serve = childProcess.spawn(
+    process.execPath,
+    [
+      "--experimental-transform-types",
+      "--disable-warning=ExperimentalWarning",
+      "--import",
+      sourceHook,
+      cliEntry,
+      "serve",
+    ],
+    {
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   const httpBaseUrl = await waitReady(serve);
   const wsBaseUrl = httpBaseUrl.replace(/^http/, "ws");
 

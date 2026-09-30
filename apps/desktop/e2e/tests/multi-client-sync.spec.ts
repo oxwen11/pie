@@ -44,8 +44,15 @@ test.beforeAll(async ({}, testInfo) => {
   seedProject(home, testInfo.outputPath("workspace"));
 
   server = childProcess.spawn(
-    "bun",
-    ["--no-install", path.join(repoRoot, "packages/pie/src/node/cli.ts"), "serve"],
+    process.execPath,
+    [
+      "--experimental-transform-types",
+      "--disable-warning=ExperimentalWarning",
+      "--import",
+      path.join(repoRoot, "tools/node/register-ts-hook.mjs"),
+      path.join(repoRoot, "packages/pie/src/node/cli.ts"),
+      "serve",
+    ],
     {
       env: {
         ...process.env,

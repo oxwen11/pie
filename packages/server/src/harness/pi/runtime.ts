@@ -32,14 +32,14 @@ import type { PiProcess } from "./process";
 import type { PiSessionToolsShape } from "./session-tools";
 import type { PiUIMessageChunk } from "./ui-message";
 
-export {
+export type {
   CreateSessionInput,
   PromptReceipt,
   ResumeSessionInput,
   SessionCapabilities,
-  SessionCapabilitiesSchema,
   UserInput,
 };
+export { SessionCapabilitiesSchema };
 
 const EVENT_QUEUE_CAPACITY = 1024;
 

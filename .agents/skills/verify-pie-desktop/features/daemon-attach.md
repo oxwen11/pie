@@ -11,7 +11,7 @@ Playwright covers the second-Desktop same-home path in `apps/desktop/e2e/tests/d
 ```bash
 # after verify-pie-desktop launch
 export PIE_HOME="$(node -e 'console.log(JSON.parse(require("fs").readFileSync("/tmp/pie-verify-desktop/current/meta.json","utf8")).pieHome)')"
-cd packages/pie && bun --no-install src/node/cli.ts daemon status
+cd packages/pie && node --experimental-transform-types --disable-warning=ExperimentalWarning --import ../../tools/node/register-ts-hook.mjs src/node/cli.ts daemon status
 ```
 
 `verify-pie-desktop launch` always allocates a **new** isolated home — it cannot attach to a CLI-prestarted daemon. The "CLI first, then desktop" path is a **manual** `pnpm run dev` from `apps/desktop` with exported env, not the helper.
