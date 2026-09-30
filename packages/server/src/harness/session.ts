@@ -1,4 +1,10 @@
+import fs from "node:fs";
+import path from "node:path";
+
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type {
+  AgentModelState,
+  PieUIMessage,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEvent,
@@ -8,7 +14,13 @@ import type {
 import { Deferred, Effect, Exit, Fiber, Ref, Scope, Semaphore, Stream } from "effect";
 
 import type { EventBusShape } from "../events/event-bus";
-import type { ResumeSessionError } from "./errors";
+import {
+  AgentOperationError,
+  SessionClosed,
+  SessionNotResumable,
+  type ResumeSessionError,
+} from "./errors";
+import { entriesToUIMessages } from "./pi/history";
 import type { PiAgentRuntime } from "./pi/runtime";
 import {
   foldSessionEvent,
@@ -29,15 +41,18 @@ import { inSession } from "./session-identity";
  * {@link SessionScopedEvent}s (attaching the {@link SessionRef}), and publishes
  * onto the EventBus.
  *
- * It *optionally owns* a {@link PiAgentRuntime} — the live execution
- * resource: a pi child, a Claude SDK handle, a Codex thread. Optional is the
- * whole point. A session exists as soon as anything writes to it and outlives
- * every runtime it ever holds, so observing one costs no process, and a
- * crashed runtime leaves a session that is still queryable and can start over.
+ * It *optionally owns* a {@link PiAgentRuntime} — the live Pi process.
+ * Optional is the whole point. A session exists as soon as anything writes to
+ * it and outlives every runtime it ever holds, so observing one costs no
+ * process, and a crashed runtime leaves a session that is still queryable and
+ * can start over.
+ *
+ * Cold reads reuse one opened `SessionManager` instead of starting that
+ * process. The session decides which: a held runtime, else the Pi file API.
  *
  * A private collaborator of {@link PiAgentSessionManager}: no Context tag.
- * It does not know how to open a native session — the manager hands it an
- * `acquire` — but it is the only thing that decides *when* one is opened, so
+ * It does not spawn a process itself — the manager hands it an `acquire` —
+ * but it is the only thing that decides *when* one is opened, so
  * single-flighting lives here and adapters keep their single-caller invariant.
  */
 
@@ -126,15 +141,68 @@ export type PiAgentSessionShape = {
    * rather than racing it.
    */
   readonly releaseRuntime: Effect.Effect<void>;
+  /** Settled transcript. Runtime if one is held, otherwise one opened SessionManager. */
+  readonly messages: (
+    agentSessionId: string,
+    cwd: string,
+  ) => Effect.Effect<
+    ReadonlyArray<PieUIMessage>,
+    SessionNotResumable | AgentOperationError | SessionClosed
+  >;
+  /** Model from the runtime, or from the opened SessionManager. Missing file is `undefined`. */
+  readonly modelState: (
+    agentSessionId: string,
+    cwd: string,
+  ) => Effect.Effect<AgentModelState | undefined, AgentOperationError | SessionClosed>;
+};
+
+/** Test seam. Production uses {@link SessionManager.open}. */
+export type SessionColdRead = (
+  agentSessionId: string,
+  cwd: string,
+) => Effect.Effect<
+  { readonly messages: ReadonlyArray<PieUIMessage>; readonly model: AgentModelState },
+  AgentOperationError | SessionNotResumable
+>;
+
+const sessionFile = (agentSessionId: string, cwd: string): string | undefined => {
+  const resolved = path.resolve(cwd);
+  let real = resolved;
+  try {
+    real = fs.realpathSync(resolved);
+  } catch {
+    real = resolved;
+  }
+  return (
+    SessionManager.findById(real, agentSessionId) ??
+    (real === resolved ? undefined : SessionManager.findById(resolved, agentSessionId))
+  );
 };
 
 export const makePiAgentSession = (
   ref: SessionRef,
   bus: EventBusShape,
+  readCold?: SessionColdRead,
 ): Effect.Effect<PiAgentSessionShape, never, Scope.Scope> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
     const state = yield* Ref.make(initialSessionState);
+    // One Pi file handle. Dropped when a process starts or stops, because that rewrites the file.
+    let piFile: SessionManager | undefined;
+    let cold:
+      | { readonly messages: ReadonlyArray<PieUIMessage>; readonly model: AgentModelState }
+      | undefined;
+    const forgetFile = () => {
+      piFile = undefined;
+      cold = undefined;
+    };
+    const openFile = (agentSessionId: string, cwd: string): SessionManager | undefined => {
+      if (piFile) return piFile;
+      const file = sessionFile(agentSessionId, cwd);
+      if (file === undefined) return undefined;
+      piFile = SessionManager.open(file);
+      return piFile;
+    };
     const lifecycle = yield* Ref.make<Lifecycle>({
       held: undefined,
       acquiring: undefined,
@@ -345,6 +413,7 @@ export const makePiAgentSession = (
         if (current.sealed) return [{ _tag: "Sealed" }, current];
         if (current.held) return [{ _tag: "Held", runtime: current.held.runtime }, current];
         if (current.acquiring) return [{ _tag: "Await", ticket: current.acquiring }, current];
+        forgetFile();
         const ticket = Deferred.makeUnsafe<PiAgentRuntime, ResumeSessionError>();
         return [
           { _tag: "Start", ticket },
@@ -377,25 +446,97 @@ export const makePiAgentSession = (
         }),
       );
 
-    const releaseRuntime: PiAgentSessionShape["releaseRuntime"] = Ref.modify(
-      lifecycle,
-      (current) =>
-        [current, { held: undefined, acquiring: current.acquiring, sealed: true }] as const,
-    ).pipe(
-      Effect.flatMap((previous) =>
-        previous.acquiring
-          ? // An acquisition already in flight owns a runtime it is about to
-            // store; wait for it and take that one, or the process it started
-            // would outlive the session that asked for it.
-            Deferred.await(previous.acquiring).pipe(
-              Effect.exit,
-              Effect.andThen(takeHeld),
-              Effect.flatMap(shutDown),
-            )
-          : shutDown(previous.held),
+    const releaseRuntime: PiAgentSessionShape["releaseRuntime"] = Effect.sync(forgetFile).pipe(
+      Effect.andThen(
+        Ref.modify(
+          lifecycle,
+          (current) =>
+            [current, { held: undefined, acquiring: current.acquiring, sealed: true }] as const,
+        ).pipe(
+          Effect.flatMap((previous) =>
+            previous.acquiring
+              ? // An acquisition already in flight owns a runtime it is about to
+                // store; wait for it and take that one, or the process it started
+                // would outlive the session that asked for it.
+                Deferred.await(previous.acquiring).pipe(
+                  Effect.exit,
+                  Effect.andThen(takeHeld),
+                  Effect.flatMap(shutDown),
+                )
+              : shutDown(previous.held),
+          ),
+          Effect.uninterruptible,
+        ),
       ),
-      Effect.uninterruptible,
     );
+
+    // Process owns the file while it is held or still starting. Otherwise one SessionManager.
+    const route = <A, E>(
+      fromRuntime: (runtime: PiAgentRuntime) => Effect.Effect<A, E>,
+      fromFile: Effect.Effect<A, E>,
+    ): Effect.Effect<A, E> =>
+      Ref.get(lifecycle).pipe(
+        Effect.flatMap((current) => {
+          if (current.held) return fromRuntime(current.held.runtime);
+          const ticket = current.acquiring;
+          if (!ticket) return fromFile;
+          return Deferred.await(ticket).pipe(
+            Effect.exit,
+            Effect.flatMap((exit) => (Exit.isSuccess(exit) ? fromRuntime(exit.value) : fromFile)),
+          );
+        }),
+      );
+
+    const fileMessages = (agentSessionId: string, cwd: string) => {
+      if (readCold) {
+        return readCold(agentSessionId, cwd).pipe(
+          Effect.tap((value) =>
+            Effect.sync(() => {
+              cold = value;
+            }),
+          ),
+          Effect.map((value) => value.messages),
+        );
+      }
+      return Effect.try({
+        try: () => openFile(agentSessionId, cwd),
+        catch: (cause) =>
+          new AgentOperationError({ sessionId: ref.sessionId, operation: "read-session", cause }),
+      }).pipe(
+        Effect.flatMap((manager) =>
+          manager
+            ? Effect.succeed(
+                entriesToUIMessages(manager.getEntries(), manager.getLeafId(), agentSessionId),
+              )
+            : Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId })),
+        ),
+      );
+    };
+
+    const fileModel = (agentSessionId: string, cwd: string) => {
+      if (readCold) {
+        if (cold) return Effect.succeed<AgentModelState | undefined>(cold.model);
+        return readCold(agentSessionId, cwd).pipe(
+          Effect.tap((value) =>
+            Effect.sync(() => {
+              cold = value;
+            }),
+          ),
+          Effect.map((value) => value.model),
+        );
+      }
+      return Effect.try({
+        try: () => openFile(agentSessionId, cwd),
+        catch: (cause) =>
+          new AgentOperationError({ sessionId: ref.sessionId, operation: "read-session", cause }),
+      }).pipe(
+        Effect.map((manager) => {
+          if (!manager) return undefined;
+          const model = manager.buildSessionProjection().model;
+          return model === null ? {} : { provider: model.provider, modelId: model.modelId };
+        }),
+      );
+    };
 
     return {
       ref,
@@ -407,5 +548,17 @@ export const makePiAgentSession = (
       peekRuntime: Ref.get(lifecycle).pipe(Effect.map((current) => current.held?.runtime)),
       ensureRuntime,
       releaseRuntime,
+      messages: (agentSessionId, cwd) =>
+        route(
+          (runtime) => runtime.getMessages,
+          cold ? Effect.succeed(cold.messages) : fileMessages(agentSessionId, cwd),
+        ),
+      modelState: (agentSessionId, cwd) =>
+        route(
+          (runtime) => runtime.getModelState,
+          cold
+            ? Effect.succeed<AgentModelState | undefined>(cold.model)
+            : fileModel(agentSessionId, cwd),
+        ),
     } satisfies PiAgentSessionShape;
   });

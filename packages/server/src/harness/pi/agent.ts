@@ -1,10 +1,10 @@
-import type { PieUIMessage } from "@getpie/contract";
+import type { AgentModelState, PieUIMessage } from "@getpie/contract";
 import { Context, Effect, Option, type FileSystem, type Scope } from "effect";
 
 import {
   AgentOpenError,
+  AgentOperationError,
   AgentUnavailable,
-  type AgentOperationError,
   type ExecutableNotFound,
   type SessionNotResumable,
 } from "../errors";
@@ -35,7 +35,11 @@ export type PiAgentShape = {
   readonly getMessages?: (
     agentSessionId: string,
     cwd?: string,
-  ) => Effect.Effect<ReadonlyArray<PieUIMessage>, AgentOperationError>;
+  ) => Effect.Effect<ReadonlyArray<PieUIMessage>, AgentOperationError | SessionNotResumable>;
+  readonly getModelState?: (
+    agentSessionId: string,
+    cwd?: string,
+  ) => Effect.Effect<AgentModelState, AgentOperationError>;
   readonly getSessionInfo: (
     agentSessionId: string,
     cwd?: string,
