@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  omitEchoedFollowUps,
   promoteQueuedFollowUp,
   queuedPromptKey,
   removeQueuedItem,
@@ -32,6 +33,21 @@ describe("queued prompt edits", () => {
       steering: ["steer-a", "steer-b", "later-a"],
       followUp: ["later-b"],
     });
+  });
+
+  it("drops in-flight follow-ups the queue has already echoed", () => {
+    expect(
+      omitEchoedFollowUps(["hello", "hello", "later"], {
+        steering: [],
+        followUp: ["hello"],
+      }),
+    ).toEqual(["hello", "later"]);
+    expect(
+      omitEchoedFollowUps(["hello"], {
+        steering: ["hello"],
+        followUp: [],
+      }),
+    ).toEqual([]);
   });
 
   it("keys duplicate queued texts by occurrence", () => {

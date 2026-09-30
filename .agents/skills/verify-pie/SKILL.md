@@ -111,7 +111,7 @@ Stable handles (from source, not guesses):
 | Draft composer | contenteditable; placeholder **Do Anything, / for skills, @ for context** |
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty, not while Choose project) |
 | Session send | button **Send message**; while streaming with an empty draft: **Stop generating**; typing replaces Stop with **Send message** (queue follow-up) — never both |
-| Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Send** (`Steer queued message`) promotes that row to **Steer**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steer** (no Send); not transcript bubbles |
+| Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Steer** (`Steer queued message`) promotes that row to **Steering**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steering** (no Steer); not transcript bubbles |
 | Session heading | card title is the session title (prompt text after create) or **New chat**; supporting text is the project name |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
 
