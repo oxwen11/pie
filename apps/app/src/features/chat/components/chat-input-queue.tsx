@@ -1,7 +1,14 @@
 import type { SessionPendingPrompt } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import { Input } from "@getpie/ui/components/input";
-import { PencilIcon, Trash2Icon } from "lucide-react";
+import { Kbd } from "@getpie/ui/components/kbd";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@getpie/ui/components/tooltip";
+import { CornerDownLeftIcon, PencilIcon, Trash2Icon } from "lucide-react";
 import { useState } from "react";
 
 import {
@@ -39,6 +46,7 @@ export function ChatInputQueue({
         {pending.followUp.map((text, position) => (
           <ChatInputQueueItem
             key={queuedPromptKey("followUp", pending.followUp, position)}
+            enterHint={position === 0}
             kind="followUp"
             text={text}
             onPromote={() => onReplace(promoteQueuedFollowUp(pending, position))}
@@ -52,12 +60,15 @@ export function ChatInputQueue({
 }
 
 function ChatInputQueueItem({
+  enterHint = false,
   kind,
   text,
   onPromote,
   onRemove,
   onSave,
 }: {
+  /** Empty Enter steers this row — the first follow-up only. */
+  enterHint?: boolean;
   kind: QueuedPromptKind;
   text: string;
   onPromote?: () => void;
@@ -101,24 +112,13 @@ function ChatInputQueueItem({
   }
 
   return (
-    <li
-      className="hover:bg-muted/60 flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5"
-      title={text}
-    >
+    <li className="hover:bg-muted/60 flex min-w-0 items-center gap-1.5 rounded-md px-1 py-0.5">
       {kind === "steering" ? <SteerBadge /> : null}
-      <span className="text-muted-foreground min-w-0 flex-1 truncate text-sm">{text}</span>
+      <span className="text-muted-foreground min-w-0 flex-1 truncate text-sm" title={text}>
+        {text}
+      </span>
       <span className="flex shrink-0 items-center gap-0.5">
-        {onPromote ? (
-          <Button
-            aria-label="Steer queued message"
-            onClick={onPromote}
-            size="xs"
-            type="button"
-            variant="ghost"
-          >
-            Send
-          </Button>
-        ) : null}
+        {onPromote ? <SteerQueuedButton enterHint={enterHint} onClick={onPromote} /> : null}
         {onSave ? (
           <Button
             aria-label="Edit queued message"
@@ -144,6 +144,36 @@ function ChatInputQueueItem({
   );
 }
 
+function SteerQueuedButton({ enterHint, onClick }: { enterHint: boolean; onClick: () => void }) {
+  const button = (
+    <Button
+      aria-keyshortcuts={enterHint ? "Enter" : undefined}
+      aria-label="Steer queued message"
+      onClick={onClick}
+      size="xs"
+      type="button"
+      variant="ghost"
+    >
+      {enterHint ? <CornerDownLeftIcon aria-hidden="true" /> : null}
+      Steer
+    </Button>
+  );
+  if (!enterHint) return button;
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger render={button} />
+        <TooltipContent>
+          <span className="inline-flex items-center gap-1">
+            <Kbd>Enter</Kbd>
+            to steer
+          </span>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
 function SteerBadge() {
-  return <span className="text-foreground shrink-0 text-xs font-medium">Steer</span>;
+  return <span className="text-foreground shrink-0 text-xs font-medium">Steering</span>;
 }
