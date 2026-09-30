@@ -470,14 +470,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     ): Effect.Effect<
       ReadonlyArray<PieUIMessage>,
       ResumeSessionError | SessionClosed | AgentOperationError
-    > => {
-      const cold = pi.getMessages;
-      if (cold) return cold(agentSessionId, cwd);
-      return manager.ensureRuntime({ sessionId: agentSessionId, cwd }, ref).pipe(
-        withSessionTools(ref),
-        Effect.flatMap((runtime) => runtime.getMessages),
-      );
-    };
+    > => manager.messages(ref, agentSessionId, cwd);
 
     const runtimeInput = (agentSessionId: string, cwd: string) => ({
       sessionId: agentSessionId,
@@ -756,18 +749,20 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       getModelState: (ref: SessionRef) =>
         readMetadata(ref).pipe(
           Effect.flatMap((metadata) => {
-            if (metadata.agentSessionId === undefined) {
-              return Effect.succeed(modelStateFromMetadata(metadata));
-            }
+            const fromMetadata = modelStateFromMetadata(metadata);
+            if (metadata.agentSessionId === undefined) return Effect.succeed(fromMetadata);
             const agentSessionId = metadata.agentSessionId;
             return ensureCwd(metadata).pipe(
               Effect.flatMap((resolved) =>
-                withLiveRuntime(
-                  ref,
-                  agentSessionId,
-                  resolved.cwd,
-                  (runtime) => runtime.getModelState,
-                ),
+                manager
+                  .modelState(ref, agentSessionId, resolved.cwd)
+                  .pipe(
+                    Effect.map((fromFile) =>
+                      fromFile?.provider !== undefined && fromFile.modelId !== undefined
+                        ? fromFile
+                        : fromMetadata,
+                    ),
+                  ),
               ),
             );
           }),
