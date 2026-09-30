@@ -27,9 +27,12 @@ blockers, and **Approve** when ready. If GitHub disallows a review action for th
 current identity, comment instead; this never substitutes for a required approval.
 
 Each execution is a fresh Session. Use the PR and linked GitHub context as the
-shared task and handoff record, not prior chat memory or local notes. An earlier
-`CHANGES_REQUESTED` is context for re-review, not a reason to skip it; unresolved
-findings and required approvals still block merging.
+shared task and handoff record, not prior chat memory or local notes. Start by
+checking whether the current version, CI, requirements or prior blockers changed
+in a way that warrants work. If the same blocker is unchanged, stop without
+repeating the review or comment. An earlier `CHANGES_REQUESTED` is context for
+re-review, not a reason to skip it; unresolved findings and required approvals
+still block merging.
 
 ## 1. Check CI
 
@@ -88,11 +91,12 @@ The reviewer runs the checks; the author's evidence cannot replace this step.
 
 Before stopping or merging, publish a concise durable record on the PR. Include
 the reviewed head/base SHAs, the trusted rules commit, the conclusion, and the
-checks, observed results, evidence links and gaps that support it. Record the
-justified CI-only exception when used. Supporting links are enough; no fixed
-report format is required. Record observed facts and reasons, not agent reasoning
-or raw tool logs. Sanitize evidence and keep credentials, private data and local
-execution traces off the PR.
+checks, observed results, evidence links and gaps that support it. State what
+changed condition should trigger the next fresh Session. Record the justified
+CI-only exception when used. Supporting links are enough; no fixed report format
+is required. Record observed facts and reasons, not agent reasoning or raw tool
+logs. Sanitize evidence and keep credentials, private data and local execution
+traces off the PR.
 
 Use a Review, comment or evidence attachment as appropriate. Do not rely on an
 edited comment as the only record of a final conclusion: later corrections are
