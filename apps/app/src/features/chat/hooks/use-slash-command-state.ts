@@ -21,7 +21,7 @@ export function useSlashCommandState(projectId: string | undefined): SlashComman
     }
     return {
       status: "ready",
-      items: createSlashCommandSuggestionItems(commands.data),
+      items: createSlashCommandSuggestionItems(commands.data ?? []),
     };
   }, [commands.data, commands.error, commands.isError, commands.isPending, retry]);
 }

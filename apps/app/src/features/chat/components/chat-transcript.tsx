@@ -1,6 +1,7 @@
 import { Message } from "@getpie/ui/ai-elements/message";
 import { PieLoader } from "@getpie/ui/ai-elements/pie-loader";
 import { Shimmer } from "@getpie/ui/ai-elements/shimmer";
+import { cn } from "@getpie/ui/lib/utils";
 import { useStore } from "zustand";
 
 import {
@@ -54,10 +55,12 @@ function EmptyTranscript({ historyStatus }: { historyStatus: HistoryStatus }) {
 // pending agent request cards. Only the last message can be streaming, so only
 // it gets streaming affordances.
 function ChatTranscriptView({
+  className,
   sessionId,
   snapshot,
   onRespond,
 }: {
+  className: string;
   sessionId: string;
   snapshot: ChatStoreState;
   onRespond: (requestId: string, response: AgentResponse) => void;
@@ -67,8 +70,10 @@ function ChatTranscriptView({
   // that first growth — same path as opening a session that already has data.
   if (snapshot.historyStatus === "loading") {
     return (
-      <div className="relative flex-1 overflow-y-auto py-4">
-        <EmptyTranscript historyStatus="loading" />
+      <div className={cn("relative flex-1 overflow-y-auto", className)}>
+        <div className="mx-auto w-full max-w-4xl p-4">
+          <EmptyTranscript historyStatus="loading" />
+        </div>
       </div>
     );
   }
@@ -76,8 +81,9 @@ function ChatTranscriptView({
   const lastIndex = snapshot.messages.length - 1;
   const turnInProgress = snapshot.status === "submitted" || snapshot.status === "streaming";
   return (
-    <Conversation key={sessionId}>
-      <ConversationContent scrollClassName="scrollbar-thin" className="px-0 py-4">
+    <Conversation className={className} key={sessionId}>
+      {/* Cap lives on the content, not the scroller, so the scrollbar stays at the panel edge. */}
+      <ConversationContent scrollClassName="scrollbar-thin" className="mx-auto w-full max-w-4xl">
         {snapshot.messages.length === 0 && (
           <EmptyTranscript historyStatus={snapshot.historyStatus} />
         )}
@@ -105,10 +111,15 @@ function ChatTranscriptView({
 // Context-aware wrapper: subscribes to the whole store here so per-token
 // message updates re-render only the transcript, never its siblings (the
 // composer subscribes narrowly on its own).
-export function ChatTranscript() {
+export function ChatTranscript({ className }: { className: string }) {
   const { sessionId, store, respondToRequest } = useChatSession();
   const snapshot = useStore(store);
   return (
-    <ChatTranscriptView sessionId={sessionId} snapshot={snapshot} onRespond={respondToRequest} />
+    <ChatTranscriptView
+      className={className}
+      sessionId={sessionId}
+      snapshot={snapshot}
+      onRespond={respondToRequest}
+    />
   );
 }
