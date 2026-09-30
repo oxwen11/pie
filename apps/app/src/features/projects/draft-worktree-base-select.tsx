@@ -76,12 +76,16 @@ export function DraftWorktreeBaseSelect({
     >
       <ComboboxTrigger
         aria-label="Base branch for worktree"
-        className="data-placeholder:text-muted-foreground w-auto max-w-56 min-w-0 justify-self-start font-normal"
+        className="w-auto max-w-56 min-w-0 justify-self-start"
         render={<Button size="sm" variant="ghost" />}
         title={value ?? undefined}
       >
         <ComboboxValue placeholder="Base branch">
-          {(name: string | null) => <span className="truncate">{name ?? "Base branch"}</span>}
+          {(name: string | null) => (
+            <span className="in-data-placeholder:text-muted-foreground truncate font-normal">
+              {name ?? "Base branch"}
+            </span>
+          )}
         </ComboboxValue>
         <ChevronsUpDownIcon />
       </ComboboxTrigger>

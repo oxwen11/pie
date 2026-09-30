@@ -2,7 +2,7 @@ import net from "node:net";
 
 import { embeddedDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { Deferred, Duration, Effect, Exit, Schedule, Scope } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import {
   baseSshArgs,

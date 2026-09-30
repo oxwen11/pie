@@ -6,7 +6,7 @@ import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { layer } from "@effect/vitest";
 import { Effect, FileSystem, Layer } from "effect";
-import { HttpEffect, HttpServerResponse } from "effect/unstable/http";
+import { HttpEffect, HttpServerResponse } from "effect/http";
 import { describe, expect, it } from "vitest";
 
 import { createUIHandler, withStaticCacheControl } from "../../src/http/ui";

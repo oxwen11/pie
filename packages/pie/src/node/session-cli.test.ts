@@ -14,7 +14,6 @@ const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, 
 
 const repoRoot = fromModuleUrl("../../../..");
 const cliEntry = fromModuleUrl("./cli.ts");
-const tsx = path.join(repoRoot, "node_modules/.bin/tsx");
 const fakePi = path.join(repoRoot, "tools/testing/fake-pi.mjs");
 const FAKE_REPLY = "CLI_FAKE_PI_REPLY";
 const TEST_KEY = "githash:00000000";
@@ -99,7 +98,7 @@ function pieEnv(home: string, extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv 
 }
 
 function runCliResult(args: string[], env: NodeJS.ProcessEnv) {
-  return childProcess.spawnSync(tsx, [cliEntry, ...args], {
+  return childProcess.spawnSync("bun", ["--no-install", cliEntry, ...args], {
     env,
     encoding: "utf8",
     timeout: 40_000,
@@ -216,7 +215,7 @@ describe("pie run against live serve", () => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-cli-home-"));
     workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-cli-ws-"));
     env = pieEnv(home);
-    serve = childProcess.spawn(tsx, [cliEntry, "serve"], {
+    serve = childProcess.spawn("bun", ["--no-install", cliEntry, "serve"], {
       env,
       stdio: ["ignore", "pipe", "pipe"],
     });

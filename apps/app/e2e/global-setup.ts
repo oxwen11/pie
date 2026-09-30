@@ -10,7 +10,6 @@ const fromHere = (relative: string) => url.fileURLToPath(new URL(relative, impor
 
 const repoRoot = fromHere("../../..");
 const cliEntry = fromHere("../../../packages/pie/src/node/cli.ts");
-const tsx = path.join(repoRoot, "node_modules/.bin/tsx");
 const fakeGh = path.join(repoRoot, "tools/testing/fake-gh.mjs");
 
 const SAMPLE = "sample";
@@ -90,7 +89,7 @@ export default async function setup({
     PIE_DAEMON_COMPATIBILITY_KEY: "githash:00000000",
   };
 
-  const serve = childProcess.spawn(tsx, [cliEntry, "serve"], {
+  const serve = childProcess.spawn("bun", ["--no-install", cliEntry, "serve"], {
     env,
     stdio: ["ignore", "pipe", "pipe"],
   });

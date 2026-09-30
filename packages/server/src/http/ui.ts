@@ -2,8 +2,8 @@ import path from "node:path";
 import url from "node:url";
 
 import { Effect, FileSystem, type Path } from "effect";
-import type { HttpPlatform } from "effect/unstable/http";
-import { HttpServerRequest, HttpServerResponse, HttpStaticServer } from "effect/unstable/http";
+import type { HttpPlatform } from "effect/http";
+import { HttpServerRequest, HttpServerResponse, HttpStaticServer } from "effect/http";
 
 /**
  * Answers everything the API routes did not claim. `never` on the error channel
