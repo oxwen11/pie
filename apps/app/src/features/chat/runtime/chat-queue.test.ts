@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defined, makeChat } from "./chat-test-helpers";
+import { assistantText, defined, makeChat } from "./chat-test-helpers";
 
 describe("Chat pending prompt", () => {
   it("sends a follow-up while streaming without a transcript bubble or local queue write", async () => {
@@ -136,6 +136,34 @@ describe("Chat pending prompt", () => {
     });
     live(2, { type: "session.crashed", reason: "boom", phase: "crashed" });
     expect(chat.store.getState().pendingPrompt).toEqual({ steering: [], followUp: [] });
+  });
+
+  it("shows a steered follow-up in the transcript immediately", async () => {
+    const { chat, transport, attach, live } = makeChat();
+    await attach({});
+    live(1, {
+      type: "session.queue.updated",
+      steering: [],
+      followUp: ["do this instead"],
+      phase: "running",
+    });
+
+    await chat.steerFollowUp(0);
+
+    expect(chat.store.getState().messages.map((message) => assistantText(message))).toEqual([
+      "do this instead",
+    ]);
+    expect(chat.store.getState().messages[0]?.role).toBe("user");
+    expect(transport.replaceQueueCalls).toEqual([{ steering: ["do this instead"], followUp: [] }]);
+
+    live(2, {
+      type: "session.prompt.submitted",
+      messageId: "server-steer",
+      parts: [{ type: "text", text: "do this instead" }],
+      phase: "running",
+    });
+    expect(chat.store.getState().messages).toHaveLength(1);
+    expect(chat.store.getState().messages[0]?.id).toBe("server-steer");
   });
 
   it("optimistically replaces the pending prompt", async () => {
