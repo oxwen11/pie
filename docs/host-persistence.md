@@ -498,7 +498,7 @@ managed socket trees with the run; no migration or separate uninstall is added.
 
 ## Verify automatic browser recording
 
-Web and Desktop Verify pin agent-browser 0.37.1. The run's shim starts recording
+Web and Desktop Verify pin agent-browser 0.38.1. The run's shim starts recording
 before its first browser command and retains the same take for later commands:
 
 ```text
