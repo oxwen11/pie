@@ -28,7 +28,7 @@ coverage
 out/
 build
 dist
-# Cargo workspace target (virtual workspace root)
+# Default Cargo workspace target. Builds use native/resource-monitor/target.
 /target/
 .vscode-test
 .tanstack

@@ -4,10 +4,7 @@
   "tasks": {
     "build": {
       "command": ["cargo", "build", "--release", "--locked", "--package", "pie-resource-monitor"],
-      "outputs": [
-        "../../target/release/pie-resource-monitor",
-        "../../target/release/pie-resource-monitor.exe"
-      ]
+      "outputs": ["target/release/pie-resource-monitor", "target/release/pie-resource-monitor.exe"]
     },
     "dev": {
       "extends": false

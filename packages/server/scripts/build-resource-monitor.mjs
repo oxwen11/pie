@@ -7,7 +7,7 @@ const root = path.resolve(here, "../../..");
 const executable = `pie-resource-monitor${process.platform === "win32" ? ".exe" : ""}`;
 // pie-resource-monitor#build writes the release binary. Rebuild only when this
 // script is invoked outside that task.
-const source = path.resolve(root, "target", "release", executable);
+const source = path.resolve(root, "native/resource-monitor/target/release", executable);
 if (!fs.existsSync(source)) {
   const result = childProcess.spawnSync(
     "cargo",
