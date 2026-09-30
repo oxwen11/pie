@@ -8,9 +8,7 @@ Optional suggestions do not block progress.
 ## Scope and context
 
 - Default: `oxwen11/pie`, author `oxwen11`, same-repository, open, non-draft PR
-  targeting `main`. Process a stack one main-targeting PR at a time.
-  A scheduled batch may review multiple ready PRs sequentially; finish and clean
-  up one PR's verification before starting the next.
+  targeting `main`. A stack merges one main-targeting PR at a time.
 - All change types are eligible. Required [design decisions](design.md), security
   checks and authorization still apply; merge permission does not authorize
   production operations or access to real user data.
@@ -29,10 +27,9 @@ blockers, and **Approve** when ready. If GitHub disallows a review action for th
 current identity, comment instead; this never substitutes for a required approval.
 
 Each execution is a fresh Session. Use the PR and linked GitHub context as the
-shared task and handoff record, not prior chat memory or local notes. Start by
-checking whether the current version, CI, requirements or prior blockers changed
-in a way that warrants work. If the same blocker is unchanged, stop without
-repeating the review or comment. An earlier `CHANGES_REQUESTED` is context for
+shared task and handoff record, not prior chat memory or local notes. Repeated
+work requires a relevant change in version, CI, requirements or blockers;
+unchanged conclusions are not repeated. An earlier `CHANGES_REQUESTED` is context for
 re-review, not a reason to skip it; unresolved findings and required approvals
 still block merging.
 
@@ -84,10 +81,9 @@ The reviewer runs the checks; the author's evidence cannot replace this step.
   the user's app, development instance or real data. Full `HOME` isolation is not
   required. For affected shared state outside `PIE_HOME`, isolate it or obtain
   explicit authorization. A worktree is not a security sandbox.
-- Run one verification task per host at a time, including within a scheduled
-  batch. If another task or foreign process occupies the resources, stop; never
-  kill its owner. Clean up only this task's processes, preserve evidence and keep
-  credentials out of uploads.
+- One verification task per host at a time. Occupied resources or another task
+  block this run; never kill the owner. Clean up only this task's processes,
+  preserve evidence and keep credentials out of uploads.
 
 ## 4. Record the outcome, then merge the verified version
 
