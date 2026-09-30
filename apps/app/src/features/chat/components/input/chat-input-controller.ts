@@ -24,7 +24,16 @@ export class ChatInputController {
   #submitting = false;
 
   constructor(private readonly opts: ChatInputControllerOptions) {
-    this.editor = new Editor({ extensions: opts.extensions(this) });
+    this.editor = new Editor({
+      extensions: opts.extensions(this),
+      editorProps: {
+        attributes: {
+          role: "textbox",
+          "aria-multiline": "true",
+          "aria-label": "Message",
+        },
+      },
+    });
     if (opts.initialContent) {
       this.editor.commands.setContent(opts.initialContent);
     }

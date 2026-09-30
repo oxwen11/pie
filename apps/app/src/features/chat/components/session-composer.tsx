@@ -3,7 +3,7 @@ import { CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
 import { cn } from "@getpie/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { GitBranchIcon, SquareIcon } from "lucide-react";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, type PropsWithChildren, type ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { useChatHandle } from "@/features/chat/runtime/use-chat-handle";
@@ -24,14 +24,15 @@ import { useChatInputMultiline } from "./input/use-chat-input-multiline";
 // flight). Empty Enter steers the first follow-up. The header lists queued
 // prompts; the footer shows the workspace's git availability and branch.
 export function SessionComposer({
+  children,
   className,
   sessionRef,
   toolbar,
-}: {
-  className: string;
+}: PropsWithChildren<{
+  className?: string;
   sessionRef: EnvironmentSessionRef;
   toolbar?: ReactNode;
-}) {
+}>) {
   const orpcQueryUtils = useEnvironmentOrpc();
   const branch = useQuery(
     orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef.ref } }),
@@ -141,7 +142,9 @@ export function SessionComposer({
         />
       }
       toolbar={toolbar}
-    />
+    >
+      {children}
+    </ChatComposerFrame>
   );
 }
 
