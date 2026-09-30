@@ -26,6 +26,11 @@ Normally use **Request changes** for defects, comments for context/environment
 blockers, and **Approve** when ready. If GitHub disallows a review action for the
 current identity, comment instead; this never substitutes for a required approval.
 
+Each execution is a fresh Session. Use the PR and linked GitHub context as the
+shared task and handoff record, not prior chat memory or local notes. An earlier
+`CHANGES_REQUESTED` is context for re-review, not a reason to skip it; unresolved
+findings and required approvals still block merging.
+
 ## 1. Check CI
 
 Record head/base SHAs and inspect required checks for this candidate:
@@ -50,10 +55,9 @@ Apply [review.md](review.md) to the requirements, full diff and affected callers
 Independently identify necessary verification and expected results; the author's
 steps are not an exhaustive test plan. Reuse recipes and supplement missing coverage.
 
-Blocking findings, unresolved `CHANGES_REQUESTED`, missing authorization or an
-unverifiable required outcome stop the workflow. Explain why and what is needed;
-do not fix-and-merge in the same review. After the author updates the PR, restart
-at CI for the new version.
+Blocking findings, missing authorization or an unverifiable required outcome
+stop the workflow. Explain why and what is needed; do not fix-and-merge in the
+same review. After the author updates the PR, restart at CI for the new version.
 
 ## 3. Verify independently
 
@@ -80,11 +84,20 @@ The reviewer runs the checks; the author's evidence cannot replace this step.
   never kill its owner. Clean up only this task's processes, preserve evidence
   and keep credentials out of uploads.
 
-## 4. Merge the verified version
+## 4. Record the outcome, then merge the verified version
 
-Record head/base SHAs, the conclusion and verification results/evidence (or the
-justified CI-only exception) on the PR; supporting links are enough, no fixed
-report format is required.
+Before stopping or merging, publish a concise durable record on the PR. Include
+the reviewed head/base SHAs, the trusted rules commit, the conclusion, and the
+checks, observed results, evidence links and gaps that support it. Record the
+justified CI-only exception when used. Supporting links are enough; no fixed
+report format is required. Record observed facts and reasons, not agent reasoning
+or raw tool logs. Sanitize evidence and keep credentials, private data and local
+execution traces off the PR.
+
+Use a Review, comment or evidence attachment as appropriate. Do not rely on an
+edited comment as the only record of a final conclusion: later corrections are
+new comments that cite the original record and preserve it. If the PR changes
+before the record is published, restart at CI and record the new version.
 
 Immediately recheck SHAs, scope/state, unresolved reviews, `MERGEABLE` and required
 CI. If head or base changed, restart at CI. Keep GitHub's strict base-up-to-date
@@ -98,5 +111,7 @@ gh pr merge "$PR" --repo oxwen11/pie --squash --match-head-commit "$HEAD_SHA"
 gh pr view "$PR" --repo oxwen11/pie --json state,headRefOid,mergedAt,mergeCommit,url
 ```
 
-Use the full reviewed and verified `HEAD_SHA`. Report merged only after GitHub
-confirms it; after a timeout, inspect server state before retrying.
+Use the full reviewed and verified `HEAD_SHA`. After GitHub confirms the merge,
+add its confirmed merge commit to the PR record. After a timeout, record the
+outcome as unverified, inspect server state and append the confirmed result;
+never infer success or failure.
