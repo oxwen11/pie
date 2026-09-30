@@ -552,6 +552,13 @@ export const makePiProcessWithDependencies = <R>(
 
                   if (!started) {
                     const active = yield* Ref.get(session.turnState);
+                    if (admission?.disposition === "handled") {
+                      return {
+                        turnId: active._tag === "Active" ? active.turnId : uuid(),
+                        started: false,
+                        output: Stream.empty,
+                      };
+                    }
                     if (active._tag === "Active") {
                       return {
                         turnId: active.turnId,

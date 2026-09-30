@@ -21,7 +21,7 @@ export function listAvailablePiCommands(
         const transport = yield* makePiTransport({
           executable: resolvePiExecutable(),
           cwd: cwd ?? agentDir,
-          args: PI_PROJECT_PROCESS_ARGS,
+          args: cwd === undefined ? [] : PI_PROJECT_PROCESS_ARGS,
           env: { PI_CODING_AGENT_DIR: agentDir },
         });
         const data = yield* transport.command<{ commands?: AgentCommand[] }>({

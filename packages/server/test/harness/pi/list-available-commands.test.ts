@@ -59,9 +59,10 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-commands-" });
+      const agentDir = yield* fs.makeTempDirectoryScoped({ prefix: "pie-agent-commands-" });
       yield* writeProjectResources(cwd, "explain", "review");
 
-      const commands = yield* Effect.promise(() => listAvailablePiCommands(cwd));
+      const commands = yield* Effect.promise(() => listAvailablePiCommands(cwd, agentDir));
       const explain = commands.find((command) => command.name === "explain");
       const review = commands.find((command) => command.name === "skill:review");
 
@@ -140,6 +141,7 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-command-extension-" });
+      const agentDir = yield* fs.makeTempDirectoryScoped({ prefix: "pie-agent-extension-" });
       const extensionDirectory = path.join(cwd, ".pi", "extensions");
       yield* fs.makeDirectory(extensionDirectory, { recursive: true });
       yield* fs.writeFileString(
@@ -153,7 +155,7 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
 `,
       );
 
-      const commands = yield* Effect.promise(() => listAvailablePiCommands(cwd));
+      const commands = yield* Effect.promise(() => listAvailablePiCommands(cwd, agentDir));
       assert.deepEqual(
         commands.find((command) => command.name === "marker"),
         { name: "marker", description: "Marker command", source: "extension" },
@@ -164,13 +166,14 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
   it.effect("keeps command discovery scoped to the requested Project", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
+      const agentDir = yield* fs.makeTempDirectoryScoped({ prefix: "pie-agent-scopes-" });
       const first = yield* fs.makeTempDirectoryScoped({ prefix: "pie-commands-a-" });
       const second = yield* fs.makeTempDirectoryScoped({ prefix: "pie-commands-b-" });
       yield* writeProjectResources(first, "first-prompt", "first-skill");
       yield* writeProjectResources(second, "second-prompt", "second-skill");
 
-      const firstCommands = yield* Effect.promise(() => listAvailablePiCommands(first));
-      const secondCommands = yield* Effect.promise(() => listAvailablePiCommands(second));
+      const firstCommands = yield* Effect.promise(() => listAvailablePiCommands(first, agentDir));
+      const secondCommands = yield* Effect.promise(() => listAvailablePiCommands(second, agentDir));
 
       assert.ok(firstCommands.some((command) => command.name === "first-prompt"));
       assert.ok(firstCommands.some((command) => command.name === "skill:first-skill"));
