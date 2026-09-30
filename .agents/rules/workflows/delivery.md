@@ -2,6 +2,8 @@
 
 - One concern per PR. Split large work into named, ordered slices before coding.
   A small fix stays one PR; multiple slices must form a stack, not disconnected PRs.
+- Use the [PR template](../../../.github/pull_request_template.md); keep it brief
+  and link existing context instead of duplicating it.
 - Create stacks with `gh stack init` → `gh stack add` → `gh stack submit --auto`.
   After trunk moves, use `gh stack sync` or `gh stack rebase`.
 - Squash merge only (`gh stack merge --squash` for stacks). When asked to review
