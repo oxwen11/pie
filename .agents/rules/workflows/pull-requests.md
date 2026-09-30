@@ -85,8 +85,9 @@ The reviewer runs the checks; the author's evidence cannot replace this step.
   serial. Bind every operation to its owned run; occupied resources block that
   configuration, not unrelated isolated runs. Never adopt or kill another
   task's processes. Shared Pi settings/auth/package mutations remain serial and
-  require authorization; `PIE_HOME` does not isolate those writes. Preserve
-  evidence and keep credentials out of uploads.
+  require authorization; this includes creating a Session with an explicit model
+  or changing its model, which persist Pi's global default. `PIE_HOME` does not
+  isolate those writes. Preserve evidence and keep credentials out of uploads.
 
 ## 4. Record the outcome, then merge the verified version
 

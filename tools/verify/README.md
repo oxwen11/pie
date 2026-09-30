@@ -91,7 +91,11 @@ Same-root lifecycle operations and same-worktree builds remain **serial**; there
 is no shared-root launch lock or build scheduler. Never use `--replace` to take
 another task's root. Shared Pi configuration changes (login, settings, plugin
 installation) are not isolated by `PIE_HOME`; keep those operations serial and
-separately authorized. Parallel model calls still obey provider rate limits.
+separately authorized. In the current product, creating a Session with an explicit
+model and changing a Session's model also persist Pi's **global default model**
+(`persistDefaultPiModel`). Serialize those operations too; then drive existing
+Sessions in parallel. `PIE_HOME` alone does not make all Pi settings run-local.
+Parallel model calls still obey provider rate limits.
 
 Cold-start recipes and feature maps stay in the skill trees
 (`.cursor/skills/verify-pie*` are symlinks). Shared process/HTTP/JSON helpers

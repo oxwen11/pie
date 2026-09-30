@@ -449,8 +449,12 @@ unchanged files but do not provide these binding/cleanup guarantees; finish the
 owned runs before downgrading the helper. Failed/corrupt runs are not silently
 adopted or reset and may require owner diagnosis. `HOME` and Pi configuration
 remain shared: normal inference can use existing credentials, but auth/settings/
-package mutations require separate authorization and serialization. No new
-uninstall or Pi-transcript deletion behavior is introduced.
+package mutations require separate authorization and serialization. In particular,
+`persistDefaultPiModel` writes the shared Pi default when creating a Session with
+an explicit model or changing its model. Those operations must be serial even
+when their `PIE_HOME` values differ; subsequent turns can run in parallel. Verify
+does not suppress that existing product behavior or promise settings isolation.
+No new uninstall or Pi-transcript deletion behavior is introduced.
 
 ## Development Electron installation
 
