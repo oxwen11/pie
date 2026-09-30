@@ -1,10 +1,11 @@
-# desktop
+# pie desktop
 
-An Electron application with React and TypeScript
+The Electron app for pie. It starts or attaches to the pie daemon for its Pie home, renders the
+same app as the web client, and adds desktop-only features such as SSH Environments and Tailscale
+sharing. Quitting the app leaves the daemon running.
 
-## Recommended IDE Setup
-
-- [VSCode](https://code.visualstudio.com/) + [ESLint](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) + [Prettier](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode)
+Packaged builds ship Bun for `pie-pi-process`. There are no published installers yet; build from
+source as below. See the [root README](../../README.md) for what pie does.
 
 ## Project Setup
 
