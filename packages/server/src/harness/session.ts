@@ -65,8 +65,8 @@ type Held = {
 type Ticket = Deferred.Deferred<PiAgentRuntime, ResumeSessionError>;
 
 /**
- * Whether this session has a runtime, is getting one, or will never take
- * another — one Ref because the three have to be decided in a single step.
+ * Whether this session holds, acquires, or suspends a runtime, or will never
+ * take another — one Ref so ownership transitions happen in a single step.
  * Deliberately private: callers see `peekRuntime` / `ensureRuntime` /
  * `releaseRuntime` and nothing of the states in between.
  *
@@ -80,6 +80,7 @@ type Ticket = Deferred.Deferred<PiAgentRuntime, ResumeSessionError>;
 type Lifecycle = {
   readonly held: Held | undefined;
   readonly acquiring: Ticket | undefined;
+  readonly suspending: Deferred.Deferred<void> | undefined;
   readonly sealed: boolean;
 };
 
@@ -87,6 +88,7 @@ type AcquireDecision =
   | { readonly _tag: "Held"; readonly runtime: PiAgentRuntime }
   | { readonly _tag: "Start"; readonly ticket: Ticket }
   | { readonly _tag: "Await"; readonly ticket: Ticket }
+  | { readonly _tag: "Suspending"; readonly done: Deferred.Deferred<void> }
   | { readonly _tag: "Sealed" };
 
 export type PiAgentSessionShape = {
@@ -152,6 +154,7 @@ export const makePiAgentSession = (
     const lifecycle = yield* Ref.make<Lifecycle>({
       held: undefined,
       acquiring: undefined,
+      suspending: undefined,
       sealed: false,
     });
     // Generation bumps cancel an in-flight idle timer without racing suspend.
@@ -362,6 +365,7 @@ export const makePiAgentSession = (
     const ensureRuntime: PiAgentSessionShape["ensureRuntime"] = (acquire) =>
       Ref.modify(lifecycle, (current): readonly [AcquireDecision, Lifecycle] => {
         if (current.sealed) return [{ _tag: "Sealed" }, current];
+        if (current.suspending) return [{ _tag: "Suspending", done: current.suspending }, current];
         if (current.held) return [{ _tag: "Held", runtime: current.held.runtime }, current];
         if (current.acquiring) return [{ _tag: "Await", ticket: current.acquiring }, current];
         const ticket = Deferred.makeUnsafe<PiAgentRuntime, ResumeSessionError>();
@@ -383,6 +387,8 @@ export const makePiAgentSession = (
           switch (decision._tag) {
             case "Sealed":
               return Effect.succeed(undefined);
+            case "Suspending":
+              return Deferred.await(decision.done).pipe(Effect.andThen(ensureRuntime(acquire)));
             case "Held":
               return Effect.succeed(decision.runtime);
             case "Start":
@@ -398,20 +404,21 @@ export const makePiAgentSession = (
 
     const releaseRuntime: PiAgentSessionShape["releaseRuntime"] = Ref.modify(
       lifecycle,
-      (current) =>
-        [current, { held: undefined, acquiring: current.acquiring, sealed: true }] as const,
+      (current) => [current, { ...current, held: undefined, sealed: true }] as const,
     ).pipe(
       Effect.flatMap((previous) =>
-        previous.acquiring
-          ? // An acquisition already in flight owns a runtime it is about to
-            // store; wait for it and take that one, or the process it started
-            // would outlive the session that asked for it.
-            Deferred.await(previous.acquiring).pipe(
-              Effect.exit,
-              Effect.andThen(takeHeld),
-              Effect.flatMap(shutDown),
-            )
-          : shutDown(previous.held),
+        previous.suspending
+          ? Deferred.await(previous.suspending)
+          : previous.acquiring
+            ? // An acquisition already in flight owns a runtime it is about to
+              // store; wait for it and take that one, or the process it started
+              // would outlive the session that asked for it.
+              Deferred.await(previous.acquiring).pipe(
+                Effect.exit,
+                Effect.andThen(takeHeld),
+                Effect.flatMap(shutDown),
+              )
+            : shutDown(previous.held),
       ),
       Effect.uninterruptible,
     );
@@ -428,14 +435,21 @@ export const makePiAgentSession = (
           Effect.andThen(
             Ref.modify(lifecycle, (current) => {
               if (current.sealed || !current.held) {
-                return [undefined as Held | undefined, current] as const;
+                return [undefined, current] as const;
               }
-              return [current.held, { ...current, held: undefined }] as const;
+              // Hide the closing runtime from peek, but retain ownership until
+              // shutdown and the stopped event finish. Neither acquisition nor
+              // release may overtake that event and reset a replacement turn.
+              const done = Deferred.makeUnsafe<void>();
+              return [
+                { held: current.held, done },
+                { ...current, held: undefined, suspending: done },
+              ] as const;
             }),
           ),
-          Effect.flatMap((held) =>
-            held
-              ? shutDown(held).pipe(
+          Effect.flatMap((pending) =>
+            pending
+              ? shutDown(pending.held).pipe(
                   Effect.andThen(
                     apply({
                       type: "session.runtime.stopped",
@@ -447,6 +461,12 @@ export const makePiAgentSession = (
                     Effect.logInfo("session runtime suspended").pipe(
                       Effect.annotateLogs({ event: "session.runtime.stopped", reason }),
                     ),
+                  ),
+                  Effect.ensuring(
+                    Ref.update(lifecycle, (current) => ({
+                      ...current,
+                      suspending: undefined,
+                    })).pipe(Effect.andThen(Deferred.succeed(pending.done, undefined))),
                   ),
                 )
               : Effect.void,
