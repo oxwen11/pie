@@ -1,3 +1,4 @@
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type {
   AgentModelState,
   AgentResponse,
@@ -27,7 +28,7 @@ import {
   type SessionNotFound,
   SessionNotWorktree,
   type SessionRefNotFound,
-  type StoreReadError,
+  StoreReadError,
   type StoreWriteError,
   WorkspaceReadError,
   WorktreeCheckoutMissing,
@@ -201,6 +202,12 @@ export type PiAgentSessionServiceShape = {
   ) => Effect.Effect<
     SessionInfoResult,
     SessionNotFound | ProjectNotFound | StoreReadError | StoreWriteError | AgentOperationError
+  >;
+  readonly transcriptPath: (
+    ref: SessionRef,
+  ) => Effect.Effect<
+    { readonly path?: string },
+    SessionNotFound | ProjectNotFound | StoreReadError
   >;
   readonly getStatus: (ref: SessionRef) => Effect.Effect<SessionStatus>;
   readonly getSnapshot: (ref: SessionRef) => Effect.Effect<SessionRuntimeSnapshot>;
@@ -813,6 +820,38 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
             const agentSessionId = metadata.agentSessionId;
             return ensureCwd(metadata).pipe(
               Effect.flatMap((resolved) => pi.getSessionInfo(agentSessionId, resolved.cwd)),
+            );
+          }),
+          inSession(ref),
+        ),
+
+      transcriptPath: (ref: SessionRef) =>
+        readMetadata(ref).pipe(
+          Effect.flatMap((metadata) => {
+            if (metadata.agentSessionId === undefined) return Effect.succeed({});
+            const agentSessionId = metadata.agentSessionId;
+            const cwd =
+              metadata.cwd !== undefined
+                ? Effect.succeed(metadata.cwd)
+                : projects.findById(metadata.projectId).pipe(Effect.map((project) => project.path));
+            return cwd.pipe(
+              Effect.flatMap((resolved) =>
+                fs
+                  .realPath(resolved)
+                  .pipe(
+                    Effect.catch((error) =>
+                      error.reason._tag === "NotFound"
+                        ? Effect.succeed(resolved)
+                        : Effect.fail(new StoreReadError({ file: resolved, cause: error })),
+                    ),
+                  ),
+              ),
+              Effect.flatMap((canonical) =>
+                Effect.try({
+                  try: () => ({ path: SessionManager.findById(canonical, agentSessionId) }),
+                  catch: (cause) => new StoreReadError({ file: canonical, cause }),
+                }),
+              ),
             );
           }),
           inSession(ref),
