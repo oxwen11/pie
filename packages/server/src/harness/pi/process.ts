@@ -7,7 +7,7 @@ import type {
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
 import type { Crypto, FileSystem } from "effect";
 import type * as Cause from "effect/Cause";
-import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { v7 as uuid } from "uuid";
 
 import {

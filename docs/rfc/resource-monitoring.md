@@ -239,7 +239,7 @@ Sidecar 的价值是 daemon 卡住时仍能观察，不是取得 OS 原本不可
 
 ### 打包态与证据
 
-开发态 `tsx` CLI / `electron-vite dev` 不能证明分发可用。用 turbo 构建后，将 CLI 发布包安装到仓库外临时目录，Desktop 启动真正打包应用；从无关 cwd 启动，不提供源码定位 override 或 Rust 工具链。记录实际 worker/native 路径，必须来自安装产物；验证工具不得偷偷回退开发入口。
+开发态源码 CLI / `electron-vite dev` 不能证明分发可用。用 turbo 构建后，将 CLI 发布包安装到仓库外临时目录，Desktop 启动真正打包应用；从无关 cwd 启动，不提供源码定位 override 或 Rust 工具链。记录实际 worker/native 路径，必须来自安装产物；验证工具不得偷偷回退开发入口。
 
 每个声称支持的 OS/架构/runtime 组合至少跑打包态 `live` 和 `disabled`，Desktop 另跑 `stall`；不适用明确标出，不用开发机代替。缺 binary、错误架构、权限/签名导致监控降级，即使窗口正常也不算验收通过。
 

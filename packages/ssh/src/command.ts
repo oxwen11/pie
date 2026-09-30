@@ -2,7 +2,7 @@ import os from "node:os";
 
 import { findExecutable } from "@getpie/core/executable";
 import { Duration, Effect, Option, Scope, Stream } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { SshClientMissingError, SshCommandError, SshInvalidTargetError } from "./errors";
 import {

@@ -1,6 +1,7 @@
 import path from "node:path";
 
-import { Context, Crypto, Effect, Encoding, FileSystem, Layer } from "effect";
+import { Context, Crypto, Effect, FileSystem, Layer } from "effect";
+import { Hex } from "effect/encoding";
 
 import { Paths } from "../config/paths";
 import {
@@ -93,7 +94,7 @@ export const WorktreeServiceLayer: Layer.Layer<
       crypto
         .randomBytes(4)
         .pipe(
-          Effect.map(Encoding.encodeHex),
+          Effect.map(Hex.encode),
           Effect.map(generateWorktreeBranchName),
           Effect.catchTag("PlatformError", dieRng("worktree branch")),
         );
