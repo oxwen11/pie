@@ -8,7 +8,9 @@ Optional suggestions do not block progress.
 ## Scope and context
 
 - Default: `oxwen11/pie`, author `oxwen11`, same-repository, open, non-draft PR
-  targeting `main`. Process stacks one main-targeting PR at a time.
+  targeting `main`. Process a stack one main-targeting PR at a time.
+  A scheduled batch may review multiple ready PRs sequentially; finish and clean
+  up one PR's verification before starting the next.
 - All change types are eligible. Required [design decisions](design.md), security
   checks and authorization still apply; merge permission does not authorize
   production operations or access to real user data.
@@ -82,10 +84,10 @@ The reviewer runs the checks; the author's evidence cannot replace this step.
   the user's app, development instance or real data. Full `HOME` isolation is not
   required. For affected shared state outside `PIE_HOME`, isolate it or obtain
   explicit authorization. A worktree is not a security sandbox.
-- Run one verification task per host at a time, enforced by the scheduler when
-  scheduled. If another task or foreign process occupies the resources, stop;
-  never kill its owner. Clean up only this task's processes, preserve evidence
-  and keep credentials out of uploads.
+- Run one verification task per host at a time, including within a scheduled
+  batch. If another task or foreign process occupies the resources, stop; never
+  kill its owner. Clean up only this task's processes, preserve evidence and keep
+  credentials out of uploads.
 
 ## 4. Record the outcome, then merge the verified version
 
