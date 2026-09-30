@@ -1,5 +1,5 @@
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index 205144dbf79e7fc8b15ffc5d9db9922aef3d87de..e7e5d622b7346fd0c172753baf99446e8d0316ae 100644
+index 045ddb2aaa9dc0b2f1dc9c4cd81e4278a08131d2..da92b3d93de07227423220d8b66de2c76307f4b4 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -1,3 +1,5 @@
@@ -8,8 +8,18 @@ index 205144dbf79e7fc8b15ffc5d9db9922aef3d87de..e7e5d622b7346fd0c172753baf99446e
  export { type Args, parseArgs } from "./cli/args.ts";
  export { CONFIG_DIR_NAME, getAgentDir, getDocsPath, getExamplesPath, getPackageDir, getReadmePath, VERSION, } from "./config.ts";
  export { AgentSession, type AgentSessionConfig, type AgentSessionEvent, type AgentSessionEventListener, type ModelCycleResult, type ParsedSkillBlock, type PromptOptions, parseSkillBlock, type SessionStats, } from "./core/agent-session.ts";
+@@ -31,8 +33,7 @@ export type { CodemodeStoreEntryData, CodemodeToolDetails } from "./extensions/c
+ export type { LoadedMcpConfig, McpExposure, McpServerConfig, McpServerEntry } from "./extensions/mcp/config.ts";
+ export { createMcpExtension, type McpExtensionOptions, type McpTransportFactory } from "./extensions/mcp/index.ts";
+ export { createToolSearchExtension } from "./extensions/tool-search/index.ts";
+-export { type MainOptions, main } from "./main.ts";
+-export { InteractiveMode, type InteractiveModeOptions, type JsonAgentSessionEvent, type ModelInfo, type PrintModeOptions, RpcClient, type RpcClientOptions, type RpcCommand, type RpcEventListener, type RpcExtensionUIRequest, type RpcExtensionUIResponse, type RpcResponse, type RpcSessionState, runPrintMode, runRpcMode, } from "./modes/index.ts";
++export { type JsonAgentSessionEvent, type ModelInfo, type PrintModeOptions, RpcClient, type RpcClientOptions, type RpcCommand, type RpcEventListener, type RpcExtensionUIRequest, type RpcExtensionUIResponse, type RpcResponse, type RpcSessionState, runPrintMode, runRpcMode, } from "./modes/index.ts";
+ export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, type CustomEditorOptions, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, type RenderDiffOptions, rawKeyHint, renderDiff, SessionSelectorComponent, type SettingsCallbacks, type SettingsConfig, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, type ToolExecutionOptions, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, type VisualTruncateResult, } from "./modes/interactive/components/index.ts";
+ export { getLanguageFromPath, getMarkdownTheme, getSelectListTheme, getSettingsListTheme, highlightCode, initTheme, Theme, type ThemeAppearance, type ThemeBg, type ThemeColor, type ThemeStyle, type ThemeToken, } from "./modes/interactive/theme/theme.ts";
+ export { copyToClipboard } from "./utils/clipboard.ts";
 diff --git a/dist/index.js b/dist/index.js
-index 01017cdbf6a26b3d36e236c7f9e835fbf0fa5c3a..410220631f1d1a227ff82871a8237de222e42b9c 100644
+index c48934f78d61fd5f5f8008bc9e09d8c4558d330a..f4a2ca52923a181829686b61a03041a085aaaaa2 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,3 +1,5 @@
@@ -18,10 +28,10 @@ index 01017cdbf6a26b3d36e236c7f9e835fbf0fa5c3a..410220631f1d1a227ff82871a8237de2
  // Core session management
  export { parseArgs } from "./cli/args.js";
  // Config paths
-@@ -29,10 +31,8 @@ export { generateDiffString, generateUnifiedPatch } from "./core/tools/edit-diff
- // Tools
- export { createBashToolDefinition, createEditToolDefinition, createFindToolDefinition, createGrepToolDefinition, createLocalBashOperations, createLocalPowerShellOperations, createLsToolDefinition, createPowerShellToolDefinition, createReadToolDefinition, createWriteToolDefinition, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES, formatSize, truncateHead, truncateLine, truncateTail, withFileMutationQueue, } from "./core/tools/index.js";
- export { hasTrustRequiringProjectResources, ProjectTrustStore, } from "./core/trust-manager.js";
+@@ -34,10 +36,8 @@ export { VIRTUAL_MODEL_STATE_ENTRY, } from "./core/virtual-models.js";
+ export { createCodemodeExtension } from "./extensions/codemode/index.js";
+ export { createMcpExtension } from "./extensions/mcp/index.js";
+ export { createToolSearchExtension } from "./extensions/tool-search/index.js";
 -// Main entry point
 -export { main } from "./main.js";
  // Run modes for programmatic SDK usage
@@ -31,7 +41,7 @@ index 01017cdbf6a26b3d36e236c7f9e835fbf0fa5c3a..410220631f1d1a227ff82871a8237de2
  export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
  // Theme utilities for custom tools and extensions
 diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
-index 54181674b80ff729ee87ad4d9f8a7e1fa48d1f28..d9de2a14ed33ed6afd2c12f2ae3d959b143f4363 100644
+index 5cf3ad39087c5c7add9ec8a1381b4f68367972e7..f58da52db465c02b74c5e6408f3fb9567fa0e847 100644
 --- a/dist/modes/interactive/theme/theme.js
 +++ b/dist/modes/interactive/theme/theme.js
 @@ -6,6 +6,8 @@ import { getCustomThemesDir, getThemesDir } from "../../../config.js";
@@ -40,10 +50,10 @@ index 54181674b80ff729ee87ad4d9f8a7e1fa48d1f28..d9de2a14ed33ed6afd2c12f2ae3d959b
  import { stripBom } from "../../../utils/text.js";
 +import darkThemeJson from "./dark.json" with { type: "json" };
 +import lightThemeJson from "./light.json" with { type: "json" };
+ import { generateSystemThemeColors, SYSTEM_THEME_NAME, terminalAppearance } from "./system-theme.js";
+ export { SYSTEM_THEME_NAME } from "./system-theme.js";
  let themeJsonValidator;
- /**
-  * Install full theme validation. Without it, documents are accepted as-is, which is what built-in
-@@ -270,13 +272,7 @@ export class Theme {
+@@ -271,13 +273,7 @@ export class Theme {
  let BUILTIN_THEMES;
  function getBuiltinThemes() {
      if (!BUILTIN_THEMES) {
@@ -90,10 +100,10 @@ index 3078895bedba898ce26c439b6123425834ca2586..586fab202f3bae969c0d44fd67a7db84
          path.join(execDir, "photon", WASM_FILENAME),
          path.join(process.cwd(), WASM_FILENAME),
 diff --git a/dist/utils/syntax-highlight.js b/dist/utils/syntax-highlight.js
-index 711fb57c5dd2804f1eb2969baf9471afd7c788a5..738f55075900ba924b4bae0c283092335f2e66ce 100644
+index 7c40360ce63bc65d8eff063379bfce8646e9389b..a445a5f73bd4f129faaddc6db761c3e947823e1f 100644
 --- a/dist/utils/syntax-highlight.js
 +++ b/dist/utils/syntax-highlight.js
-@@ -1,177 +1,4 @@
+@@ -1,179 +1,4 @@
 -import hljs from "highlight.js/lib/core.js";
 -import bash from "highlight.js/lib/languages/bash.js";
 -import c from "highlight.js/lib/languages/c.js";
@@ -104,6 +114,7 @@ index 711fb57c5dd2804f1eb2969baf9471afd7c788a5..738f55075900ba924b4bae0c28309233
 -import groovy from "highlight.js/lib/languages/groovy.js";
 -import java from "highlight.js/lib/languages/java.js";
 -import javascript from "highlight.js/lib/languages/javascript.js";
+-import json from "highlight.js/lib/languages/json.js";
 -import kotlin from "highlight.js/lib/languages/kotlin.js";
 -import lua from "highlight.js/lib/languages/lua.js";
 -import nix from "highlight.js/lib/languages/nix.js";
@@ -121,6 +132,7 @@ index 711fb57c5dd2804f1eb2969baf9471afd7c788a5..738f55075900ba924b4bae0c28309233
 -    java,
 -    go,
 -    javascript,
+-    json,
 -    cpp,
 -    typescript,
 -    php,
@@ -274,10 +286,22 @@ index 711fb57c5dd2804f1eb2969baf9471afd7c788a5..738f55075900ba924b4bae0c28309233
 \ No newline at end of file
 +export function loadAllHighlightLanguages() { return Promise.resolve(); }
 +export function renderHighlightedHtml(html, _theme = {}) { return html; }
-+export function highlight(code, _options = {}) { return { html: String(code ?? ""), language: "plaintext" }; }
++export function highlight(code, _options = {}) { return String(code ?? ""); }
 +export function supportsLanguage(_name) { return false; }
+diff --git a/examples/extensions/custom-provider-anthropic/package-lock.json b/examples/extensions/custom-provider-anthropic/package-lock.json
+deleted file mode 100644
+index 0f04a4b6e990ec2354e48dd096522edbe95fe8bf..0000000000000000000000000000000000000000
+diff --git a/examples/extensions/gondolin/package-lock.json b/examples/extensions/gondolin/package-lock.json
+deleted file mode 100644
+index 8ccf39f0447d6635656ae041d9cffc842f7099cb..0000000000000000000000000000000000000000
+diff --git a/examples/extensions/sandbox/package-lock.json b/examples/extensions/sandbox/package-lock.json
+deleted file mode 100644
+index b701a1ba670ce5ea05dfcd5c5e7566ba7f703810..0000000000000000000000000000000000000000
+diff --git a/examples/extensions/with-deps/package-lock.json b/examples/extensions/with-deps/package-lock.json
+deleted file mode 100644
+index 2b01794b0f89bcebf1d6bf38cbf356d65b8fe6b9..0000000000000000000000000000000000000000
 diff --git a/package.json b/package.json
-index 2f6cc3f36fbea78887be3e7bbe0a2cf537f27d97..1766d7db1fa3b5b9712578a10b89d3778856256d 100644
+index 22b6fdcb43e81f4eb7f782c44e4d659293dcb544..c5012a27d2bebc9358970b0cabf7c270eefefbd6 100644
 --- a/package.json
 +++ b/package.json
 @@ -16,6 +16,14 @@
