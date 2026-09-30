@@ -5,9 +5,7 @@
  */
 export const DEFAULT_SESSION_RUNTIME_IDLE_MS = 5 * 60 * 1000;
 
-export const sessionRuntimeIdleMs = (
-  env: NodeJS.ProcessEnv = process.env,
-): number => {
+export const sessionRuntimeIdleMs = (env: NodeJS.ProcessEnv = process.env): number => {
   const raw = env.PIE_SESSION_RUNTIME_IDLE_MS?.trim();
   if (raw === undefined || raw === "") return DEFAULT_SESSION_RUNTIME_IDLE_MS;
   const parsed = Number(raw);
