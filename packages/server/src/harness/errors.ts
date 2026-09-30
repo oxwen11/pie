@@ -115,7 +115,6 @@ export class AgentOperationError extends Schema.TaggedError<AgentOperationError>
     return `Agent operation '${this.operation}' failed for session '${this.sessionId}': ${causeSummary(this.cause)}`;
   }
 }
-
 export class PiTransportError extends Schema.TaggedError<PiTransportError>()("PiTransportError", {
   operation: Schema.String,
   cause: Schema.Defect(),

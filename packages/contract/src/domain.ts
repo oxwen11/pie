@@ -469,18 +469,28 @@ export const ReplaceQueueInputSchema = Schema.Struct({
 export type ReplaceQueueInput = typeof ReplaceQueueInputSchema.Type;
 
 // ---------------------------------------------------------------------------
-// Session capabilities
+// Agent commands and session capabilities
 // ---------------------------------------------------------------------------
+
+/** Slash commands returned by Pi `get_commands`. */
+export const AgentCommandSchema = Schema.Struct({
+  name: Schema.NonEmptyString,
+  description: Schema.optionalKey(Schema.String),
+  source: Schema.Literals(["extension", "prompt", "skill"]),
+});
+export type AgentCommand = typeof AgentCommandSchema.Type;
+
+export const SessionCapabilityCommandSchema = Schema.Struct({
+  name: Schema.String,
+  description: Schema.optionalKey(Schema.String),
+});
+export type SessionCapabilityCommand = typeof SessionCapabilityCommandSchema.Type;
 
 export const SessionCapabilitiesSchema = Schema.Struct({
   models: Schema.optionalKey(
     Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.optionalKey(Schema.String) })),
   ),
-  commands: Schema.optionalKey(
-    Schema.Array(
-      Schema.Struct({ name: Schema.String, description: Schema.optionalKey(Schema.String) }),
-    ),
-  ),
+  commands: Schema.optionalKey(Schema.Array(SessionCapabilityCommandSchema)),
   mcpServers: Schema.optionalKey(
     Schema.Array(Schema.Struct({ name: Schema.String, status: Schema.String })),
   ),
@@ -525,6 +535,14 @@ export const ListAgentModelsOutputSchema = Schema.Struct({
   defaultModel: Schema.optionalKey(AgentModelSchema),
 });
 export type ListAgentModelsOutput = typeof ListAgentModelsOutputSchema.Type;
+
+export const ListAgentCommandsInputSchema = Schema.Struct({
+  projectId: Schema.optionalKey(Schema.String.check(Schema.isUUID())),
+});
+export type ListAgentCommandsInput = typeof ListAgentCommandsInputSchema.Type;
+
+export const ListAgentCommandsOutputSchema = Schema.Array(AgentCommandSchema);
+export type ListAgentCommandsOutput = typeof ListAgentCommandsOutputSchema.Type;
 
 // ---------------------------------------------------------------------------
 // Project
