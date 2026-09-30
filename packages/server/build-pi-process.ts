@@ -21,28 +21,49 @@ NodeRuntime.runMain(
     yield* fs.remove(outDir, { recursive: true, force: true });
     yield* fs.makeDirectory(outDir, { recursive: true });
 
-    for (const [name, entry] of Object.entries({
-      "pi-process": url.fileURLToPath(new URL("./src/harness/pi/rpc/entry.ts", import.meta.url)),
-      "image-resize-worker": path.join(piDir, "dist/utils/image-resize-worker.js"),
-    })) {
-      const exitCode = yield* spawner.exitCode(
-        ChildProcess.make(
-          process.execPath,
-          [
-            "build",
-            entry,
-            "--target",
-            "bun",
-            // Use Pi's bundled extension modules, never source-tree aliases.
-            "--define",
-            "PI_BUNDLED_NODE=true",
-            "--outfile",
-            path.join(outDir, `${name}.js`),
-          ],
-          { stdout: "inherit", stderr: "inherit" },
-        ),
-      );
-      if (exitCode !== 0) yield* Effect.die(new Error(`Building ${name} failed: ${exitCode}`));
+    const piProcess = url.fileURLToPath(new URL("./src/harness/pi/rpc/entry.ts", import.meta.url));
+    // Codemode embeds quickjs.wasm as a sibling asset. --outfile cannot emit it.
+    const piProcessExit = yield* spawner.exitCode(
+      ChildProcess.make(
+        process.execPath,
+        [
+          "build",
+          piProcess,
+          "--target",
+          "bun",
+          // Use Pi's bundled extension modules, never source-tree aliases.
+          "--define",
+          "PI_BUNDLED_NODE=true",
+          "--outdir",
+          outDir,
+          "--entry-naming",
+          "pi-process.[ext]",
+        ],
+        { stdout: "inherit", stderr: "inherit" },
+      ),
+    );
+    if (piProcessExit !== 0) {
+      yield* Effect.die(new Error(`Building pi-process failed: ${piProcessExit}`));
+    }
+
+    const workerExit = yield* spawner.exitCode(
+      ChildProcess.make(
+        process.execPath,
+        [
+          "build",
+          path.join(piDir, "dist/utils/image-resize-worker.js"),
+          "--target",
+          "bun",
+          "--define",
+          "PI_BUNDLED_NODE=true",
+          "--outfile",
+          path.join(outDir, "image-resize-worker.js"),
+        ],
+        { stdout: "inherit", stderr: "inherit" },
+      ),
+    );
+    if (workerExit !== 0) {
+      yield* Effect.die(new Error(`Building image-resize-worker failed: ${workerExit}`));
     }
 
     // Keep Pi's package layout so getPackageDir(), documentation and HTML export
