@@ -106,9 +106,11 @@ describe("run_at", () => {
 });
 
 describe("jitter", () => {
-  it("stays within bounds", () => {
+  it("is stable for the same task id and stays within bounds", () => {
     const after = Date.parse("2026-08-24T10:00:00+08:00");
     const a = applyRecurringJitter("*/5 * * * *", "abcd1234", after);
+    const b = applyRecurringJitter("*/5 * * * *", "abcd1234", after);
+    expect(a).toBe(b);
     const nominal = nextOccurrence("*/5 * * * *", after);
     expect(a - nominal).toBeGreaterThanOrEqual(0);
     expect(a - nominal).toBeLessThanOrEqual(2.5 * 60_000);
