@@ -205,8 +205,8 @@ summary in `schedule.json`.
 
 Each Run file contains `{ id, startedAt, reason, status }` plus optional finish
 time, session id, error/skip details, missed count, and a snapshot of the
-Schedule inputs used for that Run. The Schedule page shows the latest 20 Runs;
-older Run files stay on disk. `firedCount` remains the counter used by `maxRuns`.
+Schedule inputs used for that Run. `schedule.list` and `schedule.get` return every
+Run. `firedCount` remains the counter used by `maxRuns`.
 
 ## Pi package settings and installs
 
