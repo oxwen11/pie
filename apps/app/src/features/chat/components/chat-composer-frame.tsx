@@ -40,6 +40,18 @@ export function ChatComposerFrame({
           <PromptInput
             className="divide-y-0"
             data-layout={layout}
+            onClick={(event) => {
+              if (
+                event.defaultPrevented ||
+                !(event.target instanceof Element) ||
+                event.target.closest(
+                  "button, a, input, textarea, select, [contenteditable], [tabindex]",
+                )
+              ) {
+                return;
+              }
+              controller?.focus();
+            }}
             onSubmit={(event) => {
               event.preventDefault();
               void controller?.submit();
