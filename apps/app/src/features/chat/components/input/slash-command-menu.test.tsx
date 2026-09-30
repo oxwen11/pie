@@ -27,6 +27,12 @@ const commands: AgentCommand[] = [
   { name: "skill:review", description: "Review the current changes", source: "skill" },
 ];
 
+function commandAt(index: number): AgentCommand {
+  const command = commands[index];
+  if (!command) throw new Error("missing fixture");
+  return command;
+}
+
 const readyState = (source = commands): SlashCommandState => ({
   status: "ready",
   items: createSlashCommandSuggestionItems(source),
@@ -109,7 +115,7 @@ describe("slash command suggestions", () => {
     expect(allowSlashCommandSuggestion({ range: { from: 8, to: 9 } })).toBe(false);
     expect(
       filterSlashCommandItems(
-        createSlashCommandSuggestionItems([commands[1] ?? commands[0], commands[0]]),
+        createSlashCommandSuggestionItems([commandAt(1), commandAt(0)]),
         "",
       ).map((item) => item.command.source),
     ).toEqual(["prompt", "skill"]);
@@ -194,7 +200,7 @@ describe("slash command suggestions", () => {
         document.querySelector('[role="option"][aria-selected="true"]')?.textContent,
       ).not.toContain("skill:");
 
-      await harness.render(readyState([commands[0] ?? commands[1]]));
+      await harness.render(readyState([commandAt(0)]));
       expect(document.querySelectorAll('[role="option"]')).toHaveLength(1);
       expect(document.querySelector('[role="option"]')?.textContent).toContain("explain");
       await dispatchKey(harness, { key: "Enter" });
@@ -337,11 +343,9 @@ describe("slash command suggestions", () => {
       expect(harness.controller.editor.getHTML()).toBe("<p>/skill:review </p>");
 
       harness.controller.editor.commands.setContent("/old");
-      insertSlashCommand(
-        harness.controller.editor,
-        { from: 1, to: 5 },
-        createSlashCommandSuggestionItems(commands)[0] ?? commands[0],
-      );
+      const explain = createSlashCommandSuggestionItems(commands)[0];
+      if (!explain) throw new Error("missing explain command");
+      insertSlashCommand(harness.controller.editor, { from: 1, to: 5 }, explain);
       expect(harness.controller.editor.getHTML()).toBe("<p>/explain </p>");
     } finally {
       await harness.dispose();

@@ -1,3 +1,4 @@
+import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ListAgentCommandsOutput, ListAgentModelsOutput } from "@getpie/contract";
 import { Context, Effect, Layer } from "effect";
 
@@ -6,12 +7,8 @@ import { listAvailablePiCommands } from "./pi/list-available-commands";
 import { listAvailablePiModels } from "./pi/list-available-models";
 
 export type PiAgentServiceShape = {
-  readonly commands: (
-    cwd?: string,
-  ) => Effect.Effect<ListAgentCommandsOutput, AgentOperationError>;
-  readonly listModels: (
-    cwd?: string,
-  ) => Effect.Effect<ListAgentModelsOutput, AgentOperationError>;
+  readonly commands: (cwd?: string) => Effect.Effect<ListAgentCommandsOutput, AgentOperationError>;
+  readonly listModels: (cwd?: string) => Effect.Effect<ListAgentModelsOutput, AgentOperationError>;
 };
 
 export class PiAgentService extends Context.Service<PiAgentService, PiAgentServiceShape>()(
@@ -31,7 +28,7 @@ export const makePiAgentService = (): PiAgentServiceShape => ({
     });
   }),
   listModels: Effect.fn("PiAgentService.listModels")(function* (cwd?: string) {
-    return yield* listAvailablePiModels(cwd);
+    return yield* listAvailablePiModels(cwd ?? getAgentDir());
   }),
 });
 

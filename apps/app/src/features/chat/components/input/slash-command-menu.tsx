@@ -100,7 +100,7 @@ function SlashCommandPopup({
                 <Fragment key={item.command.name}>
                   {item.command.source === "skill" &&
                   items[index - 1]?.command.source !== "skill" ? (
-                    <div className="bg-popover text-muted-foreground sticky top-0 z-20 w-full shrink-0 px-2 py-1 text-sm leading-5">
+                    <div className="bg-popover text-muted-foreground sticky top-0 z-20 w-full shrink-0 px-2 py-2 text-sm leading-5">
                       Skills
                     </div>
                   ) : null}
@@ -111,7 +111,7 @@ function SlashCommandPopup({
                     tabIndex={-1}
                     aria-selected={index === selectedIndex}
                     data-selected={index === selectedIndex || undefined}
-                    className="text-foreground/75 data-[selected]:text-foreground data-[selected]:bg-foreground/5 flex w-full shrink-0 scroll-mt-7 items-center gap-2 overflow-hidden rounded-lg px-2 py-1 text-start text-sm"
+                    className="text-foreground/75 data-[selected]:text-foreground data-[selected]:bg-foreground/5 flex w-full shrink-0 scroll-mt-9 items-center gap-2 overflow-hidden rounded-lg px-2 py-1 text-start text-sm"
                     onPointerDown={(event) => {
                       if (event.pointerType === "mouse" && event.button === 0) {
                         event.preventDefault();
