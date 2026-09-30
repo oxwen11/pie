@@ -43,7 +43,7 @@ export function envPort(name: string, fallback: number): number {
     return fallback;
   }
   const port = Number(raw);
-  if (!Number.isInteger(port) || port <= 0) {
+  if (!Number.isInteger(port) || port <= 0 || port > 65535) {
     throw new Error(`invalid ${name}=${raw}`);
   }
   return port;

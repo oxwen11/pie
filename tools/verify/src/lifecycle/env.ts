@@ -13,12 +13,13 @@ import {
   resolveAgentBrowserBin,
   resolveBrowserEnv,
   stopAutoRecording,
+  shellQuote,
   teardownOwnedBrowser,
   type BrowserEnvVars,
 } from "../runtime/browser.ts";
 import { VerifyError } from "../runtime/fail.ts";
 import { currentRun, writeJson, writeText } from "../runtime/fs.ts";
-import { runCommandInherit } from "../runtime/process.ts";
+import { findRepoRoot, runCommandInherit } from "../runtime/process.ts";
 import type { Surface } from "../surface.ts";
 
 const RECORDING_SEQUENCE_FILE = "agent-browser-recording-sequence";
@@ -143,11 +144,12 @@ export function writeIsolationShim(
   const envFile = path.join(identity.currentLink, "agent-browser.env");
   const dest = path.join(identity.root, "bin/agent-browser");
   const entry = path.resolve(import.meta.dirname, "../../bin/agent-browser");
+  const prefix = identity.id === "web" ? "VERIFY_PIE" : "VERIFY_PIE_DESKTOP";
   writeText(
     dest,
     `#!/bin/sh
 set -eu
-env_file=${JSON.stringify(envFile)}
+env_file=${shellQuote(envFile)}
 if [ ! -f "$env_file" ]; then
   echo "pie-verify: no current ${identity.id} run. Launch first: ${identity.bin} launch" >&2
   exit 1
@@ -155,8 +157,12 @@ fi
 # shellcheck disable=SC1090
 . "$env_file"
 export PIE_VERIFY_SURFACE=${identity.id}
+export ${prefix}_ROOT=${shellQuote(identity.root)}
+export ${prefix}_SKILL_DIR=${shellQuote(identity.skillDir)}
+export ${prefix}_BROWSER_SESSION=${shellQuote(identity.browserSession)}
+export VERIFY_PIE_REPO=${shellQuote(findRepoRoot())}
 export VERIFY_PIE_AGENT_BROWSER="$AGENT_BROWSER"
-exec ${JSON.stringify(entry)} "$@"
+exec ${shellQuote(entry)} "$@"
 `,
   );
   fs.chmodSync(dest, 0o755);
@@ -181,12 +187,14 @@ function parseSurfaceOverride(value: string | undefined): "web" | "desktop" | un
   }
 }
 
-export function resolveActiveBrowserEnv(
-  input: ActiveBrowserEnvInput = {},
-): BrowserEnvVars | undefined {
-  const surface = parseSurfaceOverride(input.surface ?? process.env.PIE_VERIFY_SURFACE);
-  const webRun = input.webRun ?? currentRun(WEB.currentLink);
-  const desktopRun = input.desktopRun ?? currentRun(DESKTOP.currentLink);
+export function resolveActiveBrowserEnv(input?: ActiveBrowserEnvInput): BrowserEnvVars | undefined {
+  const selected = input ?? {
+    surface: process.env.PIE_VERIFY_SURFACE,
+    webRun: currentRun(WEB.currentLink),
+    desktopRun: currentRun(DESKTOP.currentLink),
+  };
+  const surface = parseSurfaceOverride(selected.surface);
+  const { webRun, desktopRun } = selected;
   if (surface === "web") {
     if (webRun === undefined) {
       throw new Error(`no current run. Launch first: ${WEB.bin} launch`);
@@ -248,7 +256,7 @@ export function driveHintLines(
   switch (identity.id) {
     case "web":
       return [
-        `  drive   agent-browser open http://localhost:4190/`,
+        `  drive   agent-browser open http://localhost:${identity.vitePort}/`,
         `          (or ${path.join(identity.root, "bin/agent-browser")})`,
       ];
     case "desktop":

@@ -151,7 +151,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 | CLI verify 4182 | **Do not touch.** |
 | User daemon 4000 | **Do not touch.** |
 
-Parallel Desktop runs need separate `VERIFY_PIE_DESKTOP_ROOT` and `PIE_REMOTE_DEBUG_PORT` values. They share the operator `HOME`, including `~/.pi/agent`. Let Verify derive each run's socket directory; do not share a `VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR` override. The same session name can be used in separate socket directories. Drive each run through its own `<root>/bin/agent-browser`, rather than a shared current-run pointer.
+Parallel Desktop runs need separate worktrees, `VERIFY_PIE_DESKTOP_ROOT` and `PIE_REMOTE_DEBUG_PORT` values. Keep builds and lifecycle operations serial within one worktree/root. They share the unchanged operator `HOME`, including `~/.pi/agent`; do not concurrently mutate shared settings, auth or packages. See [parallel verification](../../../tools/verify/README.md#parallel-verification). Let Verify derive each run's socket directory; do not share a `VERIFY_PIE_AGENT_BROWSER_SOCKET_DIR` override. The same session name can be used in separate socket directories. Drive each run through its own `<root>/bin/agent-browser`, rather than a shared current-run pointer.
 
 ## Feature map
 

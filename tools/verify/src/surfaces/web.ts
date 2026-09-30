@@ -52,10 +52,15 @@ async function startWeb(ctx: LaunchCtx): Promise<void> {
     );
   }
 
-  const vite = spawnLogged("pnpm", ["dev"], path.join(web.runDir, "logs/vite.log"), {
-    cwd: path.join(web.repo, "apps/app"),
-    env: { ...process.env, PIE_PORT: String(web.piePort) },
-  });
+  const vite = spawnLogged(
+    "pnpm",
+    ["dev", "--port", String(web.vitePort)],
+    path.join(web.runDir, "logs/vite.log"),
+    {
+      cwd: path.join(web.repo, "apps/app"),
+      env: web.env,
+    },
+  );
   if (vite.pid === undefined) {
     throw new Error("failed to spawn vite");
   }
