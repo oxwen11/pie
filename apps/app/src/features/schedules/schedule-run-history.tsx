@@ -4,6 +4,8 @@ import { Button } from "@getpie/ui/components/button";
 
 import { formatRunDuration, formatRunReason, formatRunStatus, formatSkipReason } from "./cadence";
 
+const VISIBLE_RUNS = 20;
+
 export type ScheduleRunHistoryProps = {
   readonly schedule: Schedule;
   readonly nowMs: number;
@@ -35,7 +37,7 @@ export function ScheduleRunHistory({ schedule, nowMs, onOpenSession }: ScheduleR
   }
   return (
     <ol className="flex flex-col gap-3">
-      {schedule.runs.map((run) => {
+      {schedule.runs.slice(0, VISIBLE_RUNS).map((run) => {
         const duration = formatRunDuration(run.startedAt, run.finishedAt, nowMs);
         const detail = runDetail(run);
         const sessionId = run.sessionId;

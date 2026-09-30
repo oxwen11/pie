@@ -83,7 +83,6 @@ describe("ScheduleRepository", () => {
       await fs.readFile(path.join(schedulesDir, SCHEDULE_ID, "schedule.json"), "utf8"),
     ) as { readonly data: Record<string, unknown> };
     expect(storedSchedule.data).not.toHaveProperty("runs");
-    expect(storedSchedule.data).not.toHaveProperty("pendingRuns");
     expect(storedSchedule.data.runIds).toEqual(["run-1"]);
     const storedRun = JSON.parse(
       await fs.readFile(path.join(schedulesDir, SCHEDULE_ID, "runs", "run-1.json"), "utf8"),
@@ -91,7 +90,7 @@ describe("ScheduleRepository", () => {
     expect(storedRun.data.id).toBe("run-1");
   });
 
-  it("preserves Run order and removes Runs outside the retained window", async () => {
+  it("keeps Run files that are no longer listed", async () => {
     const read = await run(
       Effect.gen(function* () {
         const repo = yield* TestScheduleRepository;
@@ -105,36 +104,38 @@ describe("ScheduleRepository", () => {
 
     expect(read.runs.map((item) => item.id)).toEqual(["run-2", "run-1"]);
     expect(read.runs[1]?.status).toBe("succeeded");
-    await expect(
-      fs.access(path.join(schedulesDir, SCHEDULE_ID, "runs", "run-0.json")),
-    ).rejects.toThrow("ENOENT");
+    await fs.access(path.join(schedulesDir, SCHEDULE_ID, "runs", "run-0.json"));
   });
 
-  it("does not mutate Run files when the Schedule commit fails", async () => {
+  it("leaves schedule.json unchanged when a Run write fails", async () => {
     const current = schedule([runRecord("run-1")]);
-    const next = schedule([runRecord("run-1", "succeeded")]);
+    const next = { ...schedule([runRecord("run-1", "succeeded")]), name: "Updated review" };
     const scheduleFile = path.join(schedulesDir, SCHEDULE_ID, "schedule.json");
+    const runFile = path.join(schedulesDir, SCHEDULE_ID, "runs", "run-1.json");
 
     const error = await run(
       Effect.gen(function* () {
         const repo = yield* TestScheduleRepository;
         yield* repo.create(current);
-        yield* Effect.promise(() => fs.rm(scheduleFile));
-        yield* Effect.promise(() => fs.mkdir(scheduleFile));
+        yield* Effect.promise(() => fs.rm(runFile));
+        yield* Effect.promise(() => fs.mkdir(runFile));
         return yield* Effect.flip(repo.replace(current, next));
       }),
     );
 
     expect(error._tag).toBe("StoreWriteError");
-    const storedRun = JSON.parse(
-      await fs.readFile(path.join(schedulesDir, SCHEDULE_ID, "runs", "run-1.json"), "utf8"),
-    ) as { readonly data: ScheduleRun };
-    expect(storedRun.data.status).toBe("running");
+    const storedSchedule = JSON.parse(await fs.readFile(scheduleFile, "utf8")) as {
+      readonly data: { readonly name: string };
+    };
+    expect(storedSchedule.data.name).toBe("Daily review");
   });
 
-  it("reads and materializes Runs left pending by an interrupted commit", async () => {
-    const current = schedule([runRecord("run-1")]);
-    const scheduleFile = path.join(schedulesDir, SCHEDULE_ID, "schedule.json");
+  it("trusts the Run file when it is newer than the Schedule summary", async () => {
+    const current = {
+      ...schedule([runRecord("run-1")]),
+      lastRunAt: STARTED_AT,
+      lastRunStatus: "running" as const,
+    };
     const runFile = path.join(schedulesDir, SCHEDULE_ID, "runs", "run-1.json");
 
     const read = await run(
@@ -142,31 +143,21 @@ describe("ScheduleRepository", () => {
         const repo = yield* TestScheduleRepository;
         yield* repo.create(current);
         yield* Effect.promise(async () => {
-          const stored = JSON.parse(await fs.readFile(scheduleFile, "utf8")) as {
-            data: Record<string, unknown>;
+          const stored = JSON.parse(await fs.readFile(runFile, "utf8")) as {
+            data: ScheduleRun;
           };
-          stored.data.pendingRuns = [runRecord("run-1", "succeeded")];
-          await fs.writeFile(scheduleFile, JSON.stringify(stored));
+          stored.data = runRecord("run-1", "succeeded");
+          await fs.writeFile(runFile, JSON.stringify(stored));
         });
-        const interrupted = yield* repo.read(SCHEDULE_ID);
-        yield* repo.replace(interrupted, { ...interrupted, name: "Updated review" });
         return yield* repo.read(SCHEDULE_ID);
       }),
     );
 
-    expect(read.name).toBe("Updated review");
     expect(read.runs[0]?.status).toBe("succeeded");
-    const storedSchedule = JSON.parse(await fs.readFile(scheduleFile, "utf8")) as {
-      readonly data: Record<string, unknown>;
-    };
-    expect(storedSchedule.data).not.toHaveProperty("pendingRuns");
-    const storedRun = JSON.parse(await fs.readFile(runFile, "utf8")) as {
-      readonly data: ScheduleRun;
-    };
-    expect(storedRun.data.status).toBe("succeeded");
+    expect(read.lastRunStatus).toBe("succeeded");
   });
 
-  it("ignores and cleans an unreferenced corrupt Run during replacement", async () => {
+  it("ignores an unreferenced corrupt Run", async () => {
     const current = schedule([runRecord("run-1")]);
     const next = { ...current, name: "Updated review" };
 
@@ -183,9 +174,7 @@ describe("ScheduleRepository", () => {
     );
 
     expect(read.name).toBe("Updated review");
-    await expect(
-      fs.access(path.join(schedulesDir, SCHEDULE_ID, "runs", "orphan.json")),
-    ).rejects.toThrow("ENOENT");
+    await fs.access(path.join(schedulesDir, SCHEDULE_ID, "runs", "orphan.json"));
   });
 
   it("does not adopt the retired flat-file layout", async () => {

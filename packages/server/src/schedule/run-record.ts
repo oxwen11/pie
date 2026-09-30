@@ -16,7 +16,6 @@ import { InvalidSchedule } from "../errors";
 import { CronError } from "./cron";
 import { computeNextRunAt, iso, validateExpiresAt, validateSpec } from "./next-run";
 
-export const MAX_RUNS = 20;
 const TITLE_CHARS = 60;
 
 export const compareSchedules = (a: Schedule, b: Schedule): number => {
@@ -63,7 +62,7 @@ export const appendRun = (schedule: Schedule, run: ScheduleRun, nowIso: string):
     updatedAt: nowIso,
     lastRunAt: run.startedAt,
     lastRunStatus: run.status,
-    runs: [run, ...schedule.runs].slice(0, MAX_RUNS),
+    runs: [run, ...schedule.runs],
     ...(nextFiredCount !== undefined ? { firedCount: nextFiredCount } : undefined),
     ...(run.sessionId !== undefined ? { lastSessionId: run.sessionId } : undefined),
     ...(run.status === "failed" && run.error !== undefined ? { lastError: run.error } : undefined),

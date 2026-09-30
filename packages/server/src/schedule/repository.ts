@@ -16,22 +16,36 @@ import { ScheduleNotFound, StoreReadError, StoreWriteError } from "../errors";
 const StoredScheduleSchema = Schema.Struct({
   ...ScheduleStateSchema.fields,
   runIds: Schema.Array(Schema.String),
-  pendingRuns: Schema.optionalKey(Schema.Array(ScheduleRunSchema)),
 });
 type StoredSchedule = typeof StoredScheduleSchema.Type;
 
-const toStored = (schedule: Schedule, pendingRuns?: ReadonlyArray<ScheduleRun>): StoredSchedule => {
+const toStored = (schedule: Schedule): StoredSchedule => {
   const { runs, ...state } = schedule;
-  return {
-    ...state,
-    runIds: runs.map((run) => run.id),
-    ...(pendingRuns !== undefined && pendingRuns.length > 0 ? { pendingRuns } : undefined),
-  };
+  return { ...state, runIds: runs.map((run) => run.id) };
 };
 
 const fromStored = (stored: StoredSchedule, runs: ReadonlyArray<ScheduleRun>): Schedule => {
-  const { pendingRuns: _pendingRuns, runIds: _runIds, ...state } = stored;
-  return { ...state, runs };
+  const { runIds: _runIds, ...state } = stored;
+  const latest = runs[0];
+  if (
+    latest === undefined ||
+    state.lastRunStatus === undefined ||
+    state.lastRunStatus === latest.status
+  ) {
+    return { ...state, runs };
+  }
+  const { lastError: _lastError, ...rest } = state;
+  const repaired = {
+    ...rest,
+    runs,
+    lastRunAt: latest.startedAt,
+    lastRunStatus: latest.status,
+  };
+  const withSession =
+    latest.sessionId === undefined ? repaired : { ...repaired, lastSessionId: latest.sessionId };
+  return latest.status === "failed" && latest.error !== undefined
+    ? { ...withSession, lastError: latest.error }
+    : withSession;
 };
 
 export class ScheduleRepository extends Context.Service<
@@ -85,29 +99,24 @@ export const makeScheduleRepository = (schedulesDir: string) =>
           return yield* Effect.fail(new ScheduleNotFound({ scheduleId: id }));
         }
         const stored = found.value;
-        const pending = new Map(stored.pendingRuns?.map((run) => [run.id, run]));
         const storedRuns = yield* Effect.forEach(
           stored.runIds,
-          (runId) => {
-            const pendingRun = pending.get(runId);
-            return pendingRun !== undefined
-              ? Effect.succeed(pendingRun)
-              : runs.get(runKey(id, runId)).pipe(
-                  Effect.mapError(asReadError),
-                  Effect.flatMap(
-                    Option.match({
-                      onNone: () =>
-                        Effect.fail(
-                          new StoreReadError({
-                            file: path.join(scheduleDir(id), "runs", `${runId}.json`),
-                            cause: new Error(`schedule run ${runId} is missing`),
-                          }),
-                        ),
-                      onSome: Effect.succeed,
-                    }),
-                  ),
-                );
-          },
+          (runId) =>
+            runs.get(runKey(id, runId)).pipe(
+              Effect.mapError(asReadError),
+              Effect.flatMap(
+                Option.match({
+                  onNone: () =>
+                    Effect.fail(
+                      new StoreReadError({
+                        file: path.join(scheduleDir(id), "runs", `${runId}.json`),
+                        cause: new Error(`schedule run ${runId} is missing`),
+                      }),
+                    ),
+                  onSome: Effect.succeed,
+                }),
+              ),
+            ),
           { concurrency: 16 },
         );
         return fromStored(stored, storedRuns);
@@ -133,86 +142,21 @@ export const makeScheduleRepository = (schedulesDir: string) =>
       ),
     );
 
-    const garbageCollectRuns = (schedule: Schedule) => {
-      const retained = new Set(schedule.runs.map((run) => runKey(schedule.id, run.id)));
-      return runs.ids({ under: runPrefix(schedule.id) }).pipe(
-        Effect.mapError(asWriteError),
-        Effect.flatMap((ids) =>
-          Effect.forEach(
-            ids,
-            (id) =>
-              retained.has(id) ? Effect.void : runs.remove(id).pipe(Effect.mapError(asWriteError)),
-            { concurrency: 16, discard: true },
-          ),
-        ),
-        Effect.catch((error) =>
-          Effect.logWarning("schedule run cleanup failed").pipe(
-            Effect.annotateLogs({
-              event: "schedule.run_cleanup_failed",
-              scheduleId: schedule.id,
-              file: error.file,
-            }),
-          ),
-        ),
-      );
-    };
-
-    const commit = (current: Schedule | undefined, next: Schedule) =>
-      Effect.gen(function* () {
-        const previous = new Map<string, ScheduleRun>();
-        for (const run of current?.runs ?? []) previous.set(run.id, run);
-        const changed = next.runs.filter(
-          (run) => !util.isDeepStrictEqual(previous.get(run.id), run),
-        );
-        const storedCurrent =
-          current === undefined
-            ? Option.none<StoredSchedule>()
-            : yield* schedules.get(scheduleKey(next.id)).pipe(Effect.mapError(asWriteError));
-        const pendingIds = new Set(
-          Option.isSome(storedCurrent)
-            ? (storedCurrent.value.pendingRuns?.map((run) => run.id) ?? [])
-            : [],
-        );
-        for (const run of changed) pendingIds.add(run.id);
-        const pendingRuns = next.runs.filter((run) => pendingIds.has(run.id));
-
-        yield* schedules
-          .put(scheduleKey(next.id), toStored(next, pendingRuns))
-          .pipe(Effect.mapError(asWriteError));
-
-        const materialized = yield* Effect.forEach(
-          pendingRuns,
+    const commit = (current: Schedule | undefined, next: Schedule) => {
+      const previous = new Map<string, ScheduleRun>();
+      for (const run of current?.runs ?? []) previous.set(run.id, run);
+      const changed = next.runs.filter((run) => !util.isDeepStrictEqual(previous.get(run.id), run));
+      return Effect.gen(function* () {
+        yield* Effect.forEach(
+          changed,
           (run) => runs.put(runKey(next.id, run.id), run).pipe(Effect.mapError(asWriteError)),
           { concurrency: 16, discard: true },
-        ).pipe(
-          Effect.as(true),
-          Effect.catch((error) =>
-            Effect.logWarning("schedule run materialization failed").pipe(
-              Effect.annotateLogs({
-                event: "schedule.run_materialization_failed",
-                scheduleId: next.id,
-                file: error.file,
-              }),
-              Effect.as(false),
-            ),
-          ),
         );
-        if (materialized && pendingRuns.length > 0) {
-          yield* schedules.put(scheduleKey(next.id), toStored(next)).pipe(
-            Effect.mapError(asWriteError),
-            Effect.catch((error) =>
-              Effect.logWarning("schedule run finalization failed").pipe(
-                Effect.annotateLogs({
-                  event: "schedule.run_finalization_failed",
-                  scheduleId: next.id,
-                  file: error.file,
-                }),
-              ),
-            ),
-          );
-        }
-        yield* garbageCollectRuns(next);
+        yield* schedules
+          .put(scheduleKey(next.id), toStored(next))
+          .pipe(Effect.mapError(asWriteError));
       });
+    };
 
     return {
       list: () =>
