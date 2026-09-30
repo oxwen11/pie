@@ -82,6 +82,8 @@ type Lifecycle = {
   readonly acquiring: Ticket | undefined;
   readonly suspending: Deferred.Deferred<void> | undefined;
   readonly sealed: boolean;
+  readonly admissions: number;
+  readonly idleGeneration: number;
 };
 
 type AcquireDecision =
@@ -129,10 +131,13 @@ export type PiAgentSessionShape = {
    * rather than racing it.
    */
   readonly releaseRuntime: Effect.Effect<void>;
+  /** Protect prompt lookup/acquisition and admission from idle shutdown until scope exit.
+   * False means sealed; the manager must retry against its current session. */
+  readonly reserveAdmission: Effect.Effect<boolean, never, Scope.Scope>;
   /**
    * Kill the held Pi runtime without sealing the session, and publish
    * `session.runtime.stopped`. The next {@link ensureRuntime} may resume.
-   * No-op when nothing is held. Used for idle timeout.
+   * No-op unless held, idle, and free of prompt admissions. Used for idle timeout.
    */
   readonly suspendRuntime: (reason?: string) => Effect.Effect<void>;
 };
@@ -156,9 +161,9 @@ export const makePiAgentSession = (
       acquiring: undefined,
       suspending: undefined,
       sealed: false,
+      admissions: 0,
+      idleGeneration: 0,
     });
-    // Generation bumps cancel an in-flight idle timer without racing suspend.
-    const idleGeneration = yield* Ref.make(0);
     // Filled once idle helpers exist; applyWith calls it after every publish.
     let afterPublish: Effect.Effect<void> = Effect.void;
 
@@ -423,81 +428,129 @@ export const makePiAgentSession = (
       Effect.uninterruptible,
     );
 
-    const cancelIdleTimer: Effect.Effect<void> = Ref.update(idleGeneration, (n) => n + 1);
+    const cancelIdleTimer: Effect.Effect<void> = Ref.update(lifecycle, (current) => ({
+      ...current,
+      idleGeneration: current.idleGeneration + 1,
+    }));
 
     /**
      * Drop the held runtime without sealing, publish `session.runtime.stopped`,
      * leave the session queryable so the next prompt can {@link ensureRuntime}.
      */
-    const suspendRuntime = (reason = "idle"): Effect.Effect<void> =>
+    const suspendRuntime = (reason = "idle", generation?: number): Effect.Effect<void> =>
       identified(
-        cancelIdleTimer.pipe(
-          Effect.andThen(
-            Ref.modify(lifecycle, (current) => {
-              if (current.sealed || !current.held) {
-                return [undefined, current] as const;
-              }
-              // Hide the closing runtime from peek, but retain ownership until
-              // shutdown and the stopped event finish. Neither acquisition nor
-              // release may overtake that event and reset a replacement turn.
-              const done = Deferred.makeUnsafe<void>();
-              return [
-                { held: current.held, done },
-                { ...current, held: undefined, suspending: done },
-              ] as const;
+        applyLock
+          .withPermit(
+            Effect.gen(function* () {
+              // Check eligibility and claim ownership under the fold/publication
+              // lock. Shutdown must run outside it: interrupting the drain and
+              // publishing stopped both need that lock to remain available.
+              if ((yield* Ref.get(state)).phase !== "idle") return undefined;
+              return yield* Ref.modify(lifecycle, (current) => {
+                if (
+                  current.sealed ||
+                  !current.held ||
+                  current.admissions > 0 ||
+                  (generation !== undefined && current.idleGeneration !== generation)
+                ) {
+                  return [undefined, current] as const;
+                }
+                // Keep the ticket until both shutdown and stopped publication finish.
+                const done = Deferred.makeUnsafe<void>();
+                return [
+                  { held: current.held, done },
+                  {
+                    ...current,
+                    held: undefined,
+                    suspending: done,
+                    idleGeneration: current.idleGeneration + 1,
+                  },
+                ] as const;
+              });
             }),
-          ),
-          Effect.flatMap((pending) =>
-            pending
-              ? shutDown(pending.held).pipe(
-                  Effect.andThen(
-                    apply({
-                      type: "session.runtime.stopped",
-                      sessionId: ref.sessionId,
-                      reason,
-                    }),
-                  ),
-                  Effect.andThen(
-                    Effect.logInfo("session runtime suspended").pipe(
-                      Effect.annotateLogs({ event: "session.runtime.stopped", reason }),
+          )
+          .pipe(
+            Effect.flatMap((pending) =>
+              pending
+                ? shutDown(pending.held).pipe(
+                    Effect.andThen(
+                      apply({
+                        type: "session.runtime.stopped",
+                        sessionId: ref.sessionId,
+                        reason,
+                      }),
                     ),
-                  ),
-                  Effect.ensuring(
-                    Ref.update(lifecycle, (current) => ({
-                      ...current,
-                      suspending: undefined,
-                    })).pipe(Effect.andThen(Deferred.succeed(pending.done, undefined))),
-                  ),
-                )
-              : Effect.void,
+                    Effect.andThen(
+                      Effect.logInfo("session runtime suspended").pipe(
+                        Effect.annotateLogs({ event: "session.runtime.stopped", reason }),
+                      ),
+                    ),
+                    Effect.ensuring(
+                      Ref.update(lifecycle, (current) => ({
+                        ...current,
+                        suspending: undefined,
+                      })).pipe(Effect.andThen(Deferred.succeed(pending.done, undefined))),
+                    ),
+                  )
+                : Effect.void,
+            ),
+            Effect.uninterruptible,
           ),
-          Effect.uninterruptible,
-        ),
       );
 
     /** Arm idle kill when we hold a runtime and the fold says idle. */
     const armIdleTimer: Effect.Effect<void> = Effect.gen(function* () {
       if (idleTimeoutMs <= 0) return;
-      const held = yield* Ref.get(lifecycle).pipe(Effect.map((current) => current.held));
-      if (!held) return;
+      const ownership = yield* Ref.get(lifecycle);
+      if (!ownership.held || ownership.sealed || ownership.admissions > 0) return;
       const phase = yield* Ref.get(state).pipe(Effect.map((current) => current.phase));
       if (phase !== "idle") return;
-      const generation = yield* Ref.modify(idleGeneration, (n) => {
-        const next = n + 1;
-        return [next, next] as const;
+      const generation = yield* Ref.modify(lifecycle, (current) => {
+        const next = current.idleGeneration + 1;
+        return [next, { ...current, idleGeneration: next }] as const;
       });
       yield* Effect.forkIn(
         identified(
           Effect.sleep(`${idleTimeoutMs} millis`).pipe(
-            Effect.andThen(Ref.get(idleGeneration)),
-            Effect.flatMap((current) =>
-              current === generation ? suspendRuntime("idle") : Effect.void,
-            ),
+            Effect.andThen(suspendRuntime("idle", generation)),
           ),
         ),
         ownerScope,
       );
     });
+
+    const reserveAdmission: PiAgentSessionShape["reserveAdmission"] = Effect.suspend(() =>
+      Effect.acquireRelease(
+        Ref.modify(
+          lifecycle,
+          (current): readonly [boolean | Deferred.Deferred<void>, Lifecycle] => {
+            if (current.sealed) return [false, current] as const;
+            if (current.suspending) return [current.suspending, current] as const;
+            return [
+              true,
+              {
+                ...current,
+                admissions: current.admissions + 1,
+                idleGeneration: current.idleGeneration + 1,
+              },
+            ] as const;
+          },
+        ),
+        (reserved) =>
+          reserved === true
+            ? Ref.update(lifecycle, (current) => ({
+                ...current,
+                admissions: current.admissions - 1,
+              })).pipe(Effect.andThen(armIdleTimer))
+            : Effect.void,
+      ).pipe(
+        Effect.flatMap((reserved) =>
+          typeof reserved === "boolean"
+            ? Effect.succeed(reserved)
+            : Deferred.await(reserved).pipe(Effect.andThen(reserveAdmission)),
+        ),
+      ),
+    );
 
     // Wrap ensureRuntime to (re)arm idle once a runtime is held while idle.
     const ensureRuntimeWithIdle: PiAgentSessionShape["ensureRuntime"] = (acquire) =>
@@ -518,5 +571,6 @@ export const makePiAgentSession = (
       ensureRuntime: ensureRuntimeWithIdle,
       releaseRuntime: cancelIdleTimer.pipe(Effect.andThen(releaseRuntime)),
       suspendRuntime,
+      reserveAdmission,
     } satisfies PiAgentSessionShape;
   });

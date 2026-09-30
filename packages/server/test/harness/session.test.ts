@@ -736,3 +736,184 @@ it.effect("a close defect does not strand acquisition behind suspension", () =>
     ),
   ),
 );
+
+it.effect("idle deadline cannot interrupt turn-start publication", () =>
+  withControlledScheduler((flush) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const bus = yield* Effect.provide(EventBus, EventBusLayer);
+        const publishing = yield* Deferred.make<void>();
+        const publishGate = yield* Deferred.make<void>();
+        const session = yield* makePiAgentSession(
+          ref,
+          {
+            ...bus,
+            publish: (event) =>
+              event.type === "session.turn.started"
+                ? Deferred.succeed(publishing, undefined).pipe(
+                    Effect.andThen(Deferred.await(publishGate)),
+                    Effect.andThen(bus.publish(event)),
+                  )
+                : bus.publish(event),
+          },
+          { idleTimeoutMs: 40 },
+        );
+        const queue = yield* makeQueue;
+        const closes = yield* Ref.make(0);
+        const runtime = runtimeFrom(queue, { closes });
+        yield* session.ensureRuntime(Effect.succeed(runtime));
+        yield* Queue.offer(queue, {
+          type: "session.turn.started",
+          sessionId: nativeId,
+          turnId: "turn-1",
+        });
+        yield* Deferred.await(publishing);
+        assert.equal((yield* session.status).phase, "running");
+        yield* TestClock.adjust("100 millis");
+        yield* flush;
+        const heldAtDeadline = yield* session.peekRuntime;
+        const closesAtDeadline = yield* Ref.get(closes);
+        yield* Deferred.succeed(publishGate, undefined);
+        yield* flush;
+        assert.equal(heldAtDeadline, runtime);
+        assert.equal(closesAtDeadline, 0);
+        assert.equal((yield* session.snapshot).status.phase, "running");
+      }),
+    ),
+  ),
+);
+
+for (const ending of ["success", "failure", "interruption"] as const) {
+  it.effect(`admission reservation releases after ${ending} without releasing another caller`, () =>
+    withControlledScheduler((flush) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const bus = yield* Effect.provide(EventBus, EventBusLayer);
+          const session = yield* makePiAgentSession(ref, bus, { idleTimeoutMs: 40 });
+          const queue = yield* makeQueue;
+          const closes = yield* Ref.make(0);
+          const runtime = runtimeFrom(queue, { closes });
+          yield* session.ensureRuntime(Effect.succeed(runtime));
+          const firstGate = yield* Deferred.make<void>();
+          const secondGate = yield* Deferred.make<void>();
+          const first = yield* Effect.forkChild(
+            Effect.scoped(
+              session.reserveAdmission.pipe(
+                Effect.andThen(Deferred.await(firstGate)),
+                Effect.andThen(ending === "failure" ? Effect.fail("rejected") : Effect.void),
+              ),
+            ),
+          );
+          const second = yield* Effect.forkChild(
+            Effect.scoped(
+              session.reserveAdmission.pipe(Effect.andThen(Deferred.await(secondGate))),
+            ),
+          );
+          yield* flush;
+          yield* TestClock.adjust("100 millis");
+          assert.equal(yield* Ref.get(closes), 0);
+          if (ending === "interruption") yield* Fiber.interrupt(first);
+          else {
+            yield* Deferred.succeed(firstGate, undefined);
+            assert.equal(Exit.isFailure(yield* Fiber.await(first)), ending === "failure");
+          }
+          yield* TestClock.adjust("100 millis");
+          assert.equal(yield* session.peekRuntime, runtime);
+          yield* Deferred.succeed(secondGate, undefined);
+          yield* Fiber.join(second);
+          yield* TestClock.adjust("39 millis");
+          assert.equal(yield* Ref.get(closes), 0);
+          yield* TestClock.adjust("1 millis");
+          yield* flush;
+          assert.equal(yield* Ref.get(closes), 1);
+          yield* session.releaseRuntime;
+          assert.equal(yield* session.reserveAdmission, false);
+        }),
+      ),
+    ),
+  );
+}
+
+it.effect("admission waits through stopped publication and an interrupted waiter", () =>
+  withControlledScheduler((flush) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const bus = yield* Effect.provide(EventBus, EventBusLayer);
+        const publishing = yield* Deferred.make<void>();
+        const publishGate = yield* Deferred.make<void>();
+        const session = yield* makePiAgentSession(
+          ref,
+          {
+            ...bus,
+            publish: (event) =>
+              event.type === "session.runtime.stopped"
+                ? Deferred.succeed(publishing, undefined).pipe(
+                    Effect.andThen(Deferred.await(publishGate)),
+                    Effect.andThen(bus.publish(event)),
+                  )
+                : bus.publish(event),
+          },
+          { idleTimeoutMs: 40 },
+        );
+        const { suspending, closeGate } = yield* holdSuspension(session);
+        let admitted = false;
+        const canceled = yield* Effect.forkChild(Effect.scoped(session.reserveAdmission));
+        const waiting = yield* Effect.forkChild(
+          Effect.scoped(
+            session.reserveAdmission.pipe(
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  admitted = true;
+                }),
+              ),
+            ),
+          ),
+        );
+        yield* flush;
+        assert.equal(admitted, false);
+        yield* Fiber.interrupt(canceled);
+        yield* Deferred.succeed(closeGate, undefined);
+        yield* Deferred.await(publishing);
+        yield* flush;
+        assert.equal(admitted, false);
+        yield* Deferred.succeed(publishGate, undefined);
+        yield* Fiber.join(suspending);
+        assert.equal(yield* Fiber.join(waiting), true);
+        assert.equal(admitted, true);
+        const queue = yield* makeQueue;
+        const closes = yield* Ref.make(0);
+        yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue, { closes })));
+        yield* TestClock.adjust("100 millis");
+        yield* flush;
+        assert.equal(yield* Ref.get(closes), 1);
+      }),
+    ),
+  ),
+);
+
+for (const phase of ["running", "requires_action", "disabled"] as const) {
+  it.effect(`idle timeout preserves a ${phase} runtime`, () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const bus = yield* Effect.provide(EventBus, EventBusLayer);
+        const session = yield* makePiAgentSession(ref, bus, {
+          idleTimeoutMs: phase === "disabled" ? 0 : 40,
+        });
+        const queue = yield* makeQueue;
+        const closes = yield* Ref.make(0);
+        const runtime = runtimeFrom(queue, { closes });
+        yield* session.ensureRuntime(Effect.succeed(runtime));
+        if (phase !== "disabled")
+          yield* session.emit({ type: "session.turn.started", turnId: "turn-1" });
+        if (phase === "requires_action")
+          yield* session.emit({
+            type: "session.request.asked",
+            request: { type: "question", id: "request-1", questions: [], native: null },
+          });
+        yield* TestClock.adjust("100 millis");
+        assert.equal(yield* session.peekRuntime, runtime);
+        assert.equal(yield* Ref.get(closes), 0);
+      }),
+    ),
+  );
+}

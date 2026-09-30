@@ -74,6 +74,8 @@ export type PiAgentSessionManagerShape = {
    * for reconnecting clients).
    */
   readonly close: (ref: SessionRef) => Effect.Effect<void>;
+  /** Reserve prompt admission before looking up a runtime; released with the caller scope. */
+  readonly reserveAdmission: (ref: SessionRef) => Effect.Effect<void, never, Scope.Scope>;
   /**
    * The status/snapshot of a session. Total on purpose: a ref with nothing
    * live in memory — the ordinary state of every persisted session after a
@@ -222,6 +224,12 @@ export const makePiAgentSessionManager = (
         Effect.flatMap((runtime) => (runtime ? Effect.succeed(runtime) : acquireVia(ref, acquire))),
       );
 
+    const reserveAdmission: PiAgentSessionManagerShape["reserveAdmission"] = (ref) =>
+      sessionFor(ref).pipe(
+        Effect.flatMap((session) => session.reserveAdmission),
+        Effect.flatMap((reserved) => (reserved ? Effect.void : reserveAdmission(ref))),
+      );
+
     const peek = (ref: SessionRef): Effect.Effect<PiAgentRuntime | undefined> =>
       withSession<PiAgentRuntime | undefined>(ref, (session) => session.peekRuntime, undefined);
 
@@ -292,6 +300,7 @@ export const makePiAgentSessionManager = (
           ),
         ),
       peek,
+      reserveAdmission,
       close,
       status: (ref) => withSession(ref, (session) => session.status, toStatus(initialSessionState)),
       snapshot: (ref) =>
