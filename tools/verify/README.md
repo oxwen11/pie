@@ -54,4 +54,4 @@ Loopback health/ticket/warmup use `node:http` and try `[::1]` so Vite's
 IPv6-only 4190 is reachable when global `fetch` is intercepted or `localhost`
 is IPv4.
 
-**Helper is Node 24.** `pie-verify` and Electron's Node side stay on Node. Source pie CLI is Bun (`bun --no-install`).
+**Helper is Node 24.** `pie-verify`, the source pie CLI, and Electron's Node side stay on Node. Source pie is `node --experimental-transform-types --import tools/node/register-ts-hook.mjs`. pie-pi-process stays Bun.

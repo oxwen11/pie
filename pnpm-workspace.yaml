@@ -106,7 +106,7 @@ overrides:
   "@vitest/browser-playwright": "catalog:"
   "@types/node": "catalog:"
   # Drop the optional tsx peer everywhere. vite, tsdown, and vite-plus only
-  # use it to load TypeScript config; this repo runs TypeScript with bun.
+  # use it to load TypeScript config. This repo does not install tsx.
   tsx: "-"
   react: "catalog:react"
   react-dom: "catalog:react"

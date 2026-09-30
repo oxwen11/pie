@@ -105,7 +105,14 @@ export async function resolveCompatKey(repo: string): Promise<string> {
   return mod.resolveDaemonCompatibilityKey({ cwd: repo });
 }
 
-const pieArgv = ["--no-install", "src/node/cli.ts"];
+const sourceCliArgs = (repo: string, args: readonly string[]): string[] => [
+  "--experimental-transform-types",
+  "--disable-warning=ExperimentalWarning",
+  "--import",
+  path.join(repo, "tools/node/register-ts-hook.mjs"),
+  "src/node/cli.ts",
+  ...args,
+];
 
 export function invokePie(
   repo: string,
@@ -114,11 +121,12 @@ export function invokePie(
   options: { inherit?: boolean; logPath?: string } = {},
 ): CommandResult {
   const cwd = path.join(repo, "packages/pie");
+  const argv = sourceCliArgs(repo, args);
   if (options.logPath !== undefined) {
     const fd = fs.openSync(options.logPath, "a");
-    return runCommand("bun", [...pieArgv, ...args], { cwd, env, stdio: ["ignore", fd, fd] });
+    return runCommand(process.execPath, argv, { cwd, env, stdio: ["ignore", fd, fd] });
   }
-  return runCommand("bun", [...pieArgv, ...args], {
+  return runCommand(process.execPath, argv, {
     cwd,
     env,
     stdio: options.inherit === true ? "inherit" : "pipe",
@@ -131,7 +139,7 @@ export function spawnPie(
   logPath: string,
   env: NodeJS.ProcessEnv,
 ): ChildProcess {
-  return spawnLogged("bun", [...pieArgv, ...args], logPath, {
+  return spawnLogged(process.execPath, sourceCliArgs(repo, args), logPath, {
     cwd: path.join(repo, "packages/pie"),
     env,
   });
