@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import path from "node:path";
 import url from "node:url";
 
 import * as NodeServices from "@effect/platform-node/NodeServices";
@@ -15,14 +14,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("bundled Pi host module
   it.effect("loads user extensions from VIRTUAL_MODULES in the daemon and pie-pi-process", () =>
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
-      // tsdown may emit the folded branch in a sibling chunk, not the entry.
-      const distDir = path.dirname(serverBundle);
-      const chunkNames = (yield* fs.readDirectory(distDir)).filter((name) => name.endsWith(".js"));
-      const server = (yield* Effect.forEach(
-        chunkNames,
-        (name) => fs.readFileString(path.join(distDir, name)),
-        { concurrency: "unbounded" },
-      )).join("\n");
+      const server = yield* fs.readFileString(serverBundle);
       const piProcess = yield* fs.readFileString(piProcessBundle);
 
       // tsdown folds PI_BUNDLED_NODE so the embedded-module branch is always selected.

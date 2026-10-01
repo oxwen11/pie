@@ -9,9 +9,12 @@ export default defineConfig({
   shims: true,
   // Package is `"type": "module"`, so the forkable entry is `dist/server.js`.
   fixedExtension: false,
-  // Object entry key → output name, so the desktop supervisor and the daemon
-  // launcher can spawn a single self-contained file.
+  // Object entry key → output name. Dynamic imports stay in that file so the
+  // desktop supervisor can spawn one artifact, not a chunk graph.
   entry: { server: "src/http/main.ts" },
+  outputOptions: {
+    codeSplitting: false,
+  },
   deps: {
     // Inline everything so the forked artifact needs no node_modules resolution.
     // `vite` stays external: nothing in this package imports it. The UI is a
