@@ -14,6 +14,9 @@
 
 ## Runtime verification
 
+For PR-based verification, create a dedicated worktree per PR, even for serial
+runs. Follow the [PR worktree and isolation requirements](pull-requests.md#3-verify-independently).
+
 Use the matching [Web](../../skills/verify-pie/SKILL.md),
 [CLI](../../skills/verify-pie-cli/SKILL.md), or
 [Desktop](../../skills/verify-pie-desktop/SKILL.md) recipe:
