@@ -1,5 +1,8 @@
 # Delivery
 
+When the task changes the repo, open a pull request before you stop. Do not wait
+to be asked. Do not merge unless asked.
+
 - One concern per PR. Split large work into named, ordered slices before coding.
   A small fix stays one PR; multiple slices must form a stack, not disconnected PRs.
 - Use the [PR template](../../../.github/pull_request_template.md); keep it brief
