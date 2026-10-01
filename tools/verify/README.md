@@ -41,7 +41,7 @@ browser. Desktop Verify sets `PIE_DESKTOP_BACKGROUND=1`, keeping Electron hidden
 and non-activating; set it to `0` with `launch --replace` for a visible run. The repo shim
 (`tools/verify/bin/agent-browser`, also `pnpm exec agent-browser`) loads that
 env, ensures one numbered run-local recording is active at 60 fps, then
-forwards your command unchanged to the mise-managed agent-browser 0.37.1.
+forwards your command unchanged to the mise-managed agent-browser 0.38.1.
 Each `evidence init` stops the current clip and selects the next number; cleanup
 stops and flushes the current recording. Always pass an explicit `open` URL. `web env` / `desktop env` remain an
 optional dump. `cli` has no page.
