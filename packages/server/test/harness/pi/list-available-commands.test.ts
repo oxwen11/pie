@@ -6,6 +6,8 @@ import { layer } from "@effect/vitest";
 import { Effect, FileSystem } from "effect";
 
 import { listAvailablePiCommands } from "../../../src/harness/pi/list-available-commands";
+import { resolvePiExecutable } from "../../../src/harness/pi/resolve-executable";
+import { makePiTransport } from "../../../src/harness/pi/transport";
 
 const writeResources = (
   promptDirectory: string,
@@ -159,6 +161,20 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
       assert.deepEqual(
         commands.find((command) => command.name === "marker"),
         { name: "marker", description: "Marker command", source: "extension" },
+      );
+
+      const disabled = yield* makePiTransport({
+        executable: resolvePiExecutable(),
+        cwd,
+        args: ["--approve", "--no-extensions"],
+        env: { PI_CODING_AGENT_DIR: agentDir },
+      });
+      const hidden = yield* disabled.command<{ commands?: Array<{ name: string }> }>({
+        type: "get_commands",
+      });
+      assert.equal(
+        hidden.commands?.some((command) => command.name === "marker"),
+        false,
       );
     }),
   );
