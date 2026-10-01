@@ -212,12 +212,12 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
     },
   });
 
-  if (projectLists.some((list) => list.isPending)) {
+  const ownList =
+    projectLists[environments.findIndex((entry) => entry.environmentId === environmentId)];
+  if (ownList?.isPending || (groups.length === 0 && projectLists.some((list) => list.isPending))) {
     return <Loader />;
   }
 
-  const ownList =
-    projectLists[environments.findIndex((entry) => entry.environmentId === environmentId)];
   if (ownList?.isError) {
     return (
       <DraftProjectsError message={ownList.error.message} onRetry={() => void ownList.refetch()} />
