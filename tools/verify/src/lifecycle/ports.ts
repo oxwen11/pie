@@ -6,6 +6,10 @@ export function portPlan(identity: SurfaceIdentity): PortPlan {
   const piePort = envPort("PIE_PORT", identity.defaultPiePort);
   switch (identity.id) {
     case "web":
+      assertPiePortAllowed(identity, identity.vitePort);
+      if (piePort === identity.vitePort) {
+        throw new Error("PIE_PORT and PIE_VITE_PORT must be distinct");
+      }
       return {
         piePort,
         refuseTaken: [piePort, identity.vitePort],

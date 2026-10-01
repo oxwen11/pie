@@ -29,6 +29,15 @@ describe("portPlan", () => {
     });
   });
 
+  it("uses both explicit web ports and rejects a shared API/Vite port", () => {
+    process.env.PIE_PORT = "4184";
+    expect(portPlan({ ...WEB, vitePort: 4194 }).refuseTaken).toEqual([4184, 4194]);
+    expect(() => portPlan({ ...WEB, vitePort: 4184 })).toThrow(/distinct/);
+    expect(() => portPlan({ ...WEB, vitePort: 4000 })).toThrow(/4000/);
+    process.env.PIE_PORT = "65536";
+    expect(() => portPlan(WEB)).toThrow(/invalid PIE_PORT/);
+  });
+
   it("refuses only the pie port on cli", () => {
     delete process.env.PIE_PORT;
     expect(portPlan(CLI)).toEqual({
