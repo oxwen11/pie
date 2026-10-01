@@ -471,18 +471,21 @@ export const makePiAgentSession = (
     );
 
     // Process owns the file while it is held or still starting. Otherwise one SessionManager.
-    const route = <A, E>(
+    const route = <A, E, E2>(
       fromRuntime: (runtime: PiAgentRuntime) => Effect.Effect<A, E>,
-      fromFile: Effect.Effect<A, E>,
-    ): Effect.Effect<A, E> =>
+      fromFile: Effect.Effect<A, E2>,
+    ): Effect.Effect<A, E | E2> =>
       Ref.get(lifecycle).pipe(
-        Effect.flatMap((current) => {
+        Effect.flatMap((current): Effect.Effect<A, E | E2> => {
           if (current.held) return fromRuntime(current.held.runtime);
           const ticket = current.acquiring;
           if (!ticket) return fromFile;
           return Deferred.await(ticket).pipe(
             Effect.exit,
-            Effect.flatMap((exit) => (Exit.isSuccess(exit) ? fromRuntime(exit.value) : fromFile)),
+            Effect.flatMap(
+              (exit): Effect.Effect<A, E | E2> =>
+                Exit.isSuccess(exit) ? fromRuntime(exit.value) : fromFile,
+            ),
           );
         }),
       );
@@ -523,6 +526,7 @@ export const makePiAgentSession = (
             }),
           ),
           Effect.map((value) => value.model),
+          Effect.catchTag("SessionNotResumable", () => Effect.succeed(undefined)),
         );
       }
       return Effect.try({
