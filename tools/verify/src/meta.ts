@@ -1,5 +1,8 @@
-import { userDataDir, type SurfaceId } from "./identity.ts";
-import { isoNow, readJson, writeJson } from "./runtime/fs.ts";
+import path from "node:path";
+
+import { userDataDir, type SurfaceId, type SurfaceIdentity } from "./identity.ts";
+import { isoNow, isUnder, realPath, readJson, writeJson } from "./runtime/fs.ts";
+import { findRepoRoot } from "./runtime/process.ts";
 import type { LaunchCtx } from "./surface.ts";
 
 type RunMetaBase = {
@@ -61,6 +64,26 @@ export function readRunMeta(filePath: string): RunMeta {
     default:
       throw new TypeError(`invalid surface in ${filePath}`);
   }
+}
+
+/** Reject accidental cross-root/worktree adoption before probing or stopping a run. */
+export function readOwnedRunMeta(identity: SurfaceIdentity, runDir: string): RunMeta {
+  const root = realPath(identity.root);
+  const canonical = realPath(runDir);
+  if (
+    root === undefined ||
+    canonical === undefined ||
+    !isUnder(path.join(root, "runs"), canonical)
+  ) {
+    throw new Error("verification run is outside this isolation root");
+  }
+  const meta = readRunMeta(path.join(canonical, "meta.json"));
+  if (meta.surface !== identity.id || realPath(meta.repo) !== realPath(findRepoRoot())) {
+    throw new Error(
+      "verification run belongs to another surface or worktree; use its owning checkout and root",
+    );
+  }
+  return meta;
 }
 
 export function tryReadRunMeta(filePath: string): RunMeta | undefined {
