@@ -459,9 +459,10 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     > =>
       Effect.gen(function* () {
         const resolved = yield* resolveWorkspace(ref);
+        yield* manager.reserveAdmission(ref);
         const runtime = yield* ensureRuntimeForPrompt(ref, resolved);
         return yield* runtime.prompt(userInput);
-      });
+      }).pipe(Effect.scoped);
 
     const readHistory = (
       ref: SessionRef,

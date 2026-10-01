@@ -135,6 +135,8 @@ export const toWireBody = (
       };
     case "session.crashed":
       return { type: "session.crashed", reason: event.reason };
+    case "session.runtime.stopped":
+      return { type: "session.runtime.stopped", reason: event.reason };
     default: {
       const exhaustive: never = event;
       return exhaustive;
@@ -256,6 +258,17 @@ export const foldSessionEvent = (
       return {
         ...base,
         phase: "crashed",
+        activeTurn: null,
+        activePrompt: null,
+        pendingRequests: new Map(),
+        pendingPrompt: emptyPendingPrompt,
+      };
+    case "session.runtime.stopped":
+      // Intentional stop (idle timeout): back to idle, clear live turn
+      // state. seq/cursor keep going so clients do not rewind.
+      return {
+        ...base,
+        phase: "idle",
         activeTurn: null,
         activePrompt: null,
         pendingRequests: new Map(),

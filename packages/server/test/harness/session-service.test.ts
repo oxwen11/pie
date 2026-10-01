@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 
 import { layer } from "@effect/vitest";
 import { isSessionScopedEvent, type SessionRef, type PieUIMessage } from "@getpie/contract";
-import { Effect, Fiber, FileSystem, Layer, Logger, References, Stream } from "effect";
+import { Deferred, Effect, Fiber, FileSystem, Layer, Logger, References, Stream } from "effect";
+import { TestClock } from "effect/testing";
 
 import { structured, type LogRecord } from "../log-record";
 import { NodePlatformLayer } from "../platform";
@@ -30,6 +31,46 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
       assert.equal(result.stored.projectId, "proj-a");
       assert.equal(result.stored.cwd, "/tmp/pie-app");
       assert.equal(result.stored.archived, false);
+    }),
+  );
+
+  it.effect("idle deadline does not close a runtime during prompt admission", () =>
+    Effect.gen(function* () {
+      const admitting = yield* Deferred.make<void>();
+      const response = yield* Deferred.make<void>();
+      let calls = 0;
+      yield* run(
+        {
+          turn: "finished",
+          prompt: () =>
+            Effect.gen(function* () {
+              calls += 1;
+              if (calls > 1) {
+                yield* Deferred.succeed(admitting, undefined);
+                yield* Deferred.await(response);
+              }
+              return { turnId: "turn-1", started: true };
+            }),
+        },
+        (fixture) =>
+          Effect.gen(function* () {
+            const { ref } = yield* createSession(fixture);
+            const input = { ref, parts: [{ type: "text" as const, text: "hello" }] };
+            yield* fixture.service.prompt(input);
+            yield* TestClock.adjust("299 seconds");
+            const pending = yield* Effect.forkChild(fixture.service.prompt(input));
+            yield* Deferred.await(admitting);
+            yield* TestClock.adjust("301 seconds");
+            const closedDuringAdmission = fixture.spy.close.slice();
+            yield* Deferred.succeed(response, undefined);
+            assert.equal((yield* Fiber.join(pending)).started, true);
+            assert.deepEqual(closedDuringAdmission, []);
+            assert.equal(fixture.spy.open.length, 1);
+            assert.equal(fixture.spy.resume.length, 0);
+            yield* TestClock.adjust("301 seconds");
+            assert.deepEqual(fixture.spy.close, ["native-1"]);
+          }),
+      );
     }),
   );
 
