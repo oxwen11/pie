@@ -1,4 +1,3 @@
-import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { ListAgentCommandsOutput, ListAgentModelsOutput } from "@getpie/contract";
 import { Context, Effect, Layer } from "effect";
 
@@ -28,7 +27,7 @@ export const makePiAgentService = (): PiAgentServiceShape => ({
     });
   }),
   listModels: Effect.fn("PiAgentService.listModels")(function* (cwd?: string) {
-    return yield* listAvailablePiModels(cwd ?? getAgentDir());
+    return yield* listAvailablePiModels(cwd);
   }),
 });
 

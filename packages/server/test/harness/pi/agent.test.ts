@@ -93,6 +93,8 @@ rl.on("line", (line) => {
   }
   if (msg.type !== "prompt") return;
   const text = msg.message;
+  if (text === "handled") { send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "handled" } }); return; }
+  if (text === "queued-without-turn") { send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "queued" } }); return; }
   if (text === "fail") { send({ id: msg.id, type: "response", command: "prompt", success: false, error: "cannot prompt" }); return; }
   if (holding && !msg.streamingBehavior) {
     send({ id: msg.id, type: "response", command: "prompt", success: false, error: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." });
@@ -188,6 +190,31 @@ layer(NodeServices.layer)("PiAgent", (it) => {
           "finish",
         ],
       );
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("accepts an extension-handled input while idle without waiting for a model turn", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: fakeExecutable() });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const handled = yield* agent.session.prompt({ sessionId, text: "handled" });
+      assert.equal(handled.started, false);
+      assert.deepEqual(Array.from(yield* Stream.runCollect(handled.output)), []);
+      const ordinary = yield* agent.session.prompt({ sessionId, text: "ping" });
+      assert.equal(ordinary.started, true);
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("still rejects a queued admission without an active turn", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: fakeExecutable() });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const error = yield* agent.session
+        .prompt({ sessionId, text: "queued-without-turn" })
+        .pipe(Effect.flip);
+      assert.equal(error._tag, "AgentOperationError");
       yield* agent.session.abort(sessionId);
     }),
   );
@@ -647,7 +674,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 const sidIndex = process.argv.indexOf("--session-id");
 const isResume = process.argv[sidIndex + 1] === "existing";
 const hasModel = process.argv.includes("--provider") && process.argv.includes("p") && process.argv.includes("--model") && process.argv.includes("m");
-if (!process.argv.includes("--approve") || !process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
+if (!process.argv.includes("--approve") || process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 rl.on("line", (line) => {

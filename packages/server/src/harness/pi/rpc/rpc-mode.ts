@@ -442,10 +442,9 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
             source: "rpc",
             preflightResult: (disposition) => {
               preflightSucceeded = true;
-              // 0.99 reports disposition instead of a boolean. isStreaming is
-              // already true for a prompt that just started, so it cannot mean
-              // "queued".
-              output(success(id, "prompt", { started: disposition === "started" }));
+              // Keep the boolean for older callers. `handled` is an extension
+              // command that finished without a model turn.
+              output(success(id, "prompt", { started: disposition === "started", disposition }));
             },
           })
           .catch((cause: unknown) => {
