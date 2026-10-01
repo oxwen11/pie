@@ -6,6 +6,7 @@
   "exports": {
     "./vitest-browser": "./vitest-browser.ts",
     "./browser-locators": "./browser-locators.ts",
+    "./browser-locator-types": "./browser-locator-types.ts",
     "./seed-e2e-pi-agent": "./seed-e2e-pi-agent.ts",
     "./fake-pi": "./fake-pi.js",
     "./fake-gh": "./fake-gh.js"
