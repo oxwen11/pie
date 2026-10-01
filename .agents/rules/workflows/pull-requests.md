@@ -79,9 +79,15 @@ The reviewer runs the checks; the author's evidence cannot replace this step.
   the user's app, development instance or real data. Full `HOME` isolation is not
   required. For affected shared state outside `PIE_HOME`, isolate it or obtain
   explicit authorization. A worktree is not a security sandbox.
-- One verification task per host at a time. Occupied resources or another task
-  block this run; never kill the owner. Clean up only this task's processes,
-  preserve evidence and keep credentials out of uploads.
+- Parallel verification requires separate worktrees, verification roots,
+  application data, sample Projects, browser/Electron profiles, sockets, ports
+  and evidence. Same-root lifecycle operations and same-worktree builds stay
+  serial. Bind every operation to its owned run; occupied resources block that
+  configuration, not unrelated isolated runs. Never adopt or kill another
+  task's processes. Shared Pi settings/auth/package mutations remain serial and
+  require authorization; this includes creating a Session with an explicit model
+  or changing its model, which persist Pi's global default. `PIE_HOME` does not
+  isolate those writes. Preserve evidence and keep credentials out of uploads.
 
 ## 4. Record the outcome, then merge the verified version
 

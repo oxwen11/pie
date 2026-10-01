@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { tryReadRunMeta, type RunMeta } from "../meta.ts";
+import { readOwnedRunMeta, type RunMeta } from "../meta.ts";
 import { agentBrowserIsolation, isManagedAgentBrowserSocketDir } from "../runtime/browser.ts";
 import { clearCurrentRun, currentRun, isUnder, realPath, removePath } from "../runtime/fs.ts";
 import { removeScaffold } from "../runtime/scaffold.ts";
@@ -25,14 +25,17 @@ function sampleProjectOf(meta: RunMeta | undefined): string | undefined {
 
 export async function cleanup(surface: Surface, args: string[]): Promise<void> {
   const { identity } = surface;
-  const runDir =
-    currentRun(identity.currentLink) ?? (args[0] === undefined ? undefined : realPath(args[0]));
+  if (args.length > 1) throw new Error(`usage: ${identity.bin} cleanup [run-dir]`);
+  const runDir = args[0] === undefined ? currentRun(identity.currentLink) : realPath(args[0]);
+  if (args[0] !== undefined && runDir === undefined) {
+    throw new Error("explicit verification run does not exist");
+  }
   if (runDir === undefined) {
     console.log(`${identity.logPrefix}: no current run to clean up`);
     return;
   }
 
-  const meta = tryReadRunMeta(path.join(runDir, "meta.json"));
+  const meta = readOwnedRunMeta(identity, runDir);
   await teardownOwnedBrowserForRun(identity, runDir);
   await surface.stop(runDir, meta);
 
@@ -54,7 +57,8 @@ export async function cleanup(surface: Surface, args: string[]): Promise<void> {
     }
   }
 
-  if (isUnder(path.join(identity.root, "runs"), runDir)) {
+  const runsRoot = realPath(path.join(identity.root, "runs"));
+  if (runsRoot !== undefined && isUnder(runsRoot, runDir)) {
     removePath(runDir);
     console.log(`${identity.logPrefix}: removed ${runDir}`);
   }
