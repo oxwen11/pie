@@ -6,6 +6,7 @@ import type {
   PullRequestStackPreview,
   SessionPullRequestLink,
 } from "@getpie/contract/pull-request";
+import { SidebarProvider } from "@getpie/ui/components/sidebar";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
@@ -192,7 +193,9 @@ async function render(children: ReactNode) {
     component: () => (
       <PlatformProvider value={{}}>
         <EnvironmentOrpcProvider orpc={orpc}>
-          <PullRequestDemandProvider>{children}</PullRequestDemandProvider>
+          <SidebarProvider>
+            <PullRequestDemandProvider>{children}</PullRequestDemandProvider>
+          </SidebarProvider>
         </EnvironmentOrpcProvider>
       </PlatformProvider>
     ),

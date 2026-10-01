@@ -11,6 +11,8 @@ import { Tabs, TabsList, TabsPanel, TabsTab } from "@getpie/ui/components/tabs";
 import type { UseQueryResult } from "@tanstack/react-query";
 import { ExternalLinkIcon, GitPullRequestIcon, RefreshCwIcon } from "lucide-react";
 
+import { useShellTitlebar } from "@/components/layout/shell-chrome";
+
 import { PullRequestActions } from "./pull-request-actions";
 import { PullRequestChecks } from "./pull-request-checks";
 import { PullRequestDiffPane } from "./pull-request-diff-pane";
@@ -33,9 +35,13 @@ export function PullRequestInspect({
   refreshing: boolean;
   snapshot: PullRequestSnapshot;
 }) {
+  const titlebar = useShellTitlebar();
   return (
     <Tabs className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden" defaultValue="summary">
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
+      <div
+        className="flex h-11 shrink-0 items-center gap-2 border-b px-3"
+        data-drag-region={titlebar.dragRegion}
+      >
         <span className="relative me-1">
           <GitPullRequestIcon className="text-muted-foreground size-4" />
           <span className="bg-pull-request-open ring-background absolute -right-1 -bottom-0.5 size-2 rounded-full ring-2" />
