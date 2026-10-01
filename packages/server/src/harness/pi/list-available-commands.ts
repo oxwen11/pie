@@ -1,9 +1,10 @@
 import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import type { AgentCommand } from "@getpie/contract";
-import { Effect } from "effect";
+import { Effect, Stream } from "effect";
 
 import { PI_PROJECT_PROCESS_ARGS } from "./project-resource-policy";
+import { declineUiResponse } from "./request";
 import { resolvePiExecutable } from "./resolve-executable";
 import { makePiTransport } from "./transport";
 
@@ -21,9 +22,14 @@ export function listAvailablePiCommands(
         const transport = yield* makePiTransport({
           executable: resolvePiExecutable(),
           cwd: cwd ?? agentDir,
-          args: PI_PROJECT_PROCESS_ARGS,
+          args: cwd === undefined ? [] : PI_PROJECT_PROCESS_ARGS,
           env: { PI_CODING_AGENT_DIR: agentDir },
         });
+        // Discovery has no interactive consumer, including during session_start.
+        // Always send an explicit decline rather than leave a dialog pending.
+        yield* Stream.runForEach(transport.uiRequests, (request) =>
+          transport.respondUi(declineUiResponse(request)),
+        ).pipe(Effect.forkScoped);
         const data = yield* transport.command<{ commands?: AgentCommand[] }>({
           type: "get_commands",
         });

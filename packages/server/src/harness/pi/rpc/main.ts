@@ -64,14 +64,18 @@ export const main = async (): Promise<void> => {
       cwd: options.cwd,
       agentDir: options.agentDir,
       modelRuntimeSignal: AbortSignal.timeout(15_000),
+      settingsManager: SettingsManager.create(options.cwd, options.agentDir, {
+        projectTrusted: parsed.projectTrustOverride ?? false,
+      }),
       extensionFlagValues: FFF_OVERRIDE_FLAGS,
       resourceLoaderOptions: {
+        noExtensions: parsed.noExtensions ?? false,
         extensionFactories: [
           ...builtInExtensions,
           piBashExtension(options.cwd),
           sessionToolsExtensionFactory,
         ],
-        additionalExtensionPaths: [bundledFff],
+        additionalExtensionPaths: [bundledFff, ...(parsed.extensions ?? [])],
       },
     });
     const resolved = resolveCliModel({

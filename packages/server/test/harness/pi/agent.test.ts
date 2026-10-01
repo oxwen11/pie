@@ -93,6 +93,8 @@ rl.on("line", (line) => {
   }
   if (msg.type !== "prompt") return;
   const text = msg.message;
+  if (text === "handled") { send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "handled" } }); return; }
+  if (text === "queued-without-turn") { send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "queued" } }); return; }
   if (text === "fail") { send({ id: msg.id, type: "response", command: "prompt", success: false, error: "cannot prompt" }); return; }
   if (holding && !msg.streamingBehavior) {
     send({ id: msg.id, type: "response", command: "prompt", success: false, error: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." });
@@ -189,6 +191,40 @@ layer(NodeServices.layer)("PiAgent", (it) => {
         ],
       );
       yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("accepts an extension-handled input while idle without waiting for a model turn", () =>
+    Effect.gen(function* () {
+      const executable = fakeExecutable();
+      const process = yield* makePiProcess({ executable });
+      const pi = yield* makePiAgent(process, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
+      const handled = yield* session.prompt({ parts: [{ type: "text", text: "handled" }] });
+      assert.equal(handled.started, false);
+      assert.equal(typeof handled.turnId, "string");
+      const collected = yield* Stream.runCollect(
+        session.events.pipe(Stream.takeUntil((event) => event.body.type === "session.turn.ended")),
+      ).pipe(Effect.forkChild);
+      const ordinary = yield* session.prompt({ parts: [{ type: "text", text: "ping" }] });
+      assert.equal(ordinary.started, true);
+      const events = yield* Fiber.join(collected);
+      assert.equal(events.filter((event) => event.body.type === "session.turn.started").length, 1);
+      assert.equal(events.filter((event) => event.body.type === "session.turn.ended").length, 1);
+      assert.ok(!events.some((event) => event.body.type === "session.crashed"));
+      yield* session.close;
+    }),
+  );
+
+  it.effect("still rejects a queued admission without an active turn", () =>
+    Effect.gen(function* () {
+      const process = yield* makePiProcess({ executable: fakeExecutable() });
+      const { sessionId } = yield* process.session.create({ cwd: "/tmp" });
+      const error = yield* process.session
+        .prompt({ sessionId, text: "queued-without-turn" })
+        .pipe(Effect.flip);
+      assert.equal(error._tag, "AgentOperationError");
+      yield* process.session.abort(sessionId);
     }),
   );
 
@@ -647,7 +683,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 const sidIndex = process.argv.indexOf("--session-id");
 const isResume = process.argv[sidIndex + 1] === "existing";
 const hasModel = process.argv.includes("--provider") && process.argv.includes("p") && process.argv.includes("--model") && process.argv.includes("m");
-if (!process.argv.includes("--approve") || !process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
+if (!process.argv.includes("--approve") || process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 rl.on("line", (line) => {

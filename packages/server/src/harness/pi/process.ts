@@ -417,21 +417,6 @@ export const makePiProcessWithDependencies = <R>(
             Effect.sync(() => dependencies.onExit?.(sessionId, transport.pid)),
           );
 
-          // Readiness handshake: pi's CLI front-end resolves the session (and
-          // may exit with a human-readable error) before the RPC loop starts.
-          yield* transport.command<RpcSessionState>({ type: "get_state" }).pipe(
-            Effect.timeoutOrElse({
-              duration: HANDSHAKE_TIMEOUT,
-              orElse: () =>
-                Effect.fail(
-                  new PiTransportError({
-                    operation: "handshake-timeout",
-                    cause: new Error("Pi RPC get_state handshake timed out"),
-                  }),
-                ),
-            }),
-          );
-
           const session: SessionState = {
             sessionId,
             scope,
@@ -449,15 +434,31 @@ export const makePiProcessWithDependencies = <R>(
             turnState: yield* Ref.make<PiTurnState>({ _tag: "Idle" }),
             transform: createPiTransform(sessionId),
           };
-          yield* Ref.update(sessions, (current) => new Map(current).set(sessionId, session));
-
-          yield* Stream.runForEach(transport.events, (event) => routeEvent(session, event)).pipe(
-            Effect.catch((error) => reportCrash(session, error)),
-            Effect.forkIn(scope),
-          );
+          // Startup has no active turn or question consumer. Route UI now so
+          // session_start receives the existing safe decline, not a deadlock.
           yield* Stream.runForEach(transport.uiRequests, (request) =>
             Effect.forkIn(handleUiRequest(session, request), scope).pipe(Effect.asVoid),
           ).pipe(
+            Effect.catch((error) => reportCrash(session, error)),
+            Effect.forkIn(scope),
+          );
+          // Readiness still waits for Pi to resolve the session and finish
+          // extension startup before publishing it to callers.
+          yield* transport.command<RpcSessionState>({ type: "get_state" }).pipe(
+            Effect.timeoutOrElse({
+              duration: HANDSHAKE_TIMEOUT,
+              orElse: () =>
+                Effect.fail(
+                  new PiTransportError({
+                    operation: "handshake-timeout",
+                    cause: new Error("Pi RPC get_state handshake timed out"),
+                  }),
+                ),
+            }),
+          );
+          yield* Ref.update(sessions, (current) => new Map(current).set(sessionId, session));
+
+          yield* Stream.runForEach(transport.events, (event) => routeEvent(session, event)).pipe(
             Effect.catch((error) => reportCrash(session, error)),
             Effect.forkIn(scope),
           );
@@ -552,6 +553,13 @@ export const makePiProcessWithDependencies = <R>(
 
                   if (!started) {
                     const active = yield* Ref.get(session.turnState);
+                    if (admission?.disposition === "handled") {
+                      return {
+                        turnId: active._tag === "Active" ? active.turnId : uuid(),
+                        started: false,
+                        output: Stream.empty,
+                      };
+                    }
                     if (active._tag === "Active") {
                       return {
                         turnId: active.turnId,

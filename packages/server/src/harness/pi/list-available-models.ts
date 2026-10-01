@@ -19,7 +19,7 @@ const listModelsError = (cause: unknown) =>
  * RPC `get_available_models`, without spawning pie-pi-process.
  */
 export function listAvailablePiModels(
-  cwd: string,
+  cwd?: string,
 ): Effect.Effect<ListAgentModelsOutput, AgentOperationError> {
   return Effect.gen(function* () {
     const { createAgentSessionServices, getAgentDir, SettingsManager } = yield* Effect.tryPromise({
@@ -29,9 +29,13 @@ export function listAvailablePiModels(
     const services = yield* Effect.tryPromise({
       try: () =>
         createAgentSessionServices({
-          cwd,
+          cwd: cwd ?? getAgentDir(),
           agentDir: getAgentDir(),
-          settingsManager: SettingsManager.create(cwd, getAgentDir(), PI_PROJECT_SETTINGS_OPTIONS),
+          settingsManager: SettingsManager.create(
+            cwd ?? getAgentDir(),
+            getAgentDir(),
+            cwd === undefined ? { projectTrusted: false } : PI_PROJECT_SETTINGS_OPTIONS,
+          ),
           resourceLoaderOptions: PI_PROJECT_LOADER_OPTIONS,
         }),
       catch: listModelsError,
