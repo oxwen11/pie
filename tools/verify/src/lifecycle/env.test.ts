@@ -1,10 +1,11 @@
+import childProcess from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
-import { DESKTOP, WEB } from "../identity.ts";
+import { DESKTOP as desktopIdentity, WEB as webIdentity } from "../identity.ts";
 import { writeRunMeta, type DesktopRunMeta, type WebRunMeta } from "../meta.ts";
 import { agentBrowserIsolation } from "../runtime/browser.ts";
 import { VerifyError } from "../runtime/fail.ts";
@@ -20,6 +21,22 @@ import {
   writeBrowserEnvFile,
   writeIsolationShim,
 } from "./env.ts";
+
+// Never overwrite a live operator's default Verify wrapper or evidence.
+const testRoot = fs.mkdtempSync(path.join(os.tmpdir(), "pie-env-tests-"));
+const WEB = {
+  ...webIdentity,
+  root: path.join(testRoot, "web"),
+  currentLink: path.join(testRoot, "web/current"),
+  skillDir: path.join(testRoot, "web-skill"),
+};
+const DESKTOP = {
+  ...desktopIdentity,
+  root: path.join(testRoot, "desktop"),
+  currentLink: path.join(testRoot, "desktop/current"),
+  skillDir: path.join(testRoot, "desktop-skill"),
+};
+afterAll(() => fs.rmSync(testRoot, { recursive: true, force: true }));
 
 function webMeta(): WebRunMeta {
   return {
@@ -316,12 +333,56 @@ describe("resolveActiveBrowserEnv", () => {
 });
 
 describe("writeIsolationShim", () => {
+  it.each([WEB, DESKTOP])("binds $id even with a foreign ambient root/session", (base) => {
+    const root = fs.mkdtempSync(path.join(testRoot, `${base.id}-$quoted-`));
+    const identity = {
+      ...base,
+      root,
+      currentLink: path.join(root, "current"),
+      skillDir: path.join(root, "skill"),
+    };
+    const run = path.join(root, "runs", "bound");
+    writeRunMeta(path.join(run, "meta.json"), base.id === "web" ? webMeta() : desktopMeta());
+    fs.symlinkSync(run, identity.currentLink);
+    const bin = path.join(root, "fake-browser");
+    fs.writeFileSync(
+      bin,
+      '#!/bin/sh\nprintf "%s\\n" "$AGENT_BROWSER_SOCKET_DIR" "$PIE_VERIFY_RECORDING_PATH" "$AGENT_BROWSER_SESSION"\n',
+      { mode: 0o755 },
+    );
+    withFakeBrowser(() => {
+      process.env.VERIFY_PIE_AGENT_BROWSER = bin;
+      writeBrowserEnvFile(identity, run);
+      const result = childProcess.spawnSync(path.join(root, "bin/agent-browser"), ["--version"], {
+        encoding: "utf8",
+        env: {
+          ...process.env,
+          VERIFY_PIE_ROOT: path.join(testRoot, "foreign"),
+          VERIFY_PIE_DESKTOP_ROOT: path.join(testRoot, "foreign"),
+          VERIFY_PIE_BROWSER_SESSION: "foreign",
+          VERIFY_PIE_DESKTOP_BROWSER_SESSION: "foreign",
+        },
+      });
+      expect(result.stderr).toBe("");
+      expect(result.status).toBe(0);
+      expect(result.stdout.trim().split("\n")).toEqual([
+        agentBrowserIsolation(run).socketDir,
+        browserEnvForRun(identity, run).PIE_VERIFY_RECORDING_PATH,
+        identity.browserSession,
+      ]);
+    });
+    fs.rmSync(agentBrowserIsolation(run).socketDir, { recursive: true, force: true });
+  });
+
   it("writes a sourced wrapper under the isolation root", () => {
     writeIsolationShim(WEB);
     const dest = path.join(WEB.root, "bin/agent-browser");
     const text = fs.readFileSync(dest, "utf8");
     expect(text).toContain(path.join(WEB.currentLink, "agent-browser.env"));
     expect(text).toContain("export PIE_VERIFY_SURFACE=web");
+    expect(text).toContain(`export VERIFY_PIE_ROOT='${WEB.root}'`);
+    expect(text).toContain(`export VERIFY_PIE_SKILL_DIR='${WEB.skillDir}'`);
+    expect(text).toContain(`export VERIFY_PIE_BROWSER_SESSION='${WEB.browserSession}'`);
     expect(text).toContain('export VERIFY_PIE_AGENT_BROWSER="$AGENT_BROWSER"');
     expect(text).toContain("tools/verify/bin/agent-browser");
     expect(fs.statSync(dest).mode & 0o111).not.toBe(0);
@@ -329,16 +390,22 @@ describe("writeIsolationShim", () => {
 });
 
 describe("driveHintLines", () => {
-  it("teaches bare agent-browser for web", () => {
-    const lines = driveHintLines(WEB);
-    expect(lines.some((line) => line.includes("agent-browser open http://localhost:4190/"))).toBe(
-      true,
+  it("teaches the root-bound browser for web", () => {
+    expect(driveHintLines(WEB).join("\n")).toContain(
+      `'${path.join(WEB.root, "bin/agent-browser")}' open http://localhost:4190/`,
     );
   });
 
-  it("teaches bare agent-browser for desktop", () => {
-    const lines = driveHintLines(DESKTOP);
-    expect(lines.some((line) => line.includes("agent-browser get title"))).toBe(true);
+  it("uses the configured web port", () => {
+    expect(driveHintLines({ ...WEB, vitePort: 4194 }).join("\n")).toContain(
+      "http://localhost:4194/",
+    );
+  });
+
+  it("teaches the root-bound browser for desktop", () => {
+    expect(driveHintLines(DESKTOP).join("\n")).toContain(
+      `'${path.join(DESKTOP.root, "bin/agent-browser")}' get title`,
+    );
   });
 });
 
