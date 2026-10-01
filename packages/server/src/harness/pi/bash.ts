@@ -365,15 +365,19 @@ export async function executePieBash(input: {
   };
   shell.onData(onData);
 
-  let killReason: "abort" | "timeout" | undefined;
-  const kill = (reason: "abort" | "timeout") => {
+  let killReason: "timeout" | undefined;
+  const kill = () => {
     if (killReason) return;
-    killReason = reason;
+    killReason = "timeout";
     killProcessTree(pid);
   };
   let timeoutHandle: NodeJS.Timeout | undefined;
-  if (timeoutMs !== undefined) timeoutHandle = setTimeout(() => kill("timeout"), timeoutMs);
-  const onAbort = () => kill("abort");
+  if (timeoutMs !== undefined) timeoutHandle = setTimeout(kill, timeoutMs);
+  let yieldNow: () => void = () => undefined;
+  const yielded = new Promise<"yield">((resolve) => {
+    yieldNow = () => resolve("yield");
+  });
+  const onAbort = () => yieldNow();
   if (input.signal) {
     input.signal.addEventListener("abort", onAbort, { once: true });
     if (input.signal.aborted) onAbort();
@@ -391,10 +395,7 @@ export async function executePieBash(input: {
     },
   );
   const yieldMs = input.runInBackground ? 0 : (input.yieldMs ?? BACKGROUND_AFTER_MS);
-  let yieldTimer: NodeJS.Timeout | undefined;
-  const yielded = new Promise<"yield">((resolve) => {
-    yieldTimer = setTimeout(() => resolve("yield"), yieldMs);
-  });
+  const yieldTimer = setTimeout(yieldNow, yieldMs);
   const winner = await Promise.race([exited.then(() => "exit" as const), yielded]);
 
   const flushTail = () => {
@@ -413,7 +414,6 @@ export async function executePieBash(input: {
     const empty = killReason || (result.ok && result.code !== 0) ? "" : "(no output)";
     const text = rendered.text || empty;
     if (!rendered.details) unlinkQuiet(logPath);
-    if (killReason === "abort") throw new Error(appendStatus(text, "Command aborted"));
     if (killReason === "timeout") {
       throw new Error(
         appendStatus(text, `Command timed out after ${input.timeoutSeconds} seconds`),
@@ -471,7 +471,7 @@ export function piBashExtension(cwd: string): ExtensionFactory {
     pi.registerTool({
       name: "bash",
       label: "bash",
-      description: `Execute a bash command in the current working directory. Returns stdout and stderr. If the command is still running after ${BACKGROUND_AFTER_MS / 1000} seconds, it moves to the background and this call returns its pid and log path. Set run_in_background to return immediately. Read the log file for later output. A timeout in seconds kills the command instead of backgrounding it.`,
+      description: `Execute a bash command in the current working directory. Returns stdout and stderr. If the command is still running after ${BACKGROUND_AFTER_MS / 1000} seconds, or the turn is aborted, it moves to the background and this call returns its pid and log path. Set run_in_background to return immediately. Read the log file for later output. A timeout in seconds kills the command instead of backgrounding it.`,
       promptSnippet: "Execute bash commands (ls, grep, find, etc.)",
       promptGuidelines: [
         "You can inspect PI_* environment variables for current model and session details.",

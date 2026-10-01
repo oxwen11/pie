@@ -114,7 +114,7 @@ describe("executePieBash", () => {
     expect(full.length).toBeGreaterThan(50_000);
   });
 
-  it("aborts a running command instead of backgrounding it", async () => {
+  it("backgrounds a running command when the turn is aborted", async () => {
     const controller = new AbortController();
     const pending = executePieBash({
       command: "sleep 30",
@@ -125,7 +125,11 @@ describe("executePieBash", () => {
       logPath: (pid) => bashLogPath("test-abort", String(pid)),
     });
     controller.abort();
-    await expect(pending).rejects.toThrow("Command aborted");
+    const result = await pending;
+    const pid = Number(/pid (\d+)/.exec(result.text)?.[1]);
+    expect(result.text).toContain("Command running in background");
+    expect(() => process.kill(-pid, 0)).not.toThrow();
+    process.kill(-pid, "SIGKILL");
   });
 
   it("kills on timeout instead of backgrounding", async () => {
