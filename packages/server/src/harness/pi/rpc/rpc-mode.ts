@@ -63,6 +63,14 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
   let session = runtimeHost.session;
   let unsubscribe: (() => void) | undefined;
   let unsubscribeBackpressure: (() => void) | undefined;
+  const exit = {
+    reject: (_cause: unknown) => {
+      /* assigned synchronously by the exit promise below */
+    },
+  };
+  const exited = new Promise<never>((_resolve, reject) => {
+    exit.reject = reject;
+  });
 
   const output = (frame: unknown) => {
     writeRawStdout(serializeJsonLine(frame));
@@ -91,6 +99,15 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     { resolve: (value: RpcExtensionUIResponse) => void; reject: (error: Error) => void }
   >();
 
+  let inputEnded = false;
+  const cancelExtensionDialogs = () => {
+    inputEnded = true;
+    for (const [id, pending] of pendingExtensionRequests) {
+      pending.resolve({ type: "extension_ui_response", id, cancelled: true });
+    }
+    pendingExtensionRequests.clear();
+  };
+
   // Shutdown request flag
   let shutdownRequested = false;
   let shuttingDown = false;
@@ -103,7 +120,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     request: Record<string, unknown>,
     parseResponse: (response: RpcExtensionUIResponse) => T,
   ): Promise<T> {
-    if (opts?.signal?.aborted) return Promise.resolve(defaultValue);
+    if (inputEnded || opts?.signal?.aborted) return Promise.resolve(defaultValue);
 
     const id = crypto.randomUUID();
     return new Promise((resolve, reject) => {
@@ -273,6 +290,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     },
 
     async editor(title: string, prefill?: string): Promise<string | undefined> {
+      if (inputEnded) return undefined;
       const id = crypto.randomUUID();
       return new Promise((resolve, reject) => {
         pendingExtensionRequests.set(id, {
@@ -391,6 +409,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       },
     });
 
+    if (shuttingDown) return;
     unsubscribe?.();
     unsubscribeBackpressure?.();
     unsubscribe = session.subscribe((event) => {
@@ -412,15 +431,12 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 
     for (const signal of signals) {
       const handler = () => {
-        void shutdown(signal === "SIGHUP" ? 129 : 143, signal);
+        void shutdown(signal === "SIGHUP" ? 129 : 143, signal).catch(exit.reject);
       };
       process.on(signal, handler);
       signalCleanupHandlers.push(() => process.off(signal, handler));
     }
   };
-
-  await rebindSession();
-  registerSignalHandlers();
 
   // Handle a single command
   const handleCommand = async (command: RpcCommand): Promise<RpcResponse | undefined> => {
@@ -777,11 +793,10 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     /* assigned once stdin listeners are attached */
   };
 
-  async function shutdown(exitCode = 0, signal?: NodeJS.Signals): Promise<never> {
-    if (shuttingDown) {
-      throw new RpcChildExitError(exitCode);
-    }
+  async function shutdown(exitCode = 0, signal?: NodeJS.Signals): Promise<void> {
+    if (shuttingDown) return;
     shuttingDown = true;
+    cancelExtensionDialogs();
     for (const cleanup of signalCleanupHandlers) {
       cleanup();
     }
@@ -793,7 +808,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     if (signal !== "SIGTERM") {
       await flushRawStdout();
     }
-    throw new RpcChildExitError(exitCode);
+    exit.reject(new RpcChildExitError(exitCode));
   }
 
   async function checkShutdownRequested(): Promise<void> {
@@ -837,6 +852,10 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- JSONL command; handleCommand switches on type
     const command = parsed as RpcCommand;
     try {
+      // UI replies above must bypass initialization: session_start can await
+      // them. Ordinary commands must still wait for extensions to finish binding.
+      await binding;
+      if (shuttingDown) return;
       const response = await handleCommand(command);
       if (response) {
         output(response);
@@ -855,14 +874,25 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     }
   };
 
+  const binding = rebindSession();
+  const pendingInput = new Set<Promise<void>>();
+
   const onInputEnd = () => {
-    void shutdown();
+    cancelExtensionDialogs();
+    // Finite JSONL input can arrive while extensions are still binding. Let
+    // admitted commands finish before removing their event subscriptions.
+    void binding
+      .then(() => Promise.all(pendingInput))
+      .then(() => shutdown())
+      .catch(exit.reject);
   };
   process.stdin.on("end", onInputEnd);
 
   detachInput = (() => {
     const detachJsonl = attachJsonlLineReader(process.stdin, (line) => {
-      void handleInputLine(line);
+      const handling = handleInputLine(line);
+      pendingInput.add(handling);
+      void handling.finally(() => pendingInput.delete(handling)).catch(exit.reject);
     });
     return () => {
       detachJsonl();
@@ -870,8 +900,9 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     };
   })();
 
-  // Keep process alive forever
-  return new Promise(() => {
-    /* the child stays alive until shutdown() exits the process */
-  });
+  registerSignalHandlers();
+  await Promise.race([binding, exited]);
+
+  // Propagate shutdown to entry.ts rather than throwing in a detached callback.
+  return exited;
 }
