@@ -16,9 +16,15 @@ const imagePart = (src: string) => ({
 afterEach(() => document.documentElement.classList.remove("dark"));
 
 describe("AssistantMessage", () => {
-  it.each(["light", "dark"])(
-    "opens a translucent black preview in %s mode with working controls",
-    async (theme) => {
+  it.each([
+    { theme: "light", width: 390 },
+    { theme: "dark", width: 390 },
+    { theme: "light", width: 1280 },
+    { theme: "dark", width: 1280 },
+  ])(
+    "opens a translucent black preview in $theme mode at $width px with working controls",
+    async ({ theme, width }) => {
+      await page.viewport(width, 800);
       document.documentElement.classList.toggle("dark", theme === "dark");
       const canvas = document.createElement("canvas");
       canvas.width = 1600;
@@ -37,6 +43,8 @@ describe("AssistantMessage", () => {
       await trigger.click();
       const dialog = page.getByRole("dialog", { name: "result.png" });
       await expect.element(dialog).toBeVisible();
+      await expect.element(dialog).not.toHaveAttribute("data-starting-style");
+      await expect.poll(() => dialog.element().getAnimations().length).toBe(0);
       await expect
         .element(dialog.getByRole("heading", { name: "result.png" }))
         .toHaveClass(/sr-only/);
@@ -49,6 +57,12 @@ describe("AssistantMessage", () => {
       const zoomIn = dialog.getByRole("button", { name: "Zoom in" });
       const zoomOut = dialog.getByRole("button", { name: "Zoom out" });
       await expect.element(zoomIn).toBeEnabled();
+      const close = dialog.getByRole("button", { name: "Close image preview" });
+      for (const control of [close, zoomIn, zoomOut]) {
+        const bounds = control.element().getBoundingClientRect();
+        expect(bounds.width).toBe(44);
+        expect(bounds.height).toBe(44);
+      }
       expect(getComputedStyle(dialog.element()).backgroundColor).toBe("rgba(0, 0, 0, 0.8)");
       expect(getComputedStyle(dialog.element()).color).toBe("rgb(255, 255, 255)");
       expect(preview.element().getBoundingClientRect().width).toBeLessThanOrEqual(
@@ -66,9 +80,6 @@ describe("AssistantMessage", () => {
       for (let i = 0; i < 7; i++) await zoomIn.click();
       expect(stage.element().scrollWidth).toBeGreaterThan(stage.element().clientWidth);
 
-      const close = dialog.getByRole("button", { name: "Close image preview" });
-      expect(close.element().getBoundingClientRect().width).toBe(44);
-      expect(close.element().getBoundingClientRect().height).toBe(44);
       const bounds = dialog.element().getBoundingClientRect();
       const closeBounds = close.element().getBoundingClientRect();
       expect(closeBounds.right).toBeGreaterThan(bounds.right - 24);
@@ -84,6 +95,8 @@ describe("AssistantMessage", () => {
       await expect.element(dialog).not.toBeInTheDocument();
       await expect.element(trigger).toHaveFocus();
       await trigger.click();
+      await expect.element(dialog).not.toHaveAttribute("data-starting-style");
+      await expect.poll(() => dialog.element().getAnimations().length).toBe(0);
       await expect.element(zoomIn).toBeEnabled();
       expect(preview.element().getBoundingClientRect().width).toBeCloseTo(fitWidth, 0);
       await userEvent.keyboard("{Escape}");

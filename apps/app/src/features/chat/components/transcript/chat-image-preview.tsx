@@ -11,7 +11,7 @@ import { ExpandIcon, MinusIcon, PlusIcon, XIcon } from "lucide-react";
 import { useRef, useState, type ComponentProps } from "react";
 
 const imageClassName = "h-auto w-auto max-h-44 max-w-full rounded-md object-contain sm:max-w-xs";
-const controlClassName = "size-11";
+const controlClassName = "size-11 sm:size-11";
 
 export type ChatImagePreviewProps = Omit<ComponentProps<"img">, "src"> & { src: string };
 
