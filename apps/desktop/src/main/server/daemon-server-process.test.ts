@@ -112,7 +112,7 @@ layer(NodeServices.layer, { excludeTestServices: true, timeout: "30 seconds" })(
       const fs = yield* FileSystem.FileSystem;
       const home = yield* fs.makeTempDirectoryScoped({ prefix: "pie-daemon-desktop-" });
       const daemonDir = path.join(home, "daemon");
-      const entry = path.join(home, "fake-server.js");
+      const entry = path.join(home, "fake-server.mjs");
       const wedgeFile = path.join(home, "wedge-health");
       yield* fs.writeFileString(entry, FAKE_SERVER);
       yield* Effect.addFinalizer(() => Effect.ignore(stopDaemon(daemonDir)));

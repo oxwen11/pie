@@ -139,7 +139,7 @@ export const makePiSessionToolsBridge = (
     yield* server.serve(app);
     const directory = yield* fs.makeTempDirectoryScoped({ prefix: "pie-session-tools-" });
     yield* fs.chmod(directory, 0o700);
-    const extension = path.join(directory, "session-tools.js");
+    const extension = path.join(directory, "session-tools.mjs");
     yield* fs.writeFileString(extension, sessionToolsExtension, { mode: 0o600 });
     return {
       ready: Deferred.await(ready).pipe(

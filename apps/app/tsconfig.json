@@ -15,6 +15,6 @@
     "vitest.browser.config.ts",
     "vitest-shared.ts",
     "tailwindcss-vite.ts",
-    "../../tools/test/browser-locator-types.ts"
+    "../../tools/test/browser-locators.ts"
   ]
 }

@@ -349,11 +349,10 @@ export default defineConfig({
     },
     {
       files: [
-        "**/*.mjs",
         "tools/test/**",
         "tools/verify/bin/**",
         "apps/desktop/scripts/**",
-        "packages/server/test/**/*.js",
+        "packages/server/test/harness/pi/fixtures/registration-provider.js",
       ],
       rules: {
         "typescript/no-unsafe-argument": "off",
