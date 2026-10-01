@@ -1,0 +1,17 @@
+{
+  "name": "@getpie/test",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./vitest-browser": "./vitest-browser.ts",
+    "./browser-locators": "./browser-locators.ts",
+    "./seed-e2e-pi-agent": "./seed-e2e-pi-agent.ts",
+    "./fake-pi": "./fake-pi.js",
+    "./fake-gh": "./fake-gh.js"
+  },
+  "dependencies": {
+    "@vitest/browser-playwright": "catalog:",
+    "vitest": "catalog:"
+  }
+}

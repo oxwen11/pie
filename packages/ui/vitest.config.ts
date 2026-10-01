@@ -1,6 +1,5 @@
+import { pieBrowser, pieBrowserOptimizeDeps } from "@getpie/test/vitest-browser";
 import { defineConfig } from "vitest/config";
-
-import { pieBrowser, pieBrowserOptimizeDeps } from "../../tools/testing/vitest-browser";
 
 export default defineConfig({
   oxc: {

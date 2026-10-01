@@ -1,16 +1,14 @@
 import url from "node:url";
 
+import { pieBrowser, pieBrowserOptimizeDeps } from "@getpie/test/vitest-browser";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-import { pieBrowser, pieBrowserOptimizeDeps } from "../../tools/testing/vitest-browser";
 import { appAlias, appDir, browserTsTests } from "./vitest-shared";
 
-const browserSetupFiles = [
-  url.fileURLToPath(new URL("../../tools/testing/browser-locators.ts", import.meta.url)),
-];
+const browserSetupFiles = [url.fileURLToPath(import.meta.resolve("@getpie/test/browser-locators"))];
 
 const appVite = {
   ...appAlias,

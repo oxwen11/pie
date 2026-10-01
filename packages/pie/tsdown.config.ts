@@ -4,6 +4,8 @@ import { defineConfig } from "tsdown";
 const shared = {
   platform: "node" as const,
   format: ["esm" as const],
+  // Package is `"type": "module"`; emit `.js` instead of `.mjs`.
+  fixedExtension: false,
   minify: true,
   deps: {
     // Bundle JavaScript dependencies so npm installs only the native addon.

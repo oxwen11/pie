@@ -138,10 +138,10 @@ mise install          # or install the versions in mise.toml yourself
 pnpm install
 pnpm build
 
-node packages/pie/dist/cli.mjs daemon start
+node packages/pie/dist/cli.js daemon start
 # pie daemon started at http://127.0.0.1:4000 (pid …)
 
-node packages/pie/dist/cli.mjs pairing
+node packages/pie/dist/cli.js pairing
 # a one-time code and its expiry
 ```
 
