@@ -109,7 +109,7 @@ pnpm exec pie-verify desktop evidence note "recording-001.webm: what the clip sh
 pnpm exec pie-verify desktop evidence path
 ```
 
-agent-browser 0.37.1 records the existing pinned renderer in place. The Verify shim starts numbered 60 fps recordings on the first browser command. Run `evidence init` before each validation to stop the current take and select the next number; do not call `record start`, `restart`, or `stop`. Cleanup flushes the current take before Electron exits. A green Playwright e2e run is not a substitute for the screenshots and video.
+agent-browser 0.38.1 records the existing pinned renderer in place. The Verify shim starts numbered 60 fps recordings on the first browser command. Run `evidence init` before each validation to stop the current take and select the next number; do not call `record start`, `restart`, or `stop`. Cleanup flushes the current take before Electron exits. A green Playwright e2e run is not a substitute for the screenshots and video.
 
 `daemon.pid` is stored **redacted**. `evidence screenshot` / `snapshot` call the mise-managed `agent-browser` internally (session `pie-verify-desktop`, `--cdp <port>`) — they do not curl `/json/version`. Drive the window with `agent-browser`, not those evidence helpers.
 
