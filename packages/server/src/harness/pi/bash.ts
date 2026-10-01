@@ -9,6 +9,7 @@ import {
   type ExtensionAPI,
   type ExtensionFactory,
   bashSchema,
+  createBashToolDefinition,
   getShellConfig,
   killProcessTree,
   resolveSpawnContext,
@@ -468,17 +469,15 @@ const pieBashSchema = Type.Object({
 export function piBashExtension(cwd: string): ExtensionFactory {
   hookExit();
   return (pi: ExtensionAPI) => {
+    const base = createBashToolDefinition(cwd);
     pi.registerTool({
-      name: "bash",
-      label: "bash",
-      description: `Execute a bash command in the current working directory. Returns stdout and stderr. If the command is still running after ${BACKGROUND_AFTER_MS / 1000} seconds, or the turn is aborted, it moves to the background and this call returns its pid and log path. Set run_in_background to return immediately. Read the log file for later output. A timeout in seconds kills the command instead of backgrounding it.`,
-      promptSnippet: "Execute bash commands (ls, grep, find, etc.)",
+      ...base,
+      description: `${base.description} If it is still running after ${BACKGROUND_AFTER_MS / 1000} seconds, or the turn is aborted, this call returns its pid and log path. Set run_in_background to return immediately. A timeout kills the command instead of backgrounding it.`,
       promptGuidelines: [
-        "You can inspect PI_* environment variables for current model and session details.",
+        ...(base.promptGuidelines ?? []),
         `Commands still running after ${BACKGROUND_AFTER_MS / 1000} seconds move to the background and return a pid and log path. Read that file for later output. Stop a background command with \`kill -- -<pid>\`.`,
       ],
       parameters: pieBashSchema,
-      constrainedSampling: { type: "json_schema", strict: "prefer" },
       async execute(_toolCallId, params, signal, _onUpdate, ctx) {
         const spawned = resolveSpawnContext(params.command, ctx.cwd || cwd, undefined, true, ctx);
         const result = await executePieBash({
