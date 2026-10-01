@@ -63,11 +63,8 @@ same review. After the author updates the PR, restart at CI for the new version.
 
 The reviewer runs the checks; the author's evidence cannot replace this step.
 
-- For each PR being verified, create a separate, clean reviewer-owned worktree
-  dedicated to that PR and pinned to its recorded head. This applies to serial
-  and parallel verification alike: do not share a verification worktree across
-  PRs or switch it between PR branches. Do not use the developer's checkout or
-  the main checkout. Install locked dependencies and build affected artifacts
+- Create a dedicated, clean reviewer-owned worktree for each PR, pinned to its
+  recorded head. Install locked dependencies and build affected artifacts
   through Turbo. Confirm builds and running instances belong to this revision;
   reused artifacts or `launch --replace` alone do not prove freshness. Uncommitted
   source changes cannot serve as proof of the PR head.
