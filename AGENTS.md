@@ -26,11 +26,7 @@ applicable guidance when the scope changes.
 | Acceptance: checks, failure cases, and evidence                  | [acceptance.md](.agents/rules/workflows/acceptance.md) |
 | Delivery: work slices, PRs, CI, and merging                      | [delivery.md](.agents/rules/workflows/delivery.md)     |
 
-A repo change is not done until its pull request is open. Do not wait to be
-asked. Follow [delivery.md](.agents/rules/workflows/delivery.md): commit on a
-branch, push, and open the PR. Push to an existing open PR instead of opening
-another. Do not merge unless asked. Skip when nothing changed, the user opted
-out, or the task is read-only.
+When the task changes the repo, open a pull request before you stop. Do not merge unless asked.
 
 ## Topics — read when affected
 
