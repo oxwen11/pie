@@ -49,8 +49,9 @@ export function SessionComposer({
   const turnInProgress = status === "submitted" || status === "streaming";
   // Hide only the bubble this client just inserted, not every earlier user line
   // with the same text.
+  const hiddenSteers = new Set(optimisticSteerTexts);
   const visiblePending = {
-    steering: pendingPrompt.steering.filter((text) => !optimisticSteerTexts.includes(text)),
+    steering: pendingPrompt.steering.filter((text) => !hiddenSteers.has(text)),
     followUp: pendingPrompt.followUp,
   };
   const hasQueued = visiblePending.steering.length > 0 || visiblePending.followUp.length > 0;
