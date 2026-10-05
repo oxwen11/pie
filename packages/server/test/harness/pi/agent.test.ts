@@ -698,7 +698,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 const sidIndex = process.argv.indexOf("--session-id");
 const isResume = process.argv[sidIndex + 1] === "existing";
 const hasModel = process.argv.includes("--provider") && process.argv.includes("p") && process.argv.includes("--model") && process.argv.includes("m");
-if (!process.argv.includes("--approve") || !process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
+if (!process.argv.includes("--approve") || process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 rl.on("line", (line) => {

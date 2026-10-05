@@ -155,11 +155,11 @@ layer(NodeServices.layer, { excludeTestServices: true })(
             [pullRequest],
           );
           yield* service.close(ref);
-          yield* service.getMessages(ref); // History acquires a real, newly scoped Pi process.
+          yield* service.getMessages(ref); // Cold transcript. Does not spawn.
           yield* run("session_exclude_pull_request", { url: prUrl });
           assert.equal((yield* service.pullRequestsFor(ref))[0]?.excluded, true);
           yield* service.close(ref);
-          yield* service.getModelState(ref); // Model reads use the shared live-runtime acquisition path.
+          yield* service.getModelState(ref); // Cold model state. The next prompt is what resumes.
           yield* run("session_register_pull_request", { url: prUrl, restore: true });
           assert.equal((yield* coordinator.statuses([ref]))[0]?.links[0]?.excluded, false);
           assert.equal(remoteReads, 0);
