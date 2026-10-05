@@ -39,14 +39,20 @@ not a CLI-owned store. Any missing procedure must land in the same stack.
 
 ```text
 pie schedule ls|create|update|pause|resume|run|rm|logs …
-pie hub login|connect|status|disconnect|logout
+pie hub connect <hub-origin> --expected-environment-id UUID --token-stdin [--url DAEMON]
+pie hub status|refresh [--url DAEMON]
+pie hub disconnect --expected-environment-id UUID --yes [--url DAEMON]
 pie terminal ls|create|send|capture|close …
 ```
 
 - Schedule flags mirror contract specs (`cron` / `every` / `once` / `manual`)
   and session policies (`isolated` / `owned` / `existing`).
-- Hub commands only configure daemon enrollment. The public Hub is a separate
-  binary, never `pie hub serve`; see the [Hub RFC](pie-hub.md).
+- Hub commands configure the selected Environment through daemon RPC. `--url` /
+  `PIE_URL` retains existing connect-only behavior; otherwise use the local daemon.
+  The public Hub is a separate binary, never `pie hub serve`. Noninteractive
+  token-based setup replaces the earlier unimplemented `login/logout` proposal
+  **only if approved**; see the [Hub RFC decisions](pie-hub.md#10-decisions-for-the-developer).
+  No CLI-owned relationship store or secret in argv/stdout.
 - Terminal commands require the matching terminal contract; no focus selectors,
   host fleets, command bus, or second orchestrator.
 
