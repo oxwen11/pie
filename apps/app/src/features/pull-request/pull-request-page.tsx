@@ -315,6 +315,7 @@ function PullRequestPageDetail({
     <PullRequestInspect
       actionPending={actionPending}
       diff={diff}
+      dragRegion={titlebar.dragRegion}
       onAction={onAction}
       onRefresh={onRefresh}
       postActionRefreshFailed={postActionRefreshFailed}
