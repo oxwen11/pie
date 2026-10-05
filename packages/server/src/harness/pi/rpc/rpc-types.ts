@@ -1,5 +1,5 @@
 /**
- * Vendored from @earendil-works/pi-coding-agent v0.99.1
+ * Vendored from @earendil-works/pi-coding-agent v1.0.2
  * (`packages/coding-agent/src/modes/rpc/rpc-types.ts`).
  * Pie owns this command table.
  */
