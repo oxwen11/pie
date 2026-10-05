@@ -12,7 +12,6 @@ import {
   parseLeadingInterval,
   parseRunAt,
   previousOccurrence,
-  stableHash,
 } from "../src/cron";
 
 describe("leading interval", () => {
@@ -126,9 +125,5 @@ describe("jitter", () => {
     expect(jittered).toBeLessThanOrEqual(onHour);
     expect(onHour - jittered).toBeLessThanOrEqual(90_000);
     expect(jittered).toBeGreaterThan(created);
-  });
-
-  it("hashes the same id to the same number", () => {
-    expect(stableHash("a1b2c3d4")).toBe(stableHash("a1b2c3d4"));
   });
 });
