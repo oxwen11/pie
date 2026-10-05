@@ -14,6 +14,12 @@
 - Build, typecheck, and lint run through Turbo for upstream builds, including
   oxlint plugins. Scope with `pnpm exec turbo run typecheck --filter=@getpie/server`,
   not package scripts. Use `--force` when changed inputs are outside the cache hash.
+- The root Cargo workspace is on that same graph (`experimentalCargoWorkspaces`).
+  `pie-resource-monitor#build` is `cargo build --release --locked`; `@getpie/server#build`
+  copies `native/resource-monitor/target/release/pie-resource-monitor` into `dist/resources`. `dev` does not
+  launch the sidecar. `pnpm lint` also runs workspace `cargo clippy`. Rust test,
+  check, and format stay `pnpm exec turbo run <task> --filter=pie-resource-monitor`.
+  Do not fold those into root `pnpm test`.
 - Formatting is root-only oxfmt. `pnpm lint` / `pnpm format` rewrite files;
   `:check` variants report. Pre-commit builds oxlint plugins, then runs fixers on
   staged files — it does not run typecheck or tests. Inspect changes after commit.
@@ -44,8 +50,11 @@
   Use the relevant existing harness rather than treating one as proof of the other.
 - Conversation/sync E2E runs real `pie-pi-process` with a seeded provider under
   isolated `$PIE_HOME/agent` (`PI_CODING_AGENT_DIR`); see
-  `tools/testing/fake-e2e-provider.ts`. Connection/daemon/MessagePort cases do not
-  use that provider. `fake-pi.mjs` remains for unit/RPC executable-replacement tests.
+  `tools/testing/fake-e2e-provider.ts`. That override is only for this seeded
+  fake provider. `pie-verify` keeps `HOME` and the operator's Pi configuration;
+  do not point `PI_CODING_AGENT_DIR` at an empty directory. Connection, daemon,
+  and MessagePort cases do not use that provider. `fake-pi.mjs` remains for
+  unit/RPC executable-replacement tests.
 - Read the package's Vitest config before adding tests: include patterns and
   environment/typecheck settings differ, and an unmatched test can be silently skipped.
   Artifact tests require a build first. Server tests disable file parallelism because

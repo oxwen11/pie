@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import type { SurfaceIdentity } from "../identity.ts";
-import { initialMeta, tryReadRunMeta, writeRunMeta } from "../meta.ts";
+import { initialMeta, readOwnedRunMeta, writeRunMeta } from "../meta.ts";
 import type { RunMeta } from "../meta.ts";
 import { ensureCoreBuilt, ensureServerBuilt } from "../runtime/daemon.ts";
 import {
@@ -14,7 +14,13 @@ import {
   setCurrentRun,
   tailFile,
 } from "../runtime/fs.ts";
-import { commandOnPath, envPort, findRepoRoot, pidAlive } from "../runtime/process.ts";
+import {
+  assertOperatorPiConfig,
+  commandOnPath,
+  envPort,
+  findRepoRoot,
+  pidAlive,
+} from "../runtime/process.ts";
 import { ensureSampleProject, seedSampleProject, type SampleProject } from "../runtime/scaffold.ts";
 import { parseLaunchArgs, type LaunchCtx, type Surface } from "../surface.ts";
 import { cleanup } from "./cleanup.ts";
@@ -23,6 +29,7 @@ import { recordedPids } from "./pids.ts";
 import { applyPortPlan, portPlan } from "./ports.ts";
 
 export async function launch(surface: Surface, args: string[]): Promise<void> {
+  assertOperatorPiConfig();
   const { identity } = surface;
   const request = parseLaunchArgs(args, {
     allowServe: identity.allowServe,
@@ -61,7 +68,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   const plan = portPlan(identity);
   const existing = currentRun(identity.currentLink);
   if (existing !== undefined) {
-    const meta = tryReadRunMeta(path.join(existing, "meta.json"));
+    const meta = readOwnedRunMeta(identity, existing);
     const kind = await classifyRun(surface, existing, meta, request.mode);
     switch (kind) {
       case "reuse":
@@ -137,7 +144,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   } catch (error) {
     tailFailure(runDir, pieHome);
     copyFailureLogs(runDir, path.join(identity.root, "last-failure"));
-    await cleanup(surface, []).catch(() => undefined);
+    await cleanup(surface, [runDir]).catch(() => undefined);
     throw error;
   }
 }

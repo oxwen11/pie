@@ -1,5 +1,5 @@
 /**
- * Vendored from @earendil-works/pi-coding-agent v0.87.1
+ * Vendored from @earendil-works/pi-coding-agent v0.99.1
  * (`packages/coding-agent/src/modes/rpc/rpc-mode.ts`).
  *
  * Pie owns this loop so extension bind (`session.bindExtensions`), the RPC
@@ -440,11 +440,17 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
             images: command.images,
             streamingBehavior: command.streamingBehavior,
             source: "rpc",
-            preflightResult: (didSucceed) => {
-              if (didSucceed) {
-                preflightSucceeded = true;
-                output(success(id, "prompt", { started: !session.isStreaming }));
-              }
+            preflightResult: (disposition) => {
+              preflightSucceeded = true;
+              // 0.99 reports disposition instead of a boolean. isStreaming is
+              // already true for a prompt that just started, so it cannot mean
+              // "queued".
+              output(
+                success(id, "prompt", {
+                  started: disposition === "started",
+                  disposition,
+                }),
+              );
             },
           })
           .catch((cause: unknown) => {
@@ -457,13 +463,15 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       }
 
       case "steer": {
-        await session.steer(command.message, command.images, { source: "rpc" });
-        return success(id, "steer");
+        const disposition = await session.steer(command.message, command.images, { source: "rpc" });
+        return success(id, "steer", { disposition });
       }
 
       case "follow_up": {
-        await session.followUp(command.message, command.images, { source: "rpc" });
-        return success(id, "follow_up");
+        const disposition = await session.followUp(command.message, command.images, {
+          source: "rpc",
+        });
+        return success(id, "follow_up", { disposition });
       }
 
       case "abort": {
