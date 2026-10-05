@@ -6,7 +6,7 @@ import { cn } from "@getpie/ui/lib/utils";
 import { SearchIcon } from "lucide-react";
 import { useState } from "react";
 
-import { useShellTitlebar } from "@/components/layout/shell-chrome";
+import { ShellTitlebarClearance, useShellTitlebar } from "@/components/layout/shell-chrome";
 
 import { formatSpec } from "./cadence";
 import { projectNameOf } from "./format";
@@ -34,9 +34,9 @@ export function SchedulePageList() {
       className={cn(
         "mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden",
         panelOpen ? "px-3" : "max-w-3xl px-6",
-        titlebar.insetClassName,
       )}
     >
+      <ShellTitlebarClearance />
       {panelOpen ? (
         <ScheduleFilterBar dragRegion={titlebar.dragRegion} filter={filter} onFilter={setFilter} />
       ) : (

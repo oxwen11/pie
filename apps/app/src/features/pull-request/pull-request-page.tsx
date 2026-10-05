@@ -21,7 +21,7 @@ import { Group } from "react-resizable-panels";
 
 import { PanelSeparator } from "@/components/layout/panel-separator";
 import { ResizablePanel } from "@/components/layout/resizable-panel";
-import { useShellTitlebar } from "@/components/layout/shell-chrome";
+import { ShellTitlebarClearance, useShellTitlebar } from "@/components/layout/shell-chrome";
 import { useLocalOrpc } from "@/lib/environment-orpc";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
@@ -141,11 +141,9 @@ function PullRequestListPane({
 
   return (
     <>
+      <ShellTitlebarClearance />
       <div
-        className={cn(
-          "flex h-11 shrink-0 items-center gap-0.5 px-3 text-sm font-medium",
-          titlebar.insetClassName,
-        )}
+        className="flex h-11 shrink-0 items-center gap-0.5 px-3 text-sm font-medium"
         data-drag-region={titlebar.dragRegion}
       >
         <h1 className="sr-only">Pull requests</h1>

@@ -1,5 +1,5 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
-import type { CSSProperties } from "react";
+import { createElement, type CSSProperties } from "react";
 
 import type { Platform } from "@/platform";
 import { usePlatform } from "@/platform-context";
@@ -69,9 +69,24 @@ export function useShellTitlebar() {
   const desktop = isDesktopHost(usePlatform());
   const collapsedDesktop = desktop && !isMobile && state === "collapsed";
   return {
+    collapsedDesktop,
     dragRegion: desktop ? ("" as const) : undefined,
     insetClassName: collapsedDesktop ? ("ps-(--shell-titlebar-content-left)" as const) : false,
   };
+}
+
+/**
+ * Traffic lights only cover the top titlebar band. A narrow split cannot also
+ * spend that inset on its controls, so push those controls below the band.
+ */
+export function ShellTitlebarClearance() {
+  const titlebar = useShellTitlebar();
+  if (!titlebar.collapsedDesktop) return null;
+  return createElement("div", {
+    "aria-hidden": true,
+    className: "h-10 shrink-0",
+    "data-drag-region": titlebar.dragRegion,
+  });
 }
 
 /** Card title cluster — matches `BrandMark` / toggle cap height. */

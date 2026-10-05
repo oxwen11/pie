@@ -6,7 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, ChevronRight, Plus } from "lucide-react";
 import { useState, type ReactElement } from "react";
 
-import { useShellTitlebar } from "@/components/layout/shell-chrome";
+import { ShellTitlebarClearance, useShellTitlebar } from "@/components/layout/shell-chrome";
 import Loader from "@/components/loader";
 import { useLocalOrpc } from "@/lib/environment-orpc";
 
@@ -38,11 +38,9 @@ export function PackagesPage(): ReactElement {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <ShellTitlebarClearance />
       <div
-        className={cn(
-          "flex h-12 shrink-0 items-center justify-between px-3",
-          titlebar.insetClassName,
-        )}
+        className="flex h-12 shrink-0 items-center justify-between px-3"
         data-drag-region={titlebar.dragRegion}
       >
         {detail === null ? (
