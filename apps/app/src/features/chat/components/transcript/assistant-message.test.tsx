@@ -44,7 +44,9 @@ describe("AssistantMessage", () => {
       const dialog = page.getByRole("dialog", { name: "result.png" });
       await expect.element(dialog).toBeVisible();
       await expect.element(dialog).not.toHaveAttribute("data-starting-style");
-      await expect.poll(() => dialog.element().getAnimations().length).toBe(0);
+      for (const animation of dialog.element().getAnimations({ subtree: true })) {
+        animation.finish();
+      }
       await expect
         .element(dialog.getByRole("heading", { name: "result.png" }))
         .toHaveClass(/sr-only/);
@@ -96,7 +98,9 @@ describe("AssistantMessage", () => {
       await expect.element(trigger).toHaveFocus();
       await trigger.click();
       await expect.element(dialog).not.toHaveAttribute("data-starting-style");
-      await expect.poll(() => dialog.element().getAnimations().length).toBe(0);
+      for (const animation of dialog.element().getAnimations({ subtree: true })) {
+        animation.finish();
+      }
       await expect.element(zoomIn).toBeEnabled();
       expect(preview.element().getBoundingClientRect().width).toBeCloseTo(fitWidth, 0);
       await userEvent.keyboard("{Escape}");
