@@ -6,7 +6,13 @@ import path from "node:path";
 import { killProcessTree } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { bashLogPath, executePieBash, filterPiBashEnv } from "../../../src/harness/pi/bash";
+import { logsDirectory } from "../../../src/config/paths";
+import {
+  bashLogPath,
+  executePieBash,
+  filterPiBashEnv,
+  openBashLog,
+} from "../../../src/harness/pi/bash";
 
 const HOST_ENV: NodeJS.ProcessEnv = {
   PIE_DAEMON_DIR: "daemon-beta",
@@ -44,15 +50,39 @@ describe("filterPiBashEnv", () => {
 });
 
 describe("bashLogPath", () => {
-  it("nests the log under the session, not the tool", () => {
-    expect(bashLogPath("sess/1", "12")).toBe(
-      path.join(os.tmpdir(), "pie", "sess_1", "bash", "12.log"),
+  it("nests the log under the home logs directory, not the tool", () => {
+    expect(bashLogPath("/tmp/pie-home", "sess/1", "12")).toBe(
+      path.join(logsDirectory("/tmp/pie-home"), "bash", "sess_1", "12.log"),
     );
+  });
+});
+
+describe("openBashLog", () => {
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-bash-home-"));
+
+  it("refuses a pre-existing or symlinked directory", () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "pie-bash-outside-"));
+    const planted = path.join(logsDirectory(home), "bash");
+    fs.mkdirSync(logsDirectory(home), { mode: 0o700 });
+    fs.symlinkSync(outside, planted);
+    expect(() => openBashLog(home, bashLogPath(home, "sess", "1"))).toThrow(
+      "refusing bash log path",
+    );
+    expect(fs.readdirSync(outside)).toEqual([]);
+
+    fs.unlinkSync(planted);
+    fs.mkdirSync(planted, { mode: 0o700 });
+    const existing = bashLogPath(home, "sess", "2");
+    fs.mkdirSync(path.dirname(existing), { mode: 0o700 });
+    fs.writeFileSync(existing, "old");
+    expect(() => openBashLog(home, existing)).toThrow("refusing bash log path");
+    expect(fs.readFileSync(existing, "utf8")).toBe("old");
   });
 });
 
 describe("executePieBash", () => {
   const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "pie-bash-test-"));
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-bash-home-"));
 
   it("returns a short command and deletes its log", async () => {
     let logPath = "";
@@ -60,8 +90,9 @@ describe("executePieBash", () => {
       command: "echo hello-pie",
       cwd,
       env: process.env,
+      logRoot: home,
       logPath: (pid) => {
-        logPath = bashLogPath("test-short", String(pid));
+        logPath = bashLogPath(home, "test-short", String(pid));
         return logPath;
       },
     });
@@ -80,21 +111,22 @@ describe("executePieBash", () => {
       cwd,
       env: process.env,
       yieldMs: 200,
+      logRoot: home,
       logPath: (pid) => {
         pids.push(pid);
-        return bashLogPath("test-bg", String(pid));
+        return bashLogPath(home, "test-bg", String(pid));
       },
       onBackgroundExit: settled,
     });
     const pid = Number(result.text.match(/pid (\d+)/)?.[1]);
     expect(pid).toBeGreaterThan(0);
-    expect(result.details?.fullOutputPath).toBe(bashLogPath("test-bg", String(pid)));
-    const written = await fsPromises.readFile(bashLogPath("test-bg", String(pid)), "utf8");
+    expect(result.details?.fullOutputPath).toBe(bashLogPath(home, "test-bg", String(pid)));
+    const written = await fsPromises.readFile(bashLogPath(home, "test-bg", String(pid)), "utf8");
     expect(written).toBe("flushed\n");
     killProcessTree(pid);
     const message = await notice;
     expect(message).toContain(`Background command ${pid}`);
-    expect(message).toContain(bashLogPath("test-bg", String(pid)));
+    expect(message).toContain(bashLogPath(home, "test-bg", String(pid)));
   });
 
   it("keeps the log when the tool result is truncated", async () => {
@@ -103,8 +135,9 @@ describe("executePieBash", () => {
       command: "node -e \"process.stdout.write('x'.repeat(60000))\"",
       cwd,
       env: process.env,
+      logRoot: home,
       logPath: (pid) => {
-        logPath = bashLogPath("test-trunc", String(pid));
+        logPath = bashLogPath(home, "test-trunc", String(pid));
         return logPath;
       },
     });
@@ -114,22 +147,24 @@ describe("executePieBash", () => {
     expect(full.length).toBeGreaterThan(50_000);
   });
 
-  it("backgrounds a running command when the turn is aborted", async () => {
+  it("kills a running command when the turn is aborted", async () => {
     const controller = new AbortController();
+    let pid = 0;
     const pending = executePieBash({
       command: "sleep 30",
       cwd,
       env: process.env,
       signal: controller.signal,
       yieldMs: 60_000,
-      logPath: (pid) => bashLogPath("test-abort", String(pid)),
+      logRoot: home,
+      logPath: (id) => {
+        pid = id;
+        return bashLogPath(home, "test-abort", String(id));
+      },
     });
     controller.abort();
-    const result = await pending;
-    const pid = Number(/pid (\d+)/.exec(result.text)?.[1]);
-    expect(result.text).toContain("Command running in background");
-    expect(() => process.kill(-pid, 0)).not.toThrow();
-    process.kill(-pid, "SIGKILL");
+    await expect(pending).rejects.toThrow("Command aborted");
+    expect(() => process.kill(pid, 0)).toThrow("ESRCH");
   });
 
   it("kills on timeout instead of backgrounding", async () => {
@@ -139,7 +174,8 @@ describe("executePieBash", () => {
         cwd,
         env: process.env,
         timeoutSeconds: 1,
-        logPath: (pid) => bashLogPath("test-timeout", String(pid)),
+        logRoot: home,
+        logPath: (pid) => bashLogPath(home, "test-timeout", String(pid)),
       }),
     ).rejects.toThrow("Command timed out after 1 seconds");
   });

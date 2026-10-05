@@ -18,6 +18,13 @@ import {
   waitForChildProcess,
 } from "@earendil-works/pi-coding-agent";
 
+import {
+  LOG_FILE_MODE,
+  LOGS_DIRECTORY_MODE,
+  logsDirectory,
+  resolvePieHome,
+} from "../../config/paths";
+
 const BLOCKED_EXACT = new Set(["PORT", "ELECTRON_RENDERER_PORT", "ELECTRON_RUN_AS_NODE"]);
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const TAIL_BYTES = 100 * 1024;
@@ -54,8 +61,13 @@ export function filterPiBashEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return next;
 }
 
-export function bashLogPath(sessionId: string, jobId: string): string {
-  return path.join(os.tmpdir(), "pie", safeSegment(sessionId), "bash", `${safeSegment(jobId)}.log`);
+export function bashLogPath(home: string, sessionId: string, jobId: string): string {
+  return path.join(
+    logsDirectory(home),
+    "bash",
+    safeSegment(sessionId),
+    `${safeSegment(jobId)}.log`,
+  );
 }
 
 function safeSegment(value: string): string {
@@ -96,11 +108,65 @@ function keepTail(text: string): string {
   return bytes.subarray(start).toString("utf8");
 }
 
-function openLog(logPath: string): fs.WriteStream {
-  const dir = path.dirname(logPath);
-  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-  fs.chmodSync(dir, 0o700);
-  const log = fs.createWriteStream(logPath, { flags: "a", mode: 0o600 });
+function refuseLog(reason: string): never {
+  throw new Error(`refusing bash log path: ${reason}`);
+}
+
+function errno(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
+  return typeof error.code === "string" ? error.code : undefined;
+}
+
+function createOwnedDir(pathname: string): void {
+  let stat: fs.Stats | undefined;
+  try {
+    stat = fs.lstatSync(pathname);
+  } catch (error) {
+    if (errno(error) !== "ENOENT") throw error;
+  }
+  if (!stat) {
+    try {
+      fs.mkdirSync(pathname, { mode: LOGS_DIRECTORY_MODE });
+    } catch (error) {
+      if (errno(error) !== "EEXIST") throw error;
+    }
+    stat = fs.lstatSync(pathname);
+  }
+  const uid = process.getuid?.();
+  if (stat.isSymbolicLink() || !stat.isDirectory() || (uid !== undefined && stat.uid !== uid)) {
+    refuseLog("not a real directory owned by this user");
+  }
+}
+
+export function openBashLog(home: string, logPath: string): fs.WriteStream {
+  const root = path.resolve(home);
+  const file = path.resolve(logPath);
+  const dir = path.dirname(file);
+  if (dir !== root && !dir.startsWith(`${root}${path.sep}`)) refuseLog("escapes the home");
+  createOwnedDir(root);
+  const relative = path.relative(root, dir);
+  let current = root;
+  if (relative !== "") {
+    for (const part of relative.split(path.sep)) {
+      if (part === "" || part === "." || part === "..") refuseLog("bad segment");
+      current = path.join(current, part);
+      createOwnedDir(current);
+    }
+  }
+  const flags =
+    fs.constants.O_CREAT |
+    fs.constants.O_EXCL |
+    fs.constants.O_WRONLY |
+    (fs.constants.O_NOFOLLOW ?? 0);
+  let fd: number;
+  try {
+    fd = fs.openSync(file, flags, LOG_FILE_MODE);
+  } catch (error) {
+    const code = errno(error);
+    if (code === "EEXIST" || code === "ELOOP") refuseLog("not a new file");
+    throw error;
+  }
+  const log = fs.createWriteStream(file, { fd });
   log.on("error", () => undefined);
   return log;
 }
@@ -323,6 +389,7 @@ export async function executePieBash(input: {
   runInBackground?: boolean;
   yieldMs?: number;
   signal?: AbortSignal;
+  logRoot: string;
   logPath: (pid: number) => string;
   onBackgroundExit?: (message: string) => void;
 }): Promise<PieBashResult> {
@@ -353,7 +420,7 @@ export async function executePieBash(input: {
   const logPath = input.logPath(pid);
   let log: fs.WriteStream;
   try {
-    log = openLog(logPath);
+    log = openBashLog(input.logRoot, logPath);
   } catch (error) {
     killProcessTree(pid);
     livePids.delete(pid);
@@ -370,7 +437,7 @@ export async function executePieBash(input: {
   };
   shell.onData(onData);
 
-  let killReason: "timeout" | undefined;
+  let killReason: "abort" | "timeout" | undefined;
   const kill = () => {
     if (killReason) return;
     killReason = "timeout";
@@ -382,7 +449,11 @@ export async function executePieBash(input: {
   const yielded = new Promise<"yield">((resolve) => {
     yieldNow = () => resolve("yield");
   });
-  const onAbort = () => yieldNow();
+  const onAbort = () => {
+    if (killReason) return;
+    killReason = "abort";
+    killProcessTree(pid);
+  };
   if (input.signal) {
     input.signal.addEventListener("abort", onAbort, { once: true });
     if (input.signal.aborted) onAbort();
@@ -419,6 +490,7 @@ export async function executePieBash(input: {
     const empty = killReason || (result.ok && result.code !== 0) ? "" : "(no output)";
     const text = rendered.text || empty;
     if (!rendered.details) unlinkQuiet(logPath);
+    if (killReason === "abort") throw new Error(appendStatus(text, "Command aborted"));
     if (killReason === "timeout") {
       throw new Error(
         appendStatus(text, `Command timed out after ${input.timeoutSeconds} seconds`),
@@ -476,7 +548,7 @@ export function piBashExtension(cwd: string): ExtensionFactory {
     const base = createBashToolDefinition(cwd);
     pi.registerTool({
       ...base,
-      description: `${base.description} If it is still running after ${BACKGROUND_AFTER_MS / 1000} seconds, or the turn is aborted, this call returns its pid and log path. Set run_in_background to return immediately. A timeout kills the command instead of backgrounding it.`,
+      description: `${base.description} If it is still running after ${BACKGROUND_AFTER_MS / 1000} seconds, this call returns its pid and log path. Set run_in_background to return immediately. A timeout or an aborted turn kills the command instead of backgrounding it.`,
       promptGuidelines: [
         ...(base.promptGuidelines ?? []),
         `Commands still running after ${BACKGROUND_AFTER_MS / 1000} seconds move to the background and return a pid and log path. Read that file for later output. Stop a background command with \`kill -- -<pid>\`.`,
@@ -491,8 +563,13 @@ export function piBashExtension(cwd: string): ExtensionFactory {
           timeoutSeconds: params.timeout,
           runInBackground: params.run_in_background,
           signal,
+          logRoot: resolvePieHome(),
           logPath: (pid) =>
-            bashLogPath(ctx.sessionManager.getSessionId() ?? "unknown", String(pid)),
+            bashLogPath(
+              resolvePieHome(),
+              ctx.sessionManager.getSessionId() ?? "unknown",
+              String(pid),
+            ),
           onBackgroundExit: (message) => {
             try {
               pi.sendUserMessage(message, { deliverAs: "followUp" });
