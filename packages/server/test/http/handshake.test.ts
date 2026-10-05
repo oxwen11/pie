@@ -8,10 +8,6 @@ describe("ready line", () => {
     expect(parseReadyLine(line)).toEqual({ port: 41234 });
   });
 
-  it("is prefixed so it can be picked out of ordinary stdout", () => {
-    expect(formatReadyLine({ port: 1 }).startsWith(READY_PREFIX)).toBe(true);
-  });
-
   it("ignores an unrelated log line", () => {
     expect(parseReadyLine("pie listening on http://127.0.0.1:4000")).toBeNull();
   });

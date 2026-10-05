@@ -1,4 +1,6 @@
 import type {
+  AgentModelState,
+  PieUIMessage,
   SessionRef,
   SessionRuntimeSnapshot,
   SessionScopedEventBody,
@@ -9,15 +11,22 @@ import { Context, Deferred, Effect, Layer, Ref, Scope } from "effect";
 import { EventBus, type EventBusShape } from "../events/event-bus";
 import {
   AgentOpenError,
+  AgentOperationError,
   type CreateSessionError,
   HarnessSessionNotFound,
   type ResumeSessionError,
+  SessionClosed,
   SessionNotResumable,
 } from "./errors";
 import type { PiAgentShape } from "./pi/agent";
 import { PiAgent } from "./pi/agent";
 import type { PiAgentRuntime } from "./pi/runtime";
-import { type AcquireRuntime, type PiAgentSessionShape, makePiAgentSession } from "./session";
+import {
+  type AcquireRuntime,
+  type PiAgentSessionShape,
+  type SessionColdRead,
+  makePiAgentSession,
+} from "./session";
 import { initialSessionState, toSnapshot, toStatus } from "./session-fold";
 import type { CreateSessionInput, ResumeManagedSessionInput } from "./session-io";
 
@@ -98,6 +107,19 @@ export type PiAgentSessionManagerShape = {
    * so it materializes the session if this is the first thing to touch it.
    */
   readonly emit: (ref: SessionRef, body: SessionScopedEventBody) => Effect.Effect<void>;
+  readonly messages: (
+    ref: SessionRef,
+    agentSessionId: string,
+    cwd: string,
+  ) => Effect.Effect<
+    ReadonlyArray<PieUIMessage>,
+    SessionNotResumable | AgentOperationError | SessionClosed
+  >;
+  readonly modelState: (
+    ref: SessionRef,
+    agentSessionId: string,
+    cwd: string,
+  ) => Effect.Effect<AgentModelState | undefined, AgentOperationError | SessionClosed>;
 };
 
 export class PiAgentSessionManager extends Context.Service<
@@ -131,6 +153,16 @@ export const makePiAgentSessionManager = (
 ): Effect.Effect<PiAgentSessionManagerShape, never, Scope.Scope> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
+    // Test adapters supply a cold read. Production sessions open SessionManager themselves.
+    const coldRead: SessionColdRead | undefined =
+      pi.getMessages || pi.getModelState
+        ? (agentSessionId, cwd) =>
+            Effect.gen(function* () {
+              const messages = pi.getMessages ? yield* pi.getMessages(agentSessionId, cwd) : [];
+              const model = pi.getModelState ? yield* pi.getModelState(agentSessionId, cwd) : {};
+              return { messages, model };
+            })
+        : undefined;
     // Complete SessionRef → the session that owns its observable state.
     const sessions = yield* Ref.make<ReadonlyMap<string, SessionEntry>>(new Map());
     const sessionKey = (ref: SessionRef) => `${ref.projectId}\0${ref.sessionId}`;
@@ -146,7 +178,7 @@ export const makePiAgentSessionManager = (
             if (entry?._tag === "Live") return Effect.succeed(entry.session);
             if (entry?._tag === "Closing")
               return Deferred.await(entry.done).pipe(Effect.andThen(sessionFor(ref)));
-            return makePiAgentSession(ref, bus).pipe(
+            return makePiAgentSession(ref, bus, coldRead).pipe(
               Effect.provideService(Scope.Scope, ownerScope),
               Effect.flatMap((candidate) =>
                 Ref.modify(
@@ -299,6 +331,10 @@ export const makePiAgentSessionManager = (
       liveStatus: (ref) =>
         withSession<SessionStatus | undefined>(ref, (session) => session.status, undefined),
       emit: (ref, body) => sessionFor(ref).pipe(Effect.flatMap((session) => session.emit(body))),
+      messages: (ref, agentSessionId, cwd) =>
+        sessionFor(ref).pipe(Effect.flatMap((session) => session.messages(agentSessionId, cwd))),
+      modelState: (ref, agentSessionId, cwd) =>
+        sessionFor(ref).pipe(Effect.flatMap((session) => session.modelState(agentSessionId, cwd))),
     } satisfies PiAgentSessionManagerShape;
   });
 
