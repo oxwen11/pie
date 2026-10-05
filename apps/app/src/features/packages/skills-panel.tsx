@@ -1,4 +1,3 @@
-import type { SkillItem } from "@getpie/contract/skills";
 import {
   Empty,
   EmptyDescription,
@@ -12,6 +11,8 @@ import { useMemo, useState, type ReactElement } from "react";
 
 import Loader from "@/components/loader";
 import { useLocalOrpc } from "@/lib/environment-orpc";
+import { HighlightedMatch } from "@/lib/highlighted-match";
+import { searchSkills } from "@/lib/skill-search";
 
 function skillInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
@@ -25,17 +26,8 @@ export function SkillsPanel(): ReactElement {
     meta: { errorMode: "inline" },
   });
 
-  const items = useMemo(() => {
-    const all: ReadonlyArray<SkillItem> = list.data ?? [];
-    const needle = query.trim().toLowerCase();
-    if (needle.length === 0) return all;
-    return all.filter(
-      (item) =>
-        item.name.toLowerCase().includes(needle) ||
-        item.description.toLowerCase().includes(needle) ||
-        item.source.toLowerCase().includes(needle),
-    );
-  }, [list.data, query]);
+  const skills = list.data;
+  const items = useMemo(() => searchSkills(skills ?? [], query), [skills, query]);
 
   if (list.isPending && list.data === undefined) return <Loader />;
 
@@ -71,19 +63,27 @@ export function SkillsPanel(): ReactElement {
       <section className="flex flex-col gap-4">
         <h2 className="text-base font-medium">Installed</h2>
         {items.length === 0 ? (
-          <Empty>
-            <EmptyHeader>
-              <EmptyMedia variant="icon">
-                <Sparkles aria-hidden="true" />
-              </EmptyMedia>
-              <EmptyTitle>No skills yet</EmptyTitle>
-              <EmptyDescription>
-                Drop a <code className="text-foreground">SKILL.md</code> folder into{" "}
-                <code className="text-foreground">~/.pi/agent/skills</code> or install a package
-                that ships skills.
-              </EmptyDescription>
-            </EmptyHeader>
-          </Empty>
+          (skills?.length ?? 0) > 0 ? (
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>No matching skills</EmptyTitle>
+              </EmptyHeader>
+            </Empty>
+          ) : (
+            <Empty>
+              <EmptyHeader>
+                <EmptyMedia variant="icon">
+                  <Sparkles aria-hidden="true" />
+                </EmptyMedia>
+                <EmptyTitle>No skills yet</EmptyTitle>
+                <EmptyDescription>
+                  Drop a <code className="text-foreground">SKILL.md</code> folder into{" "}
+                  <code className="text-foreground">~/.pi/agent/skills</code> or install a package
+                  that ships skills.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )
         ) : (
           <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {items.map((item) => (
@@ -95,8 +95,18 @@ export function SkillsPanel(): ReactElement {
                   {skillInitial(item.name)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium">{item.name}</p>
-                  <p className="text-muted-foreground line-clamp-1 text-xs">{item.description}</p>
+                  <p className="truncate text-sm font-medium">
+                    <HighlightedMatch
+                      text={item.name}
+                      ranges={item.match?.field === "name" ? item.match.ranges : undefined}
+                    />
+                  </p>
+                  <p className="text-muted-foreground line-clamp-1 text-xs">
+                    <HighlightedMatch
+                      text={item.description}
+                      ranges={item.match?.field === "description" ? item.match.ranges : undefined}
+                    />
+                  </p>
                 </div>
                 <CheckIcon aria-hidden="true" className="text-pull-request-open size-4 shrink-0" />
               </li>

@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 
-import type { PieUIMessage } from "@getpie/contract";
+import type { AgentModelState, PieUIMessage } from "@getpie/contract";
 import { Context, Crypto, Effect, FileSystem, Layer, type Scope, Stream } from "effect";
 
 import { ProjectNotFound, StoreWriteError } from "../../src/errors";
@@ -72,6 +72,8 @@ export type SessionServiceRunOpts = {
   history?: ReadonlyArray<PieUIMessage>;
   // The adapter reads history cold, off disk — no runtime involved.
   coldHistory?: ReadonlyArray<PieUIMessage>;
+  // The adapter reads model state cold, off disk — no runtime involved.
+  coldModel?: AgentModelState;
   // Feed the projection a turn: "open" leaves it in flight, "finished"
   // ends it (the runtime retains the completed buffer until the next turn).
   turn?: "open" | "finished";
@@ -254,6 +256,9 @@ export const run = <A, E>(
         ),
       ...(opts.coldHistory !== undefined
         ? { getMessages: () => Effect.succeed(opts.coldHistory ?? []) }
+        : undefined),
+      ...(opts.coldModel !== undefined
+        ? { getModelState: () => Effect.succeed(opts.coldModel ?? {}) }
         : undefined),
       getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
     } satisfies PiAgentShape;

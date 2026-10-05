@@ -445,7 +445,12 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
               // 0.99 reports disposition instead of a boolean. isStreaming is
               // already true for a prompt that just started, so it cannot mean
               // "queued".
-              output(success(id, "prompt", { started: disposition === "started" }));
+              output(
+                success(id, "prompt", {
+                  started: disposition === "started",
+                  disposition,
+                }),
+              );
             },
           })
           .catch((cause: unknown) => {
