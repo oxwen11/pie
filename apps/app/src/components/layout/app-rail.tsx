@@ -1,10 +1,12 @@
 import { Button } from "@getpie/ui/components/button";
+import { useSidebar } from "@getpie/ui/components/sidebar";
 import {
   Tooltip,
   TooltipPopup,
   TooltipProvider,
   TooltipTrigger,
 } from "@getpie/ui/components/tooltip";
+import { cn } from "@getpie/ui/lib/utils";
 import { Link, useMatch } from "@tanstack/react-router";
 import type { ReactElement, ReactNode } from "react";
 
@@ -16,11 +18,16 @@ import { isDesktopHost } from "@/platform-host";
 /** Icon column that stays while the session list collapses. Lights live in the shell row above. */
 export function AppRail(): ReactElement {
   const desktop = isDesktopHost(usePlatform());
+  // Match the sidebar sheet breakpoint (800px), not Tailwind md (768px).
+  const mobile = useSidebar().isMobile;
   return (
     <TooltipProvider delay={300}>
       <nav
         aria-label="App navigation"
-        className="hidden w-13 shrink-0 flex-col items-center gap-2 px-1 pt-2 pb-2 md:flex"
+        className={cn(
+          "w-13 shrink-0 flex-col items-center gap-2 px-1 pt-2 pb-2",
+          mobile ? "hidden" : "flex",
+        )}
         data-slot="app-rail"
       >
         {!desktop ? (

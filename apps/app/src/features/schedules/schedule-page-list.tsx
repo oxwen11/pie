@@ -5,14 +5,13 @@ import { InputGroup, InputGroupAddon, InputGroupInput } from "@getpie/ui/compone
 import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { Plus, SearchIcon } from "lucide-react";
-import { useState } from "react";
 
 import { formatSpec } from "./cadence";
 import { projectNameOf } from "./format";
 import { ScheduleCard } from "./schedule-card";
 import { useSchedule } from "./schedule-context";
 
-type ScheduleListFilter = "all" | "active" | "paused";
+export type ScheduleListFilter = "all" | "active" | "paused";
 
 const FILTERS: ReadonlyArray<{ readonly value: ScheduleListFilter; readonly label: string }> = [
   { value: "all", label: "All" },
@@ -20,11 +19,19 @@ const FILTERS: ReadonlyArray<{ readonly value: ScheduleListFilter; readonly labe
   { value: "paused", label: "Paused" },
 ];
 
-export function SchedulePageList() {
+export function SchedulePageList({
+  filter,
+  onFilter,
+  onQuery,
+  query,
+}: {
+  readonly filter: ScheduleListFilter;
+  readonly onFilter: (filter: ScheduleListFilter) => void;
+  readonly onQuery: (query: string) => void;
+  readonly query: string;
+}) {
   const { actions, meta } = useSchedule();
   const { setOpenMobile } = useSidebar();
-  const [query, setQuery] = useState("");
-  const [filter, setFilter] = useState<ScheduleListFilter>("all");
   const visible = visibleSchedules(meta.items, meta.projects, query, filter);
 
   return (
@@ -52,13 +59,13 @@ export function SchedulePageList() {
           </InputGroupAddon>
           <InputGroupInput
             aria-label="Search schedules"
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => onQuery(event.target.value)}
             placeholder="Search schedules"
             value={query}
           />
         </InputGroup>
       </div>
-      <ScheduleFilterBar filter={filter} onFilter={setFilter} />
+      <ScheduleFilterBar filter={filter} onFilter={onFilter} />
       {meta.listPending || !meta.projectsReady ? (
         <p className="text-muted-foreground py-6 text-sm" role="status">
           Loading schedules…

@@ -1,5 +1,5 @@
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@getpie/ui/components/empty";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 
 import { PageSidebar } from "@/components/layout/page-sidebar";
 import Loader from "@/components/loader";
@@ -20,11 +20,14 @@ export function SchedulePage(props: SchedulePageProps) {
 
 function SchedulePageContent() {
   const { meta } = useSchedule();
+  // Keep list filters above the portal. Closing the mobile sheet unmounts the portaled list.
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "active" | "paused">("all");
   const placeholder = schedulePagePlaceholder(meta.projectsReady, meta.listPending, meta.listError);
   return (
     <>
       <PageSidebar>
-        <SchedulePageList />
+        <SchedulePageList filter={filter} onFilter={setFilter} onQuery={setQuery} query={query} />
       </PageSidebar>
       {placeholder ?? <SchedulePageFrame />}
     </>

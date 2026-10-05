@@ -127,7 +127,7 @@ export function AppShellBody({ children }: AppShellBodyProps) {
             <ContentPanelToggle className="ms-auto" />
           </header>
         ) : (
-          <div className="pointer-events-none fixed end-4 top-0 z-50 flex h-10 items-center [-webkit-app-region:initial]">
+          <div className="pointer-events-none fixed end-5 top-1 z-50 flex h-10 items-center [-webkit-app-region:initial]">
             <ContentPanelToggle className="pointer-events-auto [-webkit-app-region:no-drag]" />
           </div>
         )}
