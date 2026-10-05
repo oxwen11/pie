@@ -4,6 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import url from "node:url";
 
+import { fakeGhPath } from "@getpie/test/paths";
 import { DEFAULT_E2E_REPLY, e2ePiProcessEnv } from "@getpie/test/seed-e2e-pi-agent";
 
 const fromHere = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
@@ -11,7 +12,7 @@ const fromHere = (relative: string) => url.fileURLToPath(new URL(relative, impor
 const repoRoot = fromHere("../../..");
 const cliEntry = fromHere("../../../packages/pie/src/node/cli.ts");
 const tsx = path.join(repoRoot, "node_modules/.bin/tsx");
-const fakeGh = url.fileURLToPath(import.meta.resolve("@getpie/test/fake-gh"));
+const fakeGh = fakeGhPath;
 
 const SAMPLE = "sample";
 const SAMPLE_GIT = "sample-git";

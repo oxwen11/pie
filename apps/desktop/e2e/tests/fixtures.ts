@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
-import url from "node:url";
 
+import { fakePiPath } from "@getpie/test/paths";
 import { e2eIsolatedAgentEnv, e2ePiProcessEnv } from "@getpie/test/seed-e2e-pi-agent";
 import {
   type ElectronApplication,
@@ -21,7 +21,7 @@ const LINUX_CI_SWITCHES = [
   "--disable-dev-shm-usage",
 ];
 
-const FAKE_PI_PATH = url.fileURLToPath(import.meta.resolve("@getpie/test/fake-pi"));
+const FAKE_PI_PATH = fakePiPath;
 
 /** The one seeded project's id — the contract validates projectId as a UUID. */
 export const PROJECT_ID = "11111111-1111-4111-8111-111111111111";

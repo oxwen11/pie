@@ -1,5 +1,6 @@
 import url from "node:url";
 
+import { browserLocatorsPath } from "@getpie/test/paths";
 import { pieBrowser, pieBrowserOptimizeDeps } from "@getpie/test/vitest-browser";
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
@@ -8,7 +9,7 @@ import { defineConfig } from "vitest/config";
 
 import { appAlias, appDir, browserTsTests } from "./vitest-shared";
 
-const browserSetupFiles = [url.fileURLToPath(import.meta.resolve("@getpie/test/browser-locators"))];
+const browserSetupFiles = [browserLocatorsPath];
 
 const appVite = {
   ...appAlias,
