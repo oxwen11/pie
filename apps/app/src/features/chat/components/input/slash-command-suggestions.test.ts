@@ -21,4 +21,17 @@ describe("filterSlashCommandItems", () => {
     ]);
     expect(filtered[0]?.match?.ranges).toEqual([{ start: 0, end: 2 }]);
   });
+
+  it.each(["skill:", "skill:agent", "skill:agent-browser"])(
+    "matches a skill by its /%s command form",
+    (query) => {
+      const filtered = filterSlashCommandItems(
+        createSlashCommandSuggestionItems([
+          { name: "skill:agent-browser", description: "browse", source: "skill" },
+        ]),
+        query,
+      );
+      expect(filtered.map((item) => item.command.name)).toEqual(["skill:agent-browser"]);
+    },
+  );
 });

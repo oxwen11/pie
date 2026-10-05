@@ -17,13 +17,19 @@ function isSeparator(char: string): boolean {
   return char === "-" || char === "_" || char === "/" || /\s/u.test(char);
 }
 
+/** Length-preserving fold. `İ`.toLowerCase() is two units and would shift later ranges. */
+function foldUnit(unit: string): string {
+  const lower = unit.toLowerCase();
+  return lower.length === 1 ? lower : (lower[0] ?? unit);
+}
+
 function normalizeChars(value: string): NormChar[] {
   const chars: NormChar[] = [];
   let index = 0;
   while (index < value.length) {
     const char = value[index] ?? "";
     if (!isSeparator(char)) {
-      chars.push({ index, char: char.toLowerCase() });
+      chars.push({ index, char: foldUnit(char) });
       index += 1;
       continue;
     }

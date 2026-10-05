@@ -26,7 +26,8 @@ export function SkillsPanel(): ReactElement {
     meta: { errorMode: "inline" },
   });
 
-  const items = useMemo(() => searchSkills(list.data ?? [], query), [list.data, query]);
+  const skills = list.data;
+  const items = useMemo(() => searchSkills(skills ?? [], query), [skills, query]);
 
   if (list.isPending && list.data === undefined) return <Loader />;
 
@@ -62,7 +63,7 @@ export function SkillsPanel(): ReactElement {
       <section className="flex flex-col gap-4">
         <h2 className="text-base font-medium">Installed</h2>
         {items.length === 0 ? (
-          query.trim().length > 0 ? (
+          (skills?.length ?? 0) > 0 ? (
             <Empty>
               <EmptyHeader>
                 <EmptyTitle>No matching skills</EmptyTitle>

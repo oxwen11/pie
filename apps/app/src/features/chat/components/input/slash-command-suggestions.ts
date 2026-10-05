@@ -66,6 +66,10 @@ function rankCommandItems(
   });
 }
 
+function skillSearchQuery(query: string): string {
+  return query.trim().replace(/^skill:/i, "");
+}
+
 export function filterSlashCommandItems(
   items: ReadonlyArray<SlashCommandItem>,
   query: string,
@@ -78,7 +82,7 @@ export function filterSlashCommandItems(
       name: slashCommandLabel(item.command),
       description: item.description ?? "",
     })),
-    query,
+    skillSearchQuery(query),
   ).map((hit) => ({ ...hit.item, match: hit.match }));
 
   return [...rankCommandItems(commands, query), ...rankedSkills];

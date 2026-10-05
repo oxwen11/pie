@@ -65,6 +65,10 @@ describe("searchSkills", () => {
     });
   });
 
+  it("keeps highlight ranges aligned when lowercase expands", () => {
+    expect(searchSkills([skill("İx")], "x")[0]?.match?.ranges).toEqual([{ start: 1, end: 2 }]);
+  });
+
   it("matches a multi-word query across separators without highlighting them", () => {
     expect(searchSkills([skill("gh-fix-ci")], "fix ci")[0]?.match?.ranges).toEqual([
       { start: 3, end: 6 },
