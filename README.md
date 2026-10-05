@@ -42,9 +42,9 @@ launch a separately installed `pi` binary.
 - Conversation history stays in Pi's own session storage. pie keeps only its own Session metadata
   (Project, title, worktree, linked pull requests) under `$PIE_HOME`.
   See [ADR 0002](docs/adr/0002-session-info-storage-floor-harness-overlay.md).
-- A registered Project is trusted for Pi's declarative resources (prompts, skills, context).
-  Automatic Pi **extension** discovery is currently disabled in pie-owned sessions, so extension
-  commands, tools, hooks and UI are not available yet. See [CONTEXT.md](CONTEXT.md).
+- A registered Project is trusted for Pi prompts, skills, and context, and for executing that
+  Project's extension code. Pie-owned children load Pi's built-in, global, and Project extensions.
+  The daemon model list does not load extensions. See [CONTEXT.md](CONTEXT.md).
 
 ## Concepts
 
