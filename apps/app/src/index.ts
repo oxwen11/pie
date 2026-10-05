@@ -7,6 +7,7 @@ export type {
   EnvironmentFeed,
   EnvironmentSnapshot,
   Platform,
+  PlatformBase,
   PlatformOs,
   PlatformSsh,
   PlatformTailscale,

@@ -1,4 +1,5 @@
 import type { Schedule } from "@getpie/contract";
+import { useSidebar } from "@getpie/ui/components/sidebar";
 import { Switch } from "@getpie/ui/components/switch";
 
 import { formatNextRun, formatSpec } from "./cadence";
@@ -17,10 +18,17 @@ export type ScheduleCardProps = {
 
 export function ScheduleCard({ schedule, projectName }: ScheduleCardProps) {
   const { state, actions, meta } = useSchedule();
+  const { setOpenMobile } = useSidebar();
   const selected = schedule.id === state.selectedId;
   return (
     <ScheduleItem data-state={selected ? "selected" : undefined}>
-      <ScheduleItemTrigger aria-pressed={selected} onClick={() => actions.select(schedule.id)}>
+      <ScheduleItemTrigger
+        aria-pressed={selected}
+        onClick={() => {
+          actions.select(schedule.id);
+          setOpenMobile(false);
+        }}
+      >
         <ScheduleItemTitle>{schedule.name}</ScheduleItemTitle>
         <ScheduleItemDescription>
           {projectName} · {formatSpec(schedule.spec)} ·{" "}

@@ -3,14 +3,15 @@ import { cn } from "@getpie/ui/lib/utils";
 import { LazyMotion, domMax } from "motion/react";
 import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
 
+import { AppRail } from "@/components/layout/app-rail";
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
-import { shellProviderStyle } from "@/components/layout/shell-chrome";
+import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
 import { ShellContentPanel } from "@/components/layout/shell-content";
-import { ShellContentPanelToggle } from "@/components/layout/shell-content-panel-toggle";
 import { ShellSidebarPanel } from "@/components/layout/shell-sidebar";
 import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
 import { usePlatform } from "@/platform-context";
+import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
 
 interface AppShellContextValue {
   readonly contentPanel: {
@@ -53,17 +54,8 @@ export interface AppShellMainProps {
 export function AppShellMain({ children }: AppShellMainProps) {
   const { contentPanel } = useAppShell();
   const fill = contentPanel.maximized;
-  const withContent = contentPanel.visible && !fill;
   return (
-    <div
-      className={cn(
-        "flex min-h-0 flex-col md:py-1",
-        fill ? "w-0 overflow-hidden" : "min-w-80 flex-1",
-        withContent
-          ? "md:[&_[data-slot=sidebar-inset]]:rounded-e-none md:[&_[data-slot=sidebar-inset]]:border-e-0"
-          : "md:pe-1",
-      )}
-    >
+    <div className={cn("flex min-h-0 flex-col", fill ? "w-0 overflow-hidden" : "min-w-80 flex-1")}>
       {children}
     </div>
   );
@@ -78,21 +70,12 @@ export interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const platform = usePlatform();
-
   return (
     // The provider is shell-owned: it supplies responsive/sidebar state and is
     // also the viewport wrapper. Individual titlebar headers own draggable
-    // regions; h-svh keeps long transcripts scrolling inside the card.
-    <SidebarProvider
-      className="bg-sidebar h-svh overflow-hidden"
-      defaultOpen={readSidebarCookie()}
-      style={shellProviderStyle(platform)}
-    >
-      <LazyMotion features={domMax}>
-        {children}
-        <ShellSidebarToggle />
-      </LazyMotion>
+    // regions; h-svh keeps long transcripts scrolling inside the shell.
+    <SidebarProvider className="bg-sidebar h-svh overflow-hidden" defaultOpen={readSidebarCookie()}>
+      <LazyMotion features={domMax}>{children}</LazyMotion>
     </SidebarProvider>
   );
 }
@@ -121,10 +104,45 @@ export function AppShellBody({ children }: AppShellBodyProps) {
     [hasVisibleContentPanel, isContentPanelMaximized, setContentPanelMaximized],
   );
 
+  const platform = usePlatform();
+  const desktop = isDesktopHost(platform);
+  const macos = isDesktopMacosHost(platform);
   return (
     <AppShellContext value={context}>
-      <div className="flex min-h-0 w-full flex-1">{children}</div>
-      <ShellContentPanelToggle />
+      <div className="flex min-h-0 w-full flex-1 flex-col">
+        {desktop ? (
+          <header
+            className={cn("flex shrink-0 items-center pe-4", !macos && "h-10 ps-1")}
+            data-drag-region=""
+            style={
+              macos
+                ? {
+                    height: platform.windowChrome.titlebarHeight,
+                    paddingInlineStart: platform.windowChrome.toggleInset,
+                  }
+                : undefined
+            }
+          >
+            <ShellSidebarToggle />
+            <ContentPanelToggle className="ms-auto" />
+          </header>
+        ) : (
+          <div className="pointer-events-none fixed end-4 top-0 z-50 flex h-10 items-center [-webkit-app-region:initial]">
+            <ContentPanelToggle className="pointer-events-auto [-webkit-app-region:no-drag]" />
+          </div>
+        )}
+        <div className={cn("flex min-h-0 w-full flex-1 md:py-1 md:pe-1", macos && "md:pt-0")}>
+          <AppRail />
+          {/* One persistent border encloses the session list, main and content
+              panel. Collapsing a column never moves or removes this frame. */}
+          <div
+            className="bg-card flex min-h-0 min-w-0 flex-1 overflow-hidden md:rounded-xl md:border md:border-black/10 md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)] dark:md:border-white/8"
+            data-slot="shell-panel"
+          >
+            {children}
+          </div>
+        </div>
+      </div>
     </AppShellContext>
   );
 }

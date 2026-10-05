@@ -2,8 +2,9 @@ import type { Project, Schedule } from "@getpie/contract";
 import { MAX_SCHEDULES } from "@getpie/contract";
 import { Button } from "@getpie/ui/components/button";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@getpie/ui/components/input-group";
+import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { SearchIcon } from "lucide-react";
+import { Plus, SearchIcon } from "lucide-react";
 import { useState } from "react";
 
 import { formatSpec } from "./cadence";
@@ -21,38 +22,30 @@ const FILTERS: ReadonlyArray<{ readonly value: ScheduleListFilter; readonly labe
 
 export function SchedulePageList() {
   const { actions, meta } = useSchedule();
+  const { setOpenMobile } = useSidebar();
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<ScheduleListFilter>("all");
-  const panelOpen = meta.createOpen || meta.editing !== undefined || meta.selected !== undefined;
   const visible = visibleSchedules(meta.items, meta.projects, query, filter);
 
   return (
-    <div
-      className={cn(
-        "mx-auto flex min-h-0 w-full flex-1 flex-col overflow-hidden",
-        panelOpen ? "px-3" : "max-w-3xl px-6",
-      )}
-    >
-      {panelOpen ? (
-        <ScheduleFilterBar filter={filter} onFilter={setFilter} />
-      ) : (
-        <div className="flex items-start justify-between gap-4 pt-8 pb-1">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight">Scheduled</h1>
-            <p className="text-muted-foreground mt-1 text-sm">
-              Start a session in a project on a cadence.
-            </p>
-          </div>
-          <Button
-            disabled={!meta.canCreate}
-            onClick={() => actions.openCreate()}
-            title={scheduleCreateTitle(meta.projects.length === 0, meta.atLimit)}
-          >
-            Create
-          </Button>
-        </div>
-      )}
-      <div className={cn("w-full pb-3", panelOpen ? undefined : "pt-4")}>
+    <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden px-3">
+      <div className="flex h-10 shrink-0 items-center px-1">
+        <h1 className="text-sm font-semibold">Scheduled</h1>
+      </div>
+      <Button
+        className="mb-2 h-11 shrink-0 justify-start"
+        disabled={!meta.canCreate}
+        onClick={() => {
+          actions.openCreate();
+          setOpenMobile(false);
+        }}
+        title={scheduleCreateTitle(meta.projects.length === 0, meta.atLimit)}
+        variant="ghost"
+      >
+        <Plus />
+        New task
+      </Button>
+      <div className="w-full pb-3">
         <InputGroup className="w-full">
           <InputGroupAddon>
             <SearchIcon />
@@ -65,14 +58,20 @@ export function SchedulePageList() {
           />
         </InputGroup>
       </div>
-      {!panelOpen && meta.items.length > 0 ? (
-        <ScheduleFilterBar filter={filter} onFilter={setFilter} />
-      ) : null}
-      <SchedulePageItems
-        empty={scheduleEmptyLabel(meta.items.length, query)}
-        items={visible}
-        projects={meta.projects}
-      />
+      <ScheduleFilterBar filter={filter} onFilter={setFilter} />
+      {meta.listPending || !meta.projectsReady ? (
+        <p className="text-muted-foreground py-6 text-sm" role="status">
+          Loading schedules…
+        </p>
+      ) : meta.listError !== null ? (
+        <p className="text-muted-foreground py-6 text-sm">{meta.listError.message}</p>
+      ) : (
+        <SchedulePageItems
+          empty={scheduleEmptyLabel(meta.items.length, query)}
+          items={visible}
+          projects={meta.projects}
+        />
+      )}
     </div>
   );
 }
@@ -88,6 +87,7 @@ function ScheduleFilterBar({
     <div className="flex h-11 w-full shrink-0 items-center gap-0.5 text-sm font-medium">
       {FILTERS.map((item) => (
         <button
+          aria-pressed={filter === item.value}
           className={cn(
             "rounded-full px-2.5 py-1",
             filter === item.value

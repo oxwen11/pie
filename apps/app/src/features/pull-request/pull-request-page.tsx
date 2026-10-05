@@ -12,15 +12,14 @@ import {
   CollapsibleTrigger,
 } from "@getpie/ui/components/collapsible";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@getpie/ui/components/input-group";
+import { useSidebar } from "@getpie/ui/components/sidebar";
 import { Spinner } from "@getpie/ui/components/spinner";
 import { cn } from "@getpie/ui/lib/utils";
 import { skipToken, useQuery, type UseQueryResult } from "@tanstack/react-query";
 import { ChevronRight, SearchIcon } from "lucide-react";
 import { useState } from "react";
-import { Group } from "react-resizable-panels";
 
-import { PanelSeparator } from "@/components/layout/panel-separator";
-import { ResizablePanel } from "@/components/layout/resizable-panel";
+import { PageSidebar } from "@/components/layout/page-sidebar";
 import { useLocalOrpc } from "@/lib/environment-orpc";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
@@ -36,6 +35,7 @@ import {
 import { usePullRequestAction } from "./use-pull-request-action";
 
 export function PullRequestPage() {
+  const { setOpenMobile } = useSidebar();
   const orpcQueryUtils = useLocalOrpc();
   const [selectedRef, setSelectedRef] = useState<PullRequestRef | null>(null);
   const list = useQuery(orpcQueryUtils.pullRequest.list.queryOptions());
@@ -70,45 +70,39 @@ export function PullRequestPage() {
 
   return (
     <>
-      <Group
-        className="flex min-h-0 flex-1"
-        orientation="horizontal"
-        resizeTargetMinimumSize={{ coarse: 44, fine: 12 }}
-      >
-        <ResizablePanel
-          className="flex min-w-0 flex-col"
-          defaultSize="24rem"
-          maxSize="50%"
-          minSize="18rem"
-        >
-          <PullRequestListPane
-            error={listError}
-            items={items}
-            loading={listLoading}
-            onSelect={setSelectedRef}
-            selected={selected}
-          />
-        </ResizablePanel>
-        <PanelSeparator label="Resize pull request list" />
-        <ResizablePanel className="flex min-w-0 flex-col" minSize="18rem">
-          <PullRequestPageDetail
-            actionPending={pending}
-            diff={diff}
-            error={detail.error}
-            onAction={(next) => {
-              if (detail.data !== null && detail.data !== undefined) {
-                setIntent(pullRequestActionInput(detail.data.ref, detail.data, next));
-              }
-            }}
-            onRefresh={refresh}
-            pending={selected !== undefined && detail.isPending && detail.data === undefined}
-            postActionRefreshFailed={postActionRefreshFailed}
-            refreshing={detail.isFetching || diff.isFetching}
-            selected={selected !== undefined}
-            snapshot={detail.data ?? undefined}
-          />
-        </ResizablePanel>
-      </Group>
+      <PageSidebar>
+        <div className="flex h-10 shrink-0 items-center px-4">
+          <h1 className="text-sm font-semibold">Pull requests</h1>
+        </div>
+        <PullRequestListPane
+          error={listError}
+          items={items}
+          loading={listLoading}
+          onSelect={(ref) => {
+            setSelectedRef(ref);
+            setOpenMobile(false);
+          }}
+          selected={selected}
+        />
+      </PageSidebar>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <PullRequestPageDetail
+          actionPending={pending}
+          diff={diff}
+          error={detail.error}
+          onAction={(next) => {
+            if (detail.data !== null && detail.data !== undefined) {
+              setIntent(pullRequestActionInput(detail.data.ref, detail.data, next));
+            }
+          }}
+          onRefresh={refresh}
+          pending={selected !== undefined && detail.isPending && detail.data === undefined}
+          postActionRefreshFailed={postActionRefreshFailed}
+          refreshing={detail.isFetching || diff.isFetching}
+          selected={selected !== undefined}
+          snapshot={detail.data ?? undefined}
+        />
+      </div>
       {intent !== null ? (
         <ConfirmPullRequestAction
           input={intent}
@@ -140,7 +134,6 @@ function PullRequestListPane({
   return (
     <>
       <div className="flex h-11 shrink-0 items-center gap-0.5 px-3 text-sm font-medium">
-        <h1 className="sr-only">Pull requests</h1>
         <span className="bg-foreground/5 rounded-full px-2.5 py-1">All</span>
         <span className="text-muted-foreground px-2.5 py-1">Reviewing</span>
         <span className="text-muted-foreground px-2.5 py-1">Authored</span>

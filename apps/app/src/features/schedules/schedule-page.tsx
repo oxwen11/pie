@@ -1,10 +1,12 @@
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@getpie/ui/components/empty";
 import type { ReactNode } from "react";
 
+import { PageSidebar } from "@/components/layout/page-sidebar";
 import Loader from "@/components/loader";
 
 import { ScheduleProvider, useSchedule, type ScheduleProviderProps } from "./schedule-context";
 import { SchedulePageFrame } from "./schedule-page-frame";
+import { SchedulePageList } from "./schedule-page-list";
 
 type SchedulePageProps = Omit<ScheduleProviderProps, "children">;
 
@@ -19,8 +21,14 @@ export function SchedulePage(props: SchedulePageProps) {
 function SchedulePageContent() {
   const { meta } = useSchedule();
   const placeholder = schedulePagePlaceholder(meta.projectsReady, meta.listPending, meta.listError);
-  if (placeholder !== null) return placeholder;
-  return <SchedulePageFrame />;
+  return (
+    <>
+      <PageSidebar>
+        <SchedulePageList />
+      </PageSidebar>
+      {placeholder ?? <SchedulePageFrame />}
+    </>
+  );
 }
 
 function schedulePagePlaceholder(

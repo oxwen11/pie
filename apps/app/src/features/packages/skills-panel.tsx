@@ -8,7 +8,7 @@ import {
 } from "@getpie/ui/components/empty";
 import { useQuery } from "@tanstack/react-query";
 import { CheckIcon, SearchIcon, Sparkles } from "lucide-react";
-import { useMemo, useState, type ReactElement } from "react";
+import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import Loader from "@/components/loader";
 import { useLocalOrpc } from "@/lib/environment-orpc";
@@ -17,7 +17,7 @@ function skillInitial(name: string): string {
   return name.slice(0, 1).toUpperCase();
 }
 
-export function SkillsPanel(): ReactElement {
+export function SkillsPanel({ children }: { readonly children: ReactNode }): ReactElement {
   const orpcQueryUtils = useLocalOrpc();
   const [query, setQuery] = useState("");
   const list = useQuery({
@@ -52,9 +52,12 @@ export function SkillsPanel(): ReactElement {
 
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 pt-6 pb-10">
-      <div className="min-w-0">
-        <h1 className="text-3xl font-semibold tracking-tight">Skills</h1>
-        <p className="text-muted-foreground mt-1 text-sm">Extend Pie with task-specific skills</p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-semibold tracking-tight">Skills</h1>
+          <p className="text-muted-foreground mt-1 text-sm">Extend Pie with task-specific skills</p>
+        </div>
+        {children}
       </div>
 
       <div className="border-input bg-background flex h-11 items-center rounded-full border shadow-xs">
