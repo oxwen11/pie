@@ -58,6 +58,9 @@ Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits t
 Always Node. Desktop spawns Electron-as-Node (`Pie Helper` + asar `server.mjs`, `ELECTRON_RUN_AS_NODE`). CLI uses `process.execPath`. The live terminal is `node-pty`. Bun is only for pie-pi-process (PATH `bun` plus the package export).
 _Avoid_: spawning the shebang `pi` binary under Bun; using a user-installed `pi` as `pie-pi-process`; a Node spawn path for pie-pi-process; a Bun runtime for the daemon or live terminal
 
+**Runtime idle suspend**:
+A held Pi runtime that stays at phase `idle` for `PIE_SESSION_RUNTIME_IDLE_MS` (default 5 minutes; `0` disables) is suspended: the process is killed without sealing the session, and `session.runtime.stopped` is published. The next prompt re-`ensureRuntime`s. Clients clear live turn UI but do not treat this as terminal error.
+
 **Private modules** (no Context tags, never wired directly):
 `harness/session.ts` — **PiAgentSession**, one session as this server sees it: seq stamping, phase, buffers, pending requests, and the single-flight lifecycle of the runtime it _optionally_ owns. `harness/session-fold.ts` — the pure state fold. `harness/session-repository.ts` — metadata store over `storage/sessions/`.
 

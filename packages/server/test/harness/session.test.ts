@@ -2,8 +2,20 @@ import assert from "node:assert/strict";
 
 import { it } from "@effect/vitest";
 import type { AgentRequest, SessionRef } from "@getpie/contract";
-import { Context, Effect, Layer, Queue, Ref, Stream } from "effect";
+import {
+  Context,
+  Deferred,
+  Effect,
+  Exit,
+  Fiber,
+  Layer,
+  Queue,
+  Ref,
+  Scheduler,
+  Stream,
+} from "effect";
 import type * as Cause from "effect/Cause";
+import { TestClock } from "effect/testing";
 
 import { EventBus, EventBusLayer } from "../../src/events";
 import { AgentOperationError, type SessionEnvelopeBody } from "../../src/harness";
@@ -467,3 +479,441 @@ it.effect("a turn under the buffer caps is not marked truncated", () =>
     }),
   ),
 );
+
+it.effect("suspendRuntime kills the process, leaves idle, and allows re-acquire", () =>
+  run(
+    Effect.gen(function* () {
+      const session = yield* SessionService;
+      const queue = yield* makeQueue;
+      const closes = yield* Ref.make(0);
+
+      yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue, { closes })));
+      assert.ok(yield* session.peekRuntime);
+      const before = yield* session.snapshot;
+
+      yield* session.suspendRuntime("idle");
+      assert.equal(yield* Ref.get(closes), 1);
+      assert.equal(yield* session.peekRuntime, undefined);
+      const after = yield* session.snapshot;
+      assert.equal(after.status.phase, "idle");
+      assert.ok(after.cursor > before.cursor);
+
+      const replacement = yield* makeQueue;
+      const again = yield* session.ensureRuntime(Effect.succeed(runtimeFrom(replacement)));
+      assert.ok(again);
+      assert.ok(yield* session.peekRuntime);
+    }),
+  ),
+);
+
+const FastIdleSessionLayer = Layer.effect(
+  SessionService,
+  Effect.gen(function* () {
+    const bus = yield* EventBus;
+    return yield* makePiAgentSession(ref, bus, { idleTimeoutMs: 40 });
+  }),
+).pipe(Layer.provide(EventBusLayer));
+
+const runFastIdle = <A, E>(program: Effect.Effect<A, E, SessionService>) =>
+  program.pipe(Effect.provide(FastIdleSessionLayer));
+
+it.effect("idle timeout suspends a held idle runtime", () =>
+  runFastIdle(
+    Effect.gen(function* () {
+      const session = yield* SessionService;
+      const queue = yield* makeQueue;
+      const closes = yield* Ref.make(0);
+      yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue, { closes })));
+      assert.ok(yield* session.peekRuntime);
+
+      // @effect/vitest installs TestClock — real sleeps never fire the idle fiber.
+      yield* TestClock.adjust("100 millis");
+      assert.equal(yield* session.peekRuntime, undefined);
+      assert.equal(yield* Ref.get(closes), 1);
+      assert.equal((yield* session.status).phase, "idle");
+    }),
+  ),
+);
+
+// All descendant fibers share a dispatcher so flush reaches quiescence without
+// wall-clock sleeps or an arbitrary number of scheduler yields.
+const withControlledScheduler = <A, E, R>(
+  make: (flush: Effect.Effect<void>) => Effect.Effect<A, E, R>,
+) => {
+  const dispatcher = new Scheduler.MixedScheduler().makeDispatcher();
+  return make(Effect.sync(() => dispatcher.flush())).pipe(
+    Effect.provideService(Scheduler.Scheduler, {
+      executionMode: "async",
+      shouldYield: () => false,
+      makeDispatcher: () => dispatcher,
+    }),
+  );
+};
+
+const holdSuspension = (
+  session: PiAgentSessionShape,
+  afterClose: Effect.Effect<void> = Effect.void,
+) =>
+  Effect.gen(function* () {
+    const queue = yield* makeQueue;
+    const closeStarted = yield* Deferred.make<void>();
+    const closeGate = yield* Deferred.make<void>();
+    const closes = yield* Ref.make(0);
+    yield* session.ensureRuntime(
+      Effect.succeed({
+        ...runtimeFrom(queue),
+        close: Ref.update(closes, (n) => n + 1).pipe(
+          Effect.andThen(Deferred.succeed(closeStarted, undefined)),
+          Effect.andThen(Deferred.await(closeGate)),
+          Effect.andThen(afterClose),
+        ),
+      }),
+    );
+    const suspending = yield* Effect.forkChild(session.suspendRuntime());
+    yield* Deferred.await(closeStarted);
+    return { suspending, closeGate, closes };
+  });
+
+it.effect("suspendRuntime finishes stopping before a replacement turn starts", () =>
+  withControlledScheduler((flush) =>
+    run(
+      Effect.gen(function* () {
+        const session = yield* SessionService;
+        const { suspending, closeGate } = yield* holdSuspension(session);
+
+        const queue = yield* makeQueue;
+        const replacement = runtimeFrom(queue);
+        const prompting = yield* Effect.forkChild(
+          session.ensureRuntime(Effect.succeed(replacement)).pipe(
+            Effect.flatMap((runtime) => {
+              assert.equal(runtime, replacement);
+              return Queue.offer(queue, {
+                type: "session.turn.started",
+                sessionId: nativeId,
+                turnId: "replacement-turn",
+              });
+            }),
+          ),
+        );
+        // Drain runnable fibers while close remains blocked: on the broken
+        // implementation the replacement turn is already running here.
+        yield* flush;
+        yield* Deferred.succeed(closeGate, undefined);
+        yield* Fiber.join(suspending);
+        yield* Fiber.join(prompting);
+        const snapshot = yield* awaitCursor(session, 2);
+        assert.equal(snapshot.status.phase, "running");
+        assert.equal(snapshot.activeTurn?.turnId, "replacement-turn");
+      }),
+    ),
+  ),
+);
+
+it.effect("suspension preserves single-flight acquisition when a waiter is interrupted", () =>
+  withControlledScheduler((flush) =>
+    run(
+      Effect.gen(function* () {
+        const session = yield* SessionService;
+        const { suspending, closeGate, closes } = yield* holdSuspension(session);
+        const queue = yield* makeQueue;
+        const replacement = runtimeFrom(queue);
+        const acquisitions = yield* Ref.make(0);
+        const acquire = Ref.update(acquisitions, (n) => n + 1).pipe(Effect.as(replacement));
+        const canceled = yield* Effect.forkChild(session.ensureRuntime(acquire));
+        const first = yield* Effect.forkChild(session.ensureRuntime(acquire));
+        const second = yield* Effect.forkChild(session.ensureRuntime(acquire));
+        yield* flush;
+        yield* Fiber.interrupt(canceled);
+        const during = yield* Ref.get(acquisitions);
+        const peek = yield* session.peekRuntime;
+        // A second suspend must neither close twice nor invalidate ownership.
+        yield* session.suspendRuntime();
+        const interruption = yield* Effect.forkChild(Fiber.interrupt(suspending));
+        yield* flush;
+        yield* Deferred.succeed(closeGate, undefined);
+        yield* Fiber.join(interruption);
+        assert.equal(yield* Fiber.join(first), replacement);
+        assert.equal(yield* Fiber.join(second), replacement);
+        assert.equal(during, 0);
+        assert.equal(peek, undefined);
+        assert.equal(yield* Ref.get(acquisitions), 1);
+        assert.equal(yield* Ref.get(closes), 1);
+        assert.equal((yield* session.snapshot).cursor, 1);
+      }),
+    ),
+  ),
+);
+
+it.effect("release waits for suspension and prevents a waiting acquisition", () =>
+  withControlledScheduler((flush) =>
+    run(
+      Effect.gen(function* () {
+        const session = yield* SessionService;
+        const { suspending, closeGate, closes } = yield* holdSuspension(session);
+        const queue = yield* makeQueue;
+        const acquisitions = yield* Ref.make(0);
+        const waiting = yield* Effect.forkChild(
+          session.ensureRuntime(
+            Ref.update(acquisitions, (n) => n + 1).pipe(Effect.as(runtimeFrom(queue))),
+          ),
+        );
+        const released = yield* Ref.make(false);
+        const releasing = yield* Effect.forkChild(
+          session.releaseRuntime.pipe(Effect.andThen(Ref.set(released, true))),
+        );
+        yield* flush;
+        const releasedEarly = yield* Ref.get(released);
+        yield* Deferred.succeed(closeGate, undefined);
+        yield* Fiber.join(suspending);
+        yield* Fiber.join(releasing);
+        assert.equal(yield* Fiber.join(waiting), undefined);
+        assert.equal(releasedEarly, false);
+        assert.equal(yield* Ref.get(acquisitions), 0);
+        assert.equal(yield* Ref.get(closes), 1);
+        assert.equal(yield* session.peekRuntime, undefined);
+      }),
+    ),
+  ),
+);
+
+it.effect("stale idle timers cannot suspend a replacement running turn", () =>
+  withControlledScheduler((flush) =>
+    runFastIdle(
+      Effect.gen(function* () {
+        const session = yield* SessionService;
+        const { suspending, closeGate } = yield* holdSuspension(session);
+        yield* Deferred.succeed(closeGate, undefined);
+        yield* Fiber.join(suspending);
+        const queue = yield* makeQueue;
+        const closes = yield* Ref.make(0);
+        const replacement = runtimeFrom(queue, { closes });
+        yield* session.ensureRuntime(Effect.succeed(replacement));
+        yield* Queue.offer(queue, {
+          type: "session.turn.started",
+          sessionId: nativeId,
+          turnId: "replacement-turn",
+        });
+        yield* flush;
+        yield* TestClock.adjust("100 millis");
+        yield* flush;
+        assert.equal(yield* session.peekRuntime, replacement);
+        assert.equal(yield* Ref.get(closes), 0);
+        assert.equal((yield* session.status).phase, "running");
+        yield* Queue.offer(queue, {
+          type: "session.turn.ended",
+          sessionId: nativeId,
+          turnId: "replacement-turn",
+          outcome: "completed",
+        });
+        yield* flush;
+        yield* TestClock.adjust("100 millis");
+        yield* flush;
+        assert.equal(yield* session.peekRuntime, undefined);
+        assert.equal(yield* Ref.get(closes), 1);
+      }),
+    ),
+  ),
+);
+
+it.effect("a close defect does not strand acquisition behind suspension", () =>
+  withControlledScheduler((flush) =>
+    run(
+      Effect.gen(function* () {
+        const session = yield* SessionService;
+        const { suspending, closeGate } = yield* holdSuspension(
+          session,
+          Effect.die("close defect"),
+        );
+        const queue = yield* makeQueue;
+        const replacement = runtimeFrom(queue);
+        const waiting = yield* Effect.forkChild(session.ensureRuntime(Effect.succeed(replacement)));
+        yield* flush;
+        yield* Deferred.succeed(closeGate, undefined);
+        assert.equal(Exit.isFailure(yield* Fiber.await(suspending)), true);
+        assert.equal(yield* Fiber.join(waiting), replacement);
+        assert.equal(yield* session.peekRuntime, replacement);
+      }),
+    ),
+  ),
+);
+
+it.effect("idle deadline cannot interrupt turn-start publication", () =>
+  withControlledScheduler((flush) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const bus = yield* Effect.provide(EventBus, EventBusLayer);
+        const publishing = yield* Deferred.make<void>();
+        const publishGate = yield* Deferred.make<void>();
+        const session = yield* makePiAgentSession(
+          ref,
+          {
+            ...bus,
+            publish: (event) =>
+              event.type === "session.turn.started"
+                ? Deferred.succeed(publishing, undefined).pipe(
+                    Effect.andThen(Deferred.await(publishGate)),
+                    Effect.andThen(bus.publish(event)),
+                  )
+                : bus.publish(event),
+          },
+          { idleTimeoutMs: 40 },
+        );
+        const queue = yield* makeQueue;
+        const closes = yield* Ref.make(0);
+        const runtime = runtimeFrom(queue, { closes });
+        yield* session.ensureRuntime(Effect.succeed(runtime));
+        yield* Queue.offer(queue, {
+          type: "session.turn.started",
+          sessionId: nativeId,
+          turnId: "turn-1",
+        });
+        yield* Deferred.await(publishing);
+        assert.equal((yield* session.status).phase, "running");
+        yield* TestClock.adjust("100 millis");
+        yield* flush;
+        const heldAtDeadline = yield* session.peekRuntime;
+        const closesAtDeadline = yield* Ref.get(closes);
+        yield* Deferred.succeed(publishGate, undefined);
+        yield* flush;
+        assert.equal(heldAtDeadline, runtime);
+        assert.equal(closesAtDeadline, 0);
+        assert.equal((yield* session.snapshot).status.phase, "running");
+      }),
+    ),
+  ),
+);
+
+for (const ending of ["success", "failure", "interruption"] as const) {
+  it.effect(`admission reservation releases after ${ending} without releasing another caller`, () =>
+    withControlledScheduler((flush) =>
+      Effect.scoped(
+        Effect.gen(function* () {
+          const bus = yield* Effect.provide(EventBus, EventBusLayer);
+          const session = yield* makePiAgentSession(ref, bus, { idleTimeoutMs: 40 });
+          const queue = yield* makeQueue;
+          const closes = yield* Ref.make(0);
+          const runtime = runtimeFrom(queue, { closes });
+          yield* session.ensureRuntime(Effect.succeed(runtime));
+          const firstGate = yield* Deferred.make<void>();
+          const secondGate = yield* Deferred.make<void>();
+          const first = yield* Effect.forkChild(
+            Effect.scoped(
+              session.reserveAdmission.pipe(
+                Effect.andThen(Deferred.await(firstGate)),
+                Effect.andThen(ending === "failure" ? Effect.fail("rejected") : Effect.void),
+              ),
+            ),
+          );
+          const second = yield* Effect.forkChild(
+            Effect.scoped(
+              session.reserveAdmission.pipe(Effect.andThen(Deferred.await(secondGate))),
+            ),
+          );
+          yield* flush;
+          yield* TestClock.adjust("100 millis");
+          assert.equal(yield* Ref.get(closes), 0);
+          if (ending === "interruption") yield* Fiber.interrupt(first);
+          else {
+            yield* Deferred.succeed(firstGate, undefined);
+            assert.equal(Exit.isFailure(yield* Fiber.await(first)), ending === "failure");
+          }
+          yield* TestClock.adjust("100 millis");
+          assert.equal(yield* session.peekRuntime, runtime);
+          yield* Deferred.succeed(secondGate, undefined);
+          yield* Fiber.join(second);
+          yield* TestClock.adjust("39 millis");
+          assert.equal(yield* Ref.get(closes), 0);
+          yield* TestClock.adjust("1 millis");
+          yield* flush;
+          assert.equal(yield* Ref.get(closes), 1);
+          yield* session.releaseRuntime;
+          assert.equal(yield* session.reserveAdmission, false);
+        }),
+      ),
+    ),
+  );
+}
+
+it.effect("admission waits through stopped publication and an interrupted waiter", () =>
+  withControlledScheduler((flush) =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const bus = yield* Effect.provide(EventBus, EventBusLayer);
+        const publishing = yield* Deferred.make<void>();
+        const publishGate = yield* Deferred.make<void>();
+        const session = yield* makePiAgentSession(
+          ref,
+          {
+            ...bus,
+            publish: (event) =>
+              event.type === "session.runtime.stopped"
+                ? Deferred.succeed(publishing, undefined).pipe(
+                    Effect.andThen(Deferred.await(publishGate)),
+                    Effect.andThen(bus.publish(event)),
+                  )
+                : bus.publish(event),
+          },
+          { idleTimeoutMs: 40 },
+        );
+        const { suspending, closeGate } = yield* holdSuspension(session);
+        let admitted = false;
+        const canceled = yield* Effect.forkChild(Effect.scoped(session.reserveAdmission));
+        const waiting = yield* Effect.forkChild(
+          Effect.scoped(
+            session.reserveAdmission.pipe(
+              Effect.tap(() =>
+                Effect.sync(() => {
+                  admitted = true;
+                }),
+              ),
+            ),
+          ),
+        );
+        yield* flush;
+        assert.equal(admitted, false);
+        yield* Fiber.interrupt(canceled);
+        yield* Deferred.succeed(closeGate, undefined);
+        yield* Deferred.await(publishing);
+        yield* flush;
+        assert.equal(admitted, false);
+        yield* Deferred.succeed(publishGate, undefined);
+        yield* Fiber.join(suspending);
+        assert.equal(yield* Fiber.join(waiting), true);
+        assert.equal(admitted, true);
+        const queue = yield* makeQueue;
+        const closes = yield* Ref.make(0);
+        yield* session.ensureRuntime(Effect.succeed(runtimeFrom(queue, { closes })));
+        yield* TestClock.adjust("100 millis");
+        yield* flush;
+        assert.equal(yield* Ref.get(closes), 1);
+      }),
+    ),
+  ),
+);
+
+for (const phase of ["running", "requires_action", "disabled"] as const) {
+  it.effect(`idle timeout preserves a ${phase} runtime`, () =>
+    Effect.scoped(
+      Effect.gen(function* () {
+        const bus = yield* Effect.provide(EventBus, EventBusLayer);
+        const session = yield* makePiAgentSession(ref, bus, {
+          idleTimeoutMs: phase === "disabled" ? 0 : 40,
+        });
+        const queue = yield* makeQueue;
+        const closes = yield* Ref.make(0);
+        const runtime = runtimeFrom(queue, { closes });
+        yield* session.ensureRuntime(Effect.succeed(runtime));
+        if (phase !== "disabled")
+          yield* session.emit({ type: "session.turn.started", turnId: "turn-1" });
+        if (phase === "requires_action")
+          yield* session.emit({
+            type: "session.request.asked",
+            request: { type: "question", id: "request-1", questions: [], native: null },
+          });
+        yield* TestClock.adjust("100 millis");
+        assert.equal(yield* session.peekRuntime, runtime);
+        assert.equal(yield* Ref.get(closes), 0);
+      }),
+    ),
+  );
+}
