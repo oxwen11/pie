@@ -2,11 +2,7 @@ import { useRouterState } from "@tanstack/react-router";
 import { createContext, use, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-export function hasPageSidebar(
-  matches: ReadonlyArray<{ readonly staticData: { readonly pageSidebar?: true } }>,
-): boolean {
-  return matches.some((match) => match.staticData.pageSidebar === true);
-}
+import { hasPageSidebar } from "./page-sidebar-match";
 
 const PageSidebarContext = createContext<{
   readonly target: HTMLDivElement | null;

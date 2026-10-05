@@ -14,7 +14,8 @@ import { Link, useMatch, useRouterState } from "@tanstack/react-router";
 
 import { appNav, type AppNavItem } from "@/components/layout/app-nav";
 import { BrandMark } from "@/components/layout/brand-mark";
-import { hasPageSidebar, PageSidebarOutlet } from "@/components/layout/page-sidebar";
+import { PageSidebarOutlet } from "@/components/layout/page-sidebar";
+import { hasPageSidebar } from "@/components/layout/page-sidebar-match";
 import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
 import { ProjectList } from "@/features/projects/project-list";
 import { RecentList } from "@/features/projects/recent-list";
