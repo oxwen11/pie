@@ -1,5 +1,4 @@
 import type { Project, SessionRef, SessionSummary } from "@getpie/contract";
-import { collectFiredSessionIds } from "@getpie/contract";
 import type { PullRequestSessionStatus } from "@getpie/contract/pull-request";
 import { Collapsible, CollapsibleTrigger } from "@getpie/ui/components/collapsible";
 import {
@@ -67,11 +66,6 @@ export function ProjectSessionsGroup({
     select: selectPullRequestStatuses,
   });
   const statusBySessionId = pullRequestStatuses.data ?? EMPTY_PULL_REQUEST_STATUSES;
-  const firedSessionIds = useQuery({
-    ...orpcQueryUtils.schedule.list.queryOptions(),
-    select: collectFiredSessionIds,
-    refetchInterval: 10_000,
-  });
 
   return (
     <Collapsible defaultOpen>
@@ -112,7 +106,6 @@ export function ProjectSessionsGroup({
                   <ProjectSessionRow
                     key={session.sessionId}
                     active={active}
-                    createdBySchedule={firedSessionIds.data?.has(session.sessionId) === true}
                     environmentId={environmentId}
                     isActive={() => isSessionActive(session)}
                     pullRequest={listed}

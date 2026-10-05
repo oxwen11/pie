@@ -50,6 +50,21 @@ describe("CreateScheduleInput", () => {
     ).toBe(true);
     expect(
       accepts(CreateScheduleInputSchema, {
+        name: "Invalid owned reuse",
+        projectId: UUID,
+        prompt: "review",
+        spec: { kind: "manual" },
+        session: { policy: "owned", sessionId: UUID },
+      }),
+    ).toBe(false);
+    expect(
+      accepts(UpdateScheduleInputSchema, {
+        id: UUID,
+        session: { policy: "owned", sessionId: UUID },
+      }),
+    ).toBe(false);
+    expect(
+      accepts(CreateScheduleInputSchema, {
         name: "Fresh",
         projectId: UUID,
         prompt: "review",

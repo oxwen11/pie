@@ -1,4 +1,4 @@
-import type { ScheduleSession, ScheduleSpec } from "@getpie/contract";
+import type { CreateScheduleInput, ScheduleSession, ScheduleSpec } from "@getpie/contract";
 
 export type ScheduleCadence =
   | "manual"
@@ -112,7 +112,7 @@ export function defaultScheduleForm(projectId: string): ScheduleFormValues {
 export function sessionFromForm(
   form: Pick<ScheduleFormValues, "reuseSession" | "sessionPick" | "sessionId">,
   listedIds?: ReadonlySet<string>,
-): ScheduleSession {
+): NonNullable<CreateScheduleInput["session"]> {
   if (!form.reuseSession) return { policy: "isolated" };
   if (
     form.sessionPick === "existing" &&

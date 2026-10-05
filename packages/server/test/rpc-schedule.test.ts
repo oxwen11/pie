@@ -43,10 +43,7 @@ describe("schedule router", () => {
         archived: false,
       });
       expect(sessions).toHaveLength(1);
-      expect(sessions[0]).not.toHaveProperty("schedule");
-      expect(sessions[0]).not.toHaveProperty("scheduleId");
-      expect(sessions[0]).not.toHaveProperty("automation");
-      expect(sessions[0]).not.toHaveProperty("automationId");
+      expect(sessions[0]?.source).toEqual({ kind: "schedule", scheduleId: created.id });
       expect(sessions[0]?.title).toBe("Daily review");
       expect(fired.schedule.lastSessionId).toBe(sessions[0]?.sessionId);
       expect(fired.schedule.runs[0]?.sessionId).toBe(sessions[0]?.sessionId);
@@ -60,10 +57,7 @@ describe("schedule router", () => {
       const stored = JSON.parse(fs.readFileSync(sessionFile, "utf8")) as {
         readonly data: Record<string, unknown>;
       };
-      expect(stored.data).not.toHaveProperty("schedule");
-      expect(stored.data).not.toHaveProperty("scheduleId");
-      expect(stored.data).not.toHaveProperty("automation");
-      expect(stored.data).not.toHaveProperty("automationId");
+      expect(stored.data.source).toEqual({ kind: "schedule", scheduleId: created.id });
 
       const modeled = await h.client.schedule.update({
         id: created.id,
@@ -75,6 +69,9 @@ describe("schedule router", () => {
 
       await h.client.schedule.delete({ id: created.id });
       await expect(h.client.schedule.list()).resolves.toEqual([]);
+      await expect(
+        h.client.agent.session.list({ projectId: project.id, archived: false }),
+      ).resolves.toMatchObject([{ source: { kind: "schedule", scheduleId: created.id } }]);
       if (fired.ref !== undefined) {
         await h.client.agent.session.close({ ref: fired.ref });
       }
