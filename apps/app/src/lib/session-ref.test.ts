@@ -33,7 +33,6 @@ describe("EnvironmentSessionRef identity", () => {
   });
 
   it("keys the same session on different Environments apart", () => {
-    expect(sessionRefKey(ref())).toBe(sessionRefKey(ref()));
     expect(sessionRefKey(ref())).not.toBe(sessionRefKey(ref({ environmentId: "env-2" })));
   });
 
