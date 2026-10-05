@@ -26,6 +26,8 @@ applicable guidance when the scope changes.
 | Acceptance: checks, failure cases, and evidence                  | [acceptance.md](.agents/rules/workflows/acceptance.md) |
 | Delivery: work slices, PRs, CI, and merging                      | [delivery.md](.agents/rules/workflows/delivery.md)     |
 
+When the task ends, open a pull request.
+
 ## Topics — read when affected
 
 | Concern                                                    | Guidance                                                                                             |
