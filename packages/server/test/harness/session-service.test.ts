@@ -334,21 +334,20 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
     }),
   );
 
-  it.effect("getMessages reopens a closed session and reads through the live instance", () =>
+  it.effect("getMessages after close does not start a process", () =>
     Effect.gen(function* () {
-      const history: PieUIMessage[] = [{ id: "m1", role: "user", parts: [] }];
-      const result = yield* run({ history }, (fixture) =>
+      const result = yield* run({ history: [{ id: "m1", role: "user", parts: [] }] }, (fixture) =>
         Effect.gen(function* () {
           const { ref } = yield* createSession(fixture);
           yield* fixture.service.prompt({ ref, parts: [{ type: "text", text: "hello" }] });
           yield* awaitOpen(fixture);
           yield* fixture.service.close(ref);
-          const messages = yield* fixture.service.getMessages(ref);
-          return { messages, resume: fixture.spy.resume };
+          const error = yield* Effect.flip(fixture.service.getMessages(ref));
+          return { error, resume: fixture.spy.resume };
         }),
       );
-      assert.deepEqual(result.resume, [{ sessionId: "native-1", cwd: "/tmp/pie-app" }]);
-      assert.deepEqual(result.messages, history);
+      assert.equal(result.error._tag, "SessionNotResumable");
+      assert.deepEqual(result.resume, []);
     }),
   );
 
@@ -458,6 +457,29 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
       );
       assert.deepEqual(result.messages, history);
       // A harness that can read its own transcript is never asked for a process.
+      assert.deepEqual(result.resume, []);
+    }),
+  );
+
+  it.effect("getModelState reads cold without starting a process", () =>
+    Effect.gen(function* () {
+      const result = yield* run(
+        { coldModel: { provider: "openai", modelId: "from-file" } },
+        (fixture) =>
+          Effect.gen(function* () {
+            const { ref } = yield* fixture.service.create({
+              projectId: "proj-a",
+              cwd: "/tmp/pie-app",
+              model: { provider: "meta", modelId: "stored" },
+            });
+            const stored = yield* fixture.repo.read(ref.projectId, ref.sessionId);
+            yield* fixture.repo.write({ ...stored, agentSessionId: "native-already" });
+            yield* fixture.service.close(ref);
+            const model = yield* fixture.service.getModelState(ref);
+            return { model, resume: fixture.spy.resume };
+          }),
+      );
+      assert.deepEqual(result.model, { provider: "openai", modelId: "from-file" });
       assert.deepEqual(result.resume, []);
     }),
   );
