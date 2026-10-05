@@ -107,9 +107,9 @@ The reviewer runs the checks; the author's evidence cannot replace this step.
   corrupt target is refused before any process is stopped and must not fall back
   to another current run. Cleanup is complete only when owned processes and ports
   are gone, evidence remains, and foreign runs are untouched.
-- Do not set `PI_CODING_AGENT_DIR` to an empty directory. Real-model checks use
-  the operator's existing Pi configuration and isolate application state with
-  `PIE_HOME` only.
+- Real-model checks use the operator's existing Pi configuration and isolate
+  application state with `PIE_HOME` only. Launch refuses an overridden `HOME`
+  or an empty `PI_CODING_AGENT_DIR`.
 - Crop public evidence to the relevant UI. Omit local paths, run identifiers,
   credentials, daemon records, and unrelated diagnostics. Before/after frames
   show that drive, not a reconstructed baseline.
