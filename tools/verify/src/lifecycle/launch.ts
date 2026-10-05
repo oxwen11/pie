@@ -14,7 +14,13 @@ import {
   setCurrentRun,
   tailFile,
 } from "../runtime/fs.ts";
-import { commandOnPath, envPort, findRepoRoot, pidAlive } from "../runtime/process.ts";
+import {
+  assertOperatorPiConfig,
+  commandOnPath,
+  envPort,
+  findRepoRoot,
+  pidAlive,
+} from "../runtime/process.ts";
 import { ensureSampleProject, seedSampleProject, type SampleProject } from "../runtime/scaffold.ts";
 import { parseLaunchArgs, type LaunchCtx, type Surface } from "../surface.ts";
 import { cleanup } from "./cleanup.ts";
@@ -23,6 +29,7 @@ import { recordedPids } from "./pids.ts";
 import { applyPortPlan, portPlan } from "./ports.ts";
 
 export async function launch(surface: Surface, args: string[]): Promise<void> {
+  assertOperatorPiConfig();
   const { identity } = surface;
   const request = parseLaunchArgs(args, {
     allowServe: identity.allowServe,
