@@ -49,8 +49,9 @@ optional dump. `cli` has no page.
 ## Parallel verification
 
 Use **one worktree and one isolation root per task**. Keep `HOME` and the operator's
-Pi model/auth configuration unchanged. Roots use the existing `runs/<id>/pie-home`
-layout; no global registry or new metadata format is needed.
+Pi model/auth configuration unchanged. Launch refuses a rewritten `HOME` or an
+empty `PI_CODING_AGENT_DIR` before it spawns anything. Roots use the existing
+`runs/<id>/pie-home` layout; no global registry or new metadata format is needed.
 
 In separate shells/worktrees (choose unused ports):
 

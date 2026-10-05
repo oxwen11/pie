@@ -1,8 +1,10 @@
+import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { envPort, isSharedPieHome } from "./process.ts";
+import { assertOperatorPiConfig, envPort, isSharedPieHome } from "./process.ts";
 
 describe("envPort", () => {
   it("returns the fallback when unset", () => {
@@ -33,6 +35,30 @@ describe("envPort", () => {
         process.env.VERIFY_PIE_CLI_TEST_PORT = previous;
       }
     }
+  });
+});
+
+describe("assertOperatorPiConfig", () => {
+  const operator = { HOME: os.homedir() };
+
+  it("accepts the operator HOME and an unset agent directory", () => {
+    expect(() => assertOperatorPiConfig(operator)).not.toThrow();
+  });
+
+  it("rejects an overridden HOME or empty agent directory", () => {
+    expect(() => assertOperatorPiConfig({ HOME: "/tmp/not-the-operator" })).toThrow(/HOME/);
+    expect(() => assertOperatorPiConfig({ ...operator, PI_CODING_AGENT_DIR: " " })).toThrow(
+      /empty directory/,
+    );
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), "pie-empty-agent-"));
+    expect(() => assertOperatorPiConfig({ ...operator, PI_CODING_AGENT_DIR: empty })).toThrow(
+      /empty directory/,
+    );
+    const configured = fs.mkdtempSync(path.join(os.tmpdir(), "pie-agent-"));
+    fs.writeFileSync(path.join(configured, "auth.json"), "{}");
+    expect(() =>
+      assertOperatorPiConfig({ ...operator, PI_CODING_AGENT_DIR: configured }),
+    ).not.toThrow();
   });
 });
 
