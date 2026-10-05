@@ -1,5 +1,51 @@
+diff --git a/dist/core/tools/bash.d.ts b/dist/core/tools/bash.d.ts
+index 64be599a321c7486ebe8c9a21608ad8ce61f7778..1c71ff8e9c3bebad9cdb0bdf8d22f3db3ce34ce0 100644
+--- a/dist/core/tools/bash.d.ts
++++ b/dist/core/tools/bash.d.ts
+@@ -1,9 +1,9 @@
+ import type { AgentTool } from "@earendil-works/pi-agent-core";
+ import { type Static, Type } from "typebox";
+ import { type ShellConfig } from "../../utils/shell.ts";
+-import type { ToolDefinition } from "../extensions/types.ts";
++import type { ExtensionContext, ToolDefinition } from "../extensions/types.ts";
+ import { type TruncationResult } from "./truncate.ts";
+-declare const bashSchema: Type.TObject<{
++export declare const bashSchema: Type.TObject<{
+     command: Type.TString;
+     timeout: Type.TOptional<Type.TNumber>;
+ }>;
+@@ -67,6 +67,7 @@ export interface BashSpawnContext {
+     env: NodeJS.ProcessEnv;
+ }
+ export type BashSpawnHook = (context: BashSpawnContext) => BashSpawnContext;
++export declare function resolveSpawnContext(command: string, cwd: string, spawnHook: BashSpawnHook | undefined, exposeSessionEnvironment: boolean, ctx: ExtensionContext | undefined): BashSpawnContext;
+ export interface BashToolOptions {
+     /** Custom operations for command execution. Default: local shell */
+     operations?: BashOperations;
+diff --git a/dist/core/tools/bash.js b/dist/core/tools/bash.js
+index e52c9d779bdb50667083810d946e11da6c7e29ba..8daaa4e2c3406f874b832a1ca9cb81419219bf3e 100644
+--- a/dist/core/tools/bash.js
++++ b/dist/core/tools/bash.js
+@@ -25,7 +25,7 @@ function resolveTimeoutMs(timeout) {
+     }
+     return timeoutMs;
+ }
+-const bashSchema = Type.Object({
++export const bashSchema = Type.Object({
+     command: Type.String({ description: "Shell command to execute" }),
+     timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (optional, no default timeout)" })),
+ });
+@@ -132,7 +132,7 @@ export function createLocalShellOperations(shellName, resolveShellConfig) {
+ export function createLocalBashOperations(options) {
+     return createLocalShellOperations("bash", () => getShellConfig(options?.shellPath));
+ }
+-function resolveSpawnContext(command, cwd, spawnHook, exposeSessionEnvironment, ctx) {
++export function resolveSpawnContext(command, cwd, spawnHook, exposeSessionEnvironment, ctx) {
+     const env = { ...getShellEnv() };
+     delete env.PI_SESSION_ID;
+     delete env.PI_SESSION_FILE;
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index 045ddb2aaa9dc0b2f1dc9c4cd81e4278a08131d2..da92b3d93de07227423220d8b66de2c76307f4b4 100644
+index 9f9bd7370e5ecc288de58d20e81b2a0aadb6ea4b..aebc59f096bc11de244be342f46c8638d14bd8a7 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -1,3 +1,9 @@
@@ -23,7 +69,7 @@ index 045ddb2aaa9dc0b2f1dc9c4cd81e4278a08131d2..da92b3d93de07227423220d8b66de2c7
  export { getLanguageFromPath, getMarkdownTheme, getSelectListTheme, getSettingsListTheme, highlightCode, initTheme, Theme, type ThemeAppearance, type ThemeBg, type ThemeColor, type ThemeStyle, type ThemeToken, } from "./modes/interactive/theme/theme.ts";
  export { copyToClipboard } from "./utils/clipboard.ts";
 diff --git a/dist/index.js b/dist/index.js
-index c48934f78d61fd5f5f8008bc9e09d8c4558d330a..f4a2ca52923a181829686b61a03041a085aaaaa2 100644
+index c48934f78d61fd5f5f8008bc9e09d8c4558d330a..e4dca5d1fdf7234bfac8038f61fa151d3a37f558 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,3 +1,9 @@
@@ -48,46 +94,6 @@ index c48934f78d61fd5f5f8008bc9e09d8c4558d330a..f4a2ca52923a181829686b61a03041a0
  // UI components for extensions
  export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
  // Theme utilities for custom tools and extensions
-diff --git a/dist/core/tools/bash.d.ts b/dist/core/tools/bash.d.ts
---- a/dist/core/tools/bash.d.ts
-+++ b/dist/core/tools/bash.d.ts
-@@ -1,9 +1,9 @@
- import type { AgentTool } from "@earendil-works/pi-agent-core";
- import { type Static, Type } from "typebox";
- import { type ShellConfig } from "../../utils/shell.ts";
--import type { ToolDefinition } from "../extensions/types.ts";
-+import type { ExtensionContext, ToolDefinition } from "../extensions/types.ts";
- import { type TruncationResult } from "./truncate.ts";
--declare const bashSchema: Type.TObject<{
-+export declare const bashSchema: Type.TObject<{
-     command: Type.TString;
-     timeout: Type.TOptional<Type.TNumber>;
- }>;
-@@ -69,5 +69,6 @@ export interface BashSpawnContext {
- export type BashSpawnHook = (context: BashSpawnContext) => BashSpawnContext;
-+export declare function resolveSpawnContext(command: string, cwd: string, spawnHook: BashSpawnHook | undefined, exposeSessionEnvironment: boolean, ctx: ExtensionContext | undefined): BashSpawnContext;
- export interface BashToolOptions {
-     /** Custom operations for command execution. Default: local shell */
-     operations?: BashOperations;
-     /** Command prefix prepended to every command (for example shell setup commands) */
-diff --git a/dist/core/tools/bash.js b/dist/core/tools/bash.js
---- a/dist/core/tools/bash.js
-+++ b/dist/core/tools/bash.js
-@@ -28,4 +28,4 @@ function resolveTimeoutMs(timeout) {
--const bashSchema = Type.Object({
-+export const bashSchema = Type.Object({
-     command: Type.String({ description: "Shell command to execute" }),
-     timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (optional, no default timeout)" })),
- });
-@@ -134,7 +134,7 @@ export function createLocalBashOperations(options) {
- export function createLocalBashOperations(options) {
-     return createLocalShellOperations("bash", () => getShellConfig(options?.shellPath));
- }
--function resolveSpawnContext(command, cwd, spawnHook, exposeSessionEnvironment, ctx) {
-+export function resolveSpawnContext(command, cwd, spawnHook, exposeSessionEnvironment, ctx) {
-     const env = { ...getShellEnv() };
-     delete env.PI_SESSION_ID;
-     delete env.PI_SESSION_FILE;
 diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
 index 5cf3ad39087c5c7add9ec8a1381b4f68367972e7..f58da52db465c02b74c5e6408f3fb9567fa0e847 100644
 --- a/dist/modes/interactive/theme/theme.js
@@ -338,18 +344,18 @@ index 7c40360ce63bc65d8eff063379bfce8646e9389b..a445a5f73bd4f129faaddc6db761c3e9
 +export function supportsLanguage(_name) { return false; }
 diff --git a/examples/extensions/custom-provider-anthropic/package-lock.json b/examples/extensions/custom-provider-anthropic/package-lock.json
 deleted file mode 100644
-index 0f04a4b6e990ec2354e48dd096522edbe95fe8bf..0000000000000000000000000000000000000000
+index bd05ded4a4e3fa90b71cd5167e46fba1060c1822..0000000000000000000000000000000000000000
 diff --git a/examples/extensions/gondolin/package-lock.json b/examples/extensions/gondolin/package-lock.json
 deleted file mode 100644
-index 8ccf39f0447d6635656ae041d9cffc842f7099cb..0000000000000000000000000000000000000000
+index cd411a5c669fa5020451ee5df7abea0fdf92b903..0000000000000000000000000000000000000000
 diff --git a/examples/extensions/sandbox/package-lock.json b/examples/extensions/sandbox/package-lock.json
 deleted file mode 100644
-index b701a1ba670ce5ea05dfcd5c5e7566ba7f703810..0000000000000000000000000000000000000000
+index 8966a1ac64e89bbf59340c3eab342432926f5886..0000000000000000000000000000000000000000
 diff --git a/examples/extensions/with-deps/package-lock.json b/examples/extensions/with-deps/package-lock.json
 deleted file mode 100644
-index 2b01794b0f89bcebf1d6bf38cbf356d65b8fe6b9..0000000000000000000000000000000000000000
+index dff4bb95909145d4d7677322458af92b48f39371..0000000000000000000000000000000000000000
 diff --git a/package.json b/package.json
-index 22b6fdcb43e81f4eb7f782c44e4d659293dcb544..c5012a27d2bebc9358970b0cabf7c270eefefbd6 100644
+index 90f4c62dcd7e5ce51134f5da9f69937eba7da02d..01ece5041cc8017d99562f279054e908d7bdae6f 100644
 --- a/package.json
 +++ b/package.json
 @@ -16,6 +16,14 @@

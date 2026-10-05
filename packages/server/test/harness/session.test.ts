@@ -7,7 +7,7 @@ import type * as Cause from "effect/Cause";
 
 import { EventBus, EventBusLayer } from "../../src/events";
 import { AgentOperationError, type SessionEnvelopeBody } from "../../src/harness";
-import { AgentUnavailable } from "../../src/harness/errors";
+import { AgentUnavailable, SessionClosed, SessionNotResumable } from "../../src/harness/errors";
 import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import { streamFromQueueOne } from "../../src/harness/queue-stream";
 import { type PiAgentSessionShape, makePiAgentSession } from "../../src/harness/session";
@@ -110,6 +110,44 @@ it.effect("a session that never had a runtime reads as idle at cursor 0", () =>
       assert.deepEqual(snapshot.pendingPrompt, { steering: [], followUp: [] });
     }),
   ),
+);
+
+it.effect("cold and live reads preserve their distinct error contracts", () =>
+  Effect.scoped(
+    Effect.gen(function* () {
+      const bus = yield* EventBus;
+      const missing = yield* makePiAgentSession(ref, bus, () =>
+        Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId })),
+      );
+      assert.equal(yield* missing.modelState(nativeId, "/unused"), undefined);
+      assert.equal(
+        (yield* Effect.flip(missing.messages(nativeId, "/unused")))._tag,
+        "SessionNotResumable",
+      );
+
+      const failure = new AgentOperationError({
+        sessionId: ref.sessionId,
+        operation: "read-session",
+        cause: "unreadable",
+      });
+      const unreadable = yield* makePiAgentSession(ref, bus, () => Effect.fail(failure));
+      assert.equal(yield* Effect.flip(unreadable.modelState(nativeId, "/unused")), failure);
+      assert.equal(yield* Effect.flip(unreadable.messages(nativeId, "/unused")), failure);
+
+      const queue = yield* makeQueue;
+      const closed = new SessionClosed({ sessionId: nativeId });
+      yield* missing.ensureRuntime(
+        Effect.succeed({
+          ...runtimeFrom(queue),
+          getMessages: Effect.fail(closed),
+          getModelState: Effect.fail(closed),
+        }),
+      );
+      assert.equal(yield* Effect.flip(missing.messages(nativeId, "/unused")), closed);
+      assert.equal(yield* Effect.flip(missing.modelState(nativeId, "/unused")), closed);
+      yield* missing.releaseRuntime;
+    }),
+  ).pipe(Effect.provide(EventBusLayer)),
 );
 
 it.effect("ensureRuntime keeps the runtime it holds and stamps contiguous seqs", () =>

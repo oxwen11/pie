@@ -90,8 +90,8 @@ catalogs:
   # Pi packages move together. Exact pins: the coding-agent patch key below
   # is version-specific, and a caret would admit a release the patch misses.
   pi:
-    "@earendil-works/pi-coding-agent": 0.99.1
-    "@earendil-works/pi-tui": 0.99.1
+    "@earendil-works/pi-coding-agent": 1.0.2
+    "@earendil-works/pi-tui": 1.0.2
 overrides:
   # These overrides force TRANSITIVE deps onto the catalog version — the
   # catalog alone only governs workspace package.json entries. Load-bearing:
@@ -152,7 +152,7 @@ allowBuilds:
   # works inside git worktrees); the package's own postinstall would just fail.
   simple-git-hooks: false
 patchedDependencies:
-  "@earendil-works/pi-coding-agent@0.99.1": patches/@earendil-works__pi-coding-agent@0.99.1.patch
+  "@earendil-works/pi-coding-agent@1.0.2": patches/@earendil-works__pi-coding-agent@1.0.2.patch
   # react-scan fetches react-grab.com/api/version from `start()` with no way to
   # opt out — the renderer CSP blocks it and logs an error on every launch. The
   # patch makes that one function return early; nothing else. On a react-scan

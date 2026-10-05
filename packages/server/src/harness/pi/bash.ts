@@ -88,7 +88,11 @@ function keepTail(text: string): string {
   const bytes = Buffer.from(text);
   if (bytes.length <= TAIL_BYTES) return text;
   let start = bytes.length - TAIL_BYTES;
-  while (start < bytes.length && (bytes[start] & 0xc0) === 0x80) start += 1;
+  while (start < bytes.length) {
+    const byte = bytes[start];
+    if (byte === undefined || (byte & 0xc0) !== 0x80) break;
+    start += 1;
+  }
   return bytes.subarray(start).toString("utf8");
 }
 
@@ -359,7 +363,7 @@ export async function executePieBash(input: {
   const decoder = new TextDecoder();
   let tail = "";
   let captureTail = true;
-  const onData = (data: Buffer) => {
+  const onData = (data: Uint8Array) => {
     log.write(data);
     if (!captureTail) return;
     tail = keepTail(tail + decoder.decode(data, { stream: true }));
