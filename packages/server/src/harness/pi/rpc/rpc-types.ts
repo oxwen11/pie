@@ -144,7 +144,7 @@ export type RpcResponse =
       type: "response";
       command: "prompt";
       success: true;
-      data: { started: boolean };
+      data: { started: boolean; disposition: "started" | "queued" | "handled" };
     }
   | { id?: string; type: "response"; command: "steer"; success: true }
   | { id?: string; type: "response"; command: "follow_up"; success: true }

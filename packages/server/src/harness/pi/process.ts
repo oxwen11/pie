@@ -535,7 +535,7 @@ export const makePiProcessWithDependencies = <R>(
                   if (before._tag === "Idle") yield* drainQueue(session.chunks);
 
                   // Stock Pi before 0.99 omits `data`. 0.99 returns `{ disposition }`.
-                  // pie-pi-process still returns `{ started }`.
+                  // pie-pi-process returns `{ started, disposition }`.
                   const admission = yield* restore(
                     session.transport.command<
                       { readonly started?: boolean; readonly disposition?: string } | undefined
@@ -558,6 +558,11 @@ export const makePiProcessWithDependencies = <R>(
                         started: false,
                         output: Stream.empty,
                       };
+                    }
+                    // An extension command (e.g. `/mcp`) consumed the input
+                    // without starting a turn.
+                    if (admission?.disposition === "handled") {
+                      return { turnId: uuid(), started: false, output: Stream.empty };
                     }
                     return yield* new AgentOperationError({
                       sessionId: input.sessionId,

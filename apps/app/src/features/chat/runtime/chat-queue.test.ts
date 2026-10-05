@@ -81,6 +81,17 @@ describe("Chat pending prompt", () => {
     expect(chat.store.getState().messages).toEqual([]);
   });
 
+  it("returns to ready when Pi handles a command without starting a turn", async () => {
+    const { chat, transport, attach } = makeChat();
+    await attach({});
+    transport.promptStarted = false;
+
+    await chat.prompt("/mcp");
+
+    expect(chat.store.getState().messages).toEqual([]);
+    expect(chat.store.getState().status).toBe("ready");
+  });
+
   it("keeps the queue empty when a follow-up races to a real prompt", async () => {
     const { chat, transport, attach, live } = makeChat();
     await attach({});

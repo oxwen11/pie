@@ -94,6 +94,7 @@ rl.on("line", (line) => {
   if (msg.type !== "prompt") return;
   const text = msg.message;
   if (text === "fail") { send({ id: msg.id, type: "response", command: "prompt", success: false, error: "cannot prompt" }); return; }
+  if (text === "/cmd") { send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "handled" } }); return; }
   if (holding && !msg.streamingBehavior) {
     send({ id: msg.id, type: "response", command: "prompt", success: false, error: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." });
     return;
@@ -508,6 +509,22 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       assert.equal(error._tag, "PiRpcError");
 
       const prompt = yield* agent.session.prompt({ sessionId, text: "ping" });
+      const chunks = yield* Stream.runCollect(prompt.output);
+      assert.equal(Array.from(chunks).at(-1)?.type, "finish");
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("an extension command handled without a turn leaves the session promptable", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const handled = yield* agent.session.prompt({ sessionId, text: "/cmd" });
+      assert.equal(handled.started, false);
+      assert.equal(Array.from(yield* Stream.runCollect(handled.output)).length, 0);
+
+      const prompt = yield* agent.session.prompt({ sessionId, text: "ping" });
+      assert.equal(prompt.started, true);
       const chunks = yield* Stream.runCollect(prompt.output);
       assert.equal(Array.from(chunks).at(-1)?.type, "finish");
       yield* agent.session.abort(sessionId);
