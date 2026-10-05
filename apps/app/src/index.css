@@ -123,6 +123,19 @@
   }
 }
 
+/* Image previews stay translucent black with readable controls in either theme. */
+.chat-image-preview {
+  color-scheme: dark;
+  --popover: rgb(0 0 0 / 80%);
+  --popover-foreground: var(--color-white);
+  --foreground: var(--color-white);
+  --muted: transparent;
+  --muted-foreground: rgb(255 255 255 / 70%);
+  --accent: rgb(255 255 255 / 12%);
+  --border: rgb(255 255 255 / 15%);
+  --ring: var(--color-white);
+}
+
 /* TipTap Placeholder extension renders via ::before on the empty first paragraph. */
 .tiptap p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

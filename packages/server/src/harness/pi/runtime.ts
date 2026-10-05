@@ -29,6 +29,7 @@ import type {
 } from "../session-io";
 import { entriesToUIMessages } from "./history";
 import type { PiProcess } from "./process";
+import type { PiSessionToolsShape } from "./session-tools";
 import type { PiUIMessageChunk } from "./ui-message";
 
 export {
@@ -316,10 +317,12 @@ export const makePiAgentRuntime = (
 export const createPiAgentRuntime = (
   process: PiProcess,
   input: CreateSessionInput,
+  tools?: PiSessionToolsShape,
 ): Effect.Effect<PiAgentRuntime, AgentOpenError, Scope.Scope> =>
   process.session
     .create({
       cwd: input.cwd,
+      ...(tools ? { tools } : undefined),
       ...(input.provider ? { provider: input.provider } : undefined),
       ...(input.modelId ? { modelId: input.modelId } : undefined),
     })
@@ -331,10 +334,13 @@ export const createPiAgentRuntime = (
 export const resumePiAgentRuntime = (
   process: PiProcess,
   input: ResumeSessionInput,
+  tools?: PiSessionToolsShape,
 ): Effect.Effect<PiAgentRuntime, SessionNotResumable | AgentOpenError, Scope.Scope> =>
-  process.session.resume({ sessionId: input.sessionId, cwd: input.cwd }).pipe(
-    Effect.mapError((cause) =>
-      cause instanceof SessionNotResumable ? cause : new AgentOpenError({ cause }),
-    ),
-    Effect.flatMap(({ sessionId }) => makePiAgentRuntime(process, sessionId)),
-  );
+  process.session
+    .resume({ sessionId: input.sessionId, cwd: input.cwd, ...(tools ? { tools } : undefined) })
+    .pipe(
+      Effect.mapError((cause) =>
+        cause instanceof SessionNotResumable ? cause : new AgentOpenError({ cause }),
+      ),
+      Effect.flatMap(({ sessionId }) => makePiAgentRuntime(process, sessionId)),
+    );

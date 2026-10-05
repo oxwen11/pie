@@ -154,16 +154,17 @@ export function formatSshInput(target: SshTarget): string {
   return target.port !== null ? `${withUser}:${String(target.port)}` : withUser;
 }
 
-export const buildSshHostSpecEffect = (
+export const buildSshHostSpecEffect = Effect.fn("buildSshHostSpecEffect")(function* (
   target: SshTarget,
-): Effect.Effect<string, SshInvalidTargetError> =>
-  Effect.try({
+) {
+  return yield* Effect.try({
     try: () => buildSshHostSpec(target),
     catch: (cause) =>
       new SshInvalidTargetError({
         message: cause instanceof Error ? cause.message : "SSH target is invalid.",
       }),
   });
+});
 
 export function environmentLabel(target: SshTarget, reportedHostname?: string): string {
   const typed = target.alias.trim() || target.hostname.trim();

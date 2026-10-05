@@ -1,33 +1,26 @@
 import { SidebarInset, SidebarTrigger, useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
-import { Outlet } from "@tanstack/react-router";
-import { useReducedMotion } from "motion/react";
-import * as m from "motion/react-m";
+import { Outlet, useMatch } from "@tanstack/react-router";
 
 import { BrandMark } from "@/components/layout/brand-mark";
 import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
-import {
-  SHELL_TITLEBAR_HEADER_CLASS,
-  SHELL_TITLEBAR_LABEL_CLASS,
-} from "@/components/layout/shell-chrome";
+import { SHELL_TITLEBAR_HEADER_CLASS } from "@/components/layout/shell-chrome";
 import { usePlatform } from "@/platform-context";
 import { isDesktopHost } from "@/platform-host";
 
-export interface CardPanelProps {
-  readonly heading?: string;
-  readonly supportingText?: string;
-  readonly hideHeader?: boolean;
-}
-
-export function CardPanel({ heading, supportingText, hideHeader = false }: CardPanelProps) {
+/** Shell chrome only. Page titles live in the route that needs them. */
+export function CardPanel() {
   const { state, isMobile } = useSidebar();
   const hasContentPanelToggle = useContentPanel() !== null;
   const desktop = isDesktopHost(usePlatform());
   const collapsedDesktop = !isMobile && state === "collapsed";
   const webCollapsedChrome = collapsedDesktop && !desktop;
-  // Desktop keeps a titlebar strip even when the route hides labels — that strip
-  // is the frameless window drag region (ChatGPT/T3 pattern).
-  const showHeader = !hideHeader || isMobile || webCollapsedChrome || desktop;
+  // Session route paints the titlebar row. On desktop that row is the drag strip —
+  // keeping the empty shell header too leaves a blank band above the title.
+  const onSessionRoute = useMatch({ from: "/session/$sessionId", shouldThrow: false }) ?? null;
+  // Mobile keeps the sidebar trigger, collapsed web keeps the brand mark, and
+  // desktop keeps the frameless window drag region. Web expanded needs none.
+  const showHeader = isMobile || webCollapsedChrome || (desktop && onSessionRoute === null);
 
   return (
     <SidebarInset
@@ -43,10 +36,7 @@ export function CardPanel({ heading, supportingText, hideHeader = false }: CardP
           collapsedDesktop={collapsedDesktop}
           desktop={desktop}
           hasContentPanelToggle={hasContentPanelToggle}
-          heading={heading}
-          hideHeader={hideHeader}
           isMobile={isMobile}
-          supportingText={supportingText}
           webCollapsedChrome={webCollapsedChrome}
         />
       ) : null}
@@ -69,29 +59,19 @@ function CardPanelHeader({
   collapsedDesktop,
   desktop,
   hasContentPanelToggle,
-  heading,
-  hideHeader,
   isMobile,
-  supportingText,
   webCollapsedChrome,
 }: {
   collapsedDesktop: boolean;
   desktop: boolean;
   hasContentPanelToggle: boolean;
-  heading: string | undefined;
-  hideHeader: boolean;
   isMobile: boolean;
-  supportingText: string | undefined;
   webCollapsedChrome: boolean;
 }) {
-  const reduceMotion = useReducedMotion() === true;
-  const chromeTransition = reduceMotion ? { duration: 0 } : undefined;
-
   return (
     <header
       className={cn(
         SHELL_TITLEBAR_HEADER_CLASS,
-        !hideHeader && "border-b",
         desktop && collapsedDesktop && "ps-(--shell-titlebar-content-left)",
       )}
       data-drag-region=""
@@ -104,27 +84,6 @@ function CardPanelHeader({
             <BrandMark className="shrink-0" />
             <SidebarTrigger className="-ms-px ms-2 shrink-0 -translate-y-px" />
           </div>
-        ) : null}
-        {!hideHeader ? (
-          <m.div
-            className={SHELL_TITLEBAR_LABEL_CLASS}
-            layout={reduceMotion ? false : "position"}
-            transition={chromeTransition}
-          >
-            {heading !== undefined ? (
-              <span className="min-w-0 truncate font-medium" title={heading}>
-                {heading}
-              </span>
-            ) : null}
-            {supportingText !== undefined && (
-              <span
-                className="text-muted-foreground max-w-[50%] min-w-0 truncate"
-                title={supportingText}
-              >
-                {supportingText}
-              </span>
-            )}
-          </m.div>
         ) : null}
       </div>
       {hasContentPanelToggle ? (

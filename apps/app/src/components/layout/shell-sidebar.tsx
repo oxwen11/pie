@@ -1,11 +1,10 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
-import { cn } from "@getpie/ui/lib/utils";
 import { animate, useMotionValue, useReducedMotion } from "motion/react";
 import * as m from "motion/react-m";
 import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef } from "react";
 import { useStore } from "zustand";
 
-import { SHELL_GUTTER_CLASS } from "@/components/layout/shell-chrome";
+import { ShellGutter } from "@/components/layout/shell-gutter";
 import { shellLayout } from "@/components/layout/shell-layout";
 
 export function ShellSidebarPanel({
@@ -55,27 +54,23 @@ export function ShellSidebarPanel({
   return (
     <>
       <m.aside
-        className="flex min-h-0 shrink-0 flex-col overflow-hidden md:py-1 md:ps-1"
+        className="flex min-h-0 shrink-0 flex-col overflow-hidden md:py-1"
         data-slot="sidebar-drawer"
         data-state={open ? "open" : "closed"}
         data-testid="sidebar"
         inert={!open}
         style={{ width: columnWidth }}
       >
-        <div className="flex h-full min-h-0 shrink-0 flex-col" style={{ width: expanded }}>
+        <div className="flex h-full min-h-0 shrink-0 flex-col md:ps-1" style={{ width: expanded }}>
           {children}
         </div>
       </m.aside>
-      <div
-        aria-disabled={separatorDisabled || !open || undefined}
-        aria-orientation="vertical"
-        aria-label="Resize session list"
-        className={cn(SHELL_GUTTER_CLASS, (separatorDisabled || !open) && "w-0 after:hidden")}
-        onLostPointerCapture={onPointerUp}
+      <ShellGutter
+        disabled={separatorDisabled || !open}
+        label="Resize session list"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        role="separator"
       />
     </>
   );

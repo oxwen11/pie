@@ -50,7 +50,7 @@ function CollapsibleAssistantMessage({
   return (
     <div>
       <Collapsible
-        className="not-prose w-full py-1"
+        className="not-prose w-full py-1.5"
         open={isStreaming ? openWhileStreaming : openWhenSettled}
         onOpenChange={isStreaming ? setOpenWhileStreaming : setOpenWhenSettled}
       >
@@ -58,7 +58,7 @@ function CollapsibleAssistantMessage({
         {/* Flush left, unlike a tool card's body: what folds here is whole
             messages, so indenting them behind a rule would nest the whole
             transcript one level in. */}
-        <CollapsibleContent className="mt-2 space-y-2 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
+        <CollapsibleContent className="mt-2 transition-opacity data-ending-style:opacity-0 data-starting-style:opacity-0">
           <AssistantMessage
             parts={summary.workParts}
             isStreaming={isStreaming && summary.answerParts.length === 0}
@@ -114,7 +114,11 @@ function SummaryTrigger({ label }: { label: string }) {
     <CollapsibleTrigger
       className="group"
       render={
-        <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden">
+        <button
+          type="button"
+          className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 overflow-hidden text-left"
+          onMouseDown={(event) => event.preventDefault()}
+        >
           <span className="relative flex size-4 shrink-0 items-center justify-center">
             <TimerIcon className="size-4 group-focus-within:opacity-0 group-hover:opacity-0" />
             <div className="absolute inset-0 flex items-center justify-center opacity-0 group-focus-within:opacity-100 group-hover:opacity-100">
@@ -123,7 +127,7 @@ function SummaryTrigger({ label }: { label: string }) {
             </div>
           </span>
           <span className="min-w-0 truncate text-sm leading-none">{label}</span>
-        </div>
+        </button>
       }
     />
   );

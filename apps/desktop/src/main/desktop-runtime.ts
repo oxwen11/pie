@@ -13,10 +13,12 @@ import { ChildProcessSpawner } from "effect/unstable/process";
 import { app, dialog, nativeTheme } from "electron";
 
 import icon from "../../resources/icon.png?asset";
+import { DesktopApplication } from "./application/desktop-application";
 import { DesktopConfig, makeDesktopConfigLive, startsDesktopInBackground } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
-import { registerAppScheme } from "./electron/app-protocol";
-import { MainWindow, MainWindowLive } from "./electron/main-window";
+import { registerAppProtocol, registerAppScheme } from "./electron/app-protocol";
+import { MainWindow, makeMainWindow, rendererRoot } from "./electron/main-window";
+import { RendererChannel } from "./electron/renderer-channel";
 import { devUserDataPath, pieTempPath } from "./lib/utils";
 import { DesktopResourceMonitoringLive } from "./resources/resource-monitoring-live";
 import { LocalServerLive } from "./server/local-server-live";
@@ -37,6 +39,25 @@ function resolveWindowBackgroundColor(): string {
     return windowBackgroundColor(undefined, nativeTheme.shouldUseDarkColors);
   }
 }
+
+const MainWindowLive = Layer.effect(
+  MainWindow,
+  Effect.gen(function* () {
+    const config = yield* DesktopConfig;
+    const channel = yield* RendererChannel;
+    const application = yield* DesktopApplication;
+    const runFork = Effect.runForkWith(yield* Effect.context());
+    yield* registerAppProtocol(rendererRoot());
+    return yield* makeMainWindow({
+      devUrl: config.devUrl,
+      backgroundColor: config.windowBackgroundColor,
+      connectRenderer: channel.connect,
+      onVisibilityChanged: (visible) => {
+        runFork(application.setWindowVisible(visible));
+      },
+    });
+  }),
+);
 
 const LoginShellEnvironmentLive = Layer.effect(
   LoginShellEnvironment,

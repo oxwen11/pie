@@ -10,7 +10,7 @@ dependencies: []
 
 ## Problem Statement
 
-以仓库实际安装的 Effect `4.0.0-rc.112` 自带的 `ai-docs`（`node_modules/.pnpm/effect@4.0.0-rc.112/node_modules/effect/ai-docs/src/`）和 `.agents/rules/stack.md` 为基准，对 `packages/server`、`packages/effect-json-store`、`packages/pie`、`packages/contract`、`apps/desktop` 做了一次 Effect 用法审计。
+以仓库实际安装的 Effect `4.0.0-rc.112` 自带的 `ai-docs`（`node_modules/.pnpm/effect@4.0.0-rc.112/node_modules/effect/ai-docs/src/`）和 `.agents/rules/topics/runtime.md` 为基准，对 `packages/server`、`packages/effect-json-store`、`packages/pie`、`packages/contract`、`apps/desktop` 做了一次 Effect 用法审计。
 
 骨架是对的：`Context.Service` + 手写 `Layer`、`Scope`/`acquireRelease`、`forkIn`/`forkScoped` 结构化并发、`@effect/vitest` + `TestClock`、`effect/unstable/cli` 的 `Command.make` + `NodeRuntime.runMain`。没有发现会导致资源泄漏或死锁的结构性错误。
 
@@ -67,7 +67,7 @@ create: Effect.fn("PiAgentSessionService.create")(function* (input) { ... })
 - `packages/server/src/harness/pi/resolve-executable.ts:34–41`：`PIE_E2E`、`PIE_PI_EXECUTABLE`。
 - `apps/desktop/src/main/desktop-runtime.ts:52,57,106`、`main-window.ts:40`、`login-shell-environment.ts:108–109`、`local-server-live.ts:19`。
 
-**问题**：违反 `.agents/rules/stack.md` "side effects go through Effect's platform services"。测试只能靠改真实环境变量注入；token 不 redact；缺少类型化的默认值和错误报告。
+**问题**：违反 `.agents/rules/topics/runtime.md` "side effects go through Effect's platform services"。测试只能靠改真实环境变量注入；token 不 redact；缺少类型化的默认值和错误报告。
 
 **方案**：
 
@@ -75,7 +75,7 @@ create: Effect.fn("PiAgentSessionService.create")(function* (input) { ... })
 - `Config.integer("PIE_PORT").pipe(Config.withDefault(4180))`、`Config.logLevel("PIE_LOG_LEVEL")`。
 - 有默认值的开关用 `Context.Reference<boolean>("pie/PrintLogs", { defaultValue: () => false })`（`03_services/10_reference.ts`）。
 - 测试用 `ConfigProvider.fromMap` 注入。
-- Electron Main 属于 `stack.md` 里的豁免范围，但 `login-shell-environment.ts` 这类纯逻辑仍建议接受 `Config`。
+- Electron Main 属于 `runtime.md` 里的豁免范围，但 `login-shell-environment.ts` 这类纯逻辑仍建议接受 `Config`。
 
 #### 4. 三处 `Effect.forkDetach` 脱离监督
 
@@ -157,7 +157,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(Harness, ScheduleDaemonLayer, No
 
 **现状**：`packages/server/src/harness/pi/agent.ts:20–33` shape 方法的 `R` 含 `FileSystem.FileSystem`；78–80 行 `cachePiAgentAvailability` 通过 `(pi as MutableAvailability).availability = ...` 就地改写服务对象。
 
-**问题**：违反 `stack.md` "R-free service shapes"；服务对象事后 mutate 不符合 Effect 的不可变约定。
+**问题**：违反 `runtime.md` "R-free service shapes"；服务对象事后 mutate 不符合 Effect 的不可变约定。
 
 **方案**：在 `Layer.effect` 构造时 `const fs = yield* FileSystem.FileSystem` 后闭包捕获，shape 里 `R = never`；availability 缓存在构造阶段 `const availability = yield* Effect.cached(check)` 一次完成，删掉 `MutableAvailability`。
 
@@ -363,7 +363,7 @@ Layer.sync(ScheduleRuntime, () => ({
 - 第 1–5 条（高优先级）全部关闭：`Effect.fn` 覆盖服务 shape 方法；`Data.TaggedError` 归零；`process.env` 只剩 Electron Main 豁免点；`forkDetach` 归零；`schedule/daemon.ts` 用 `catchCause` 兜底且日志携带 Cause。
 - 第 6–17 条（中优先级）每条有独立 PR 或在本文件 Work Log 中记录 wontfix 理由。
 - 第 26 条：`session-service` 测试套件在 `@effect/vitest` 下运行，无真实 `Effect.sleep`。
-- `pnpm check` 与 `pnpm test` 通过；`.agents/rules/stack.md` 若因本次调整需要补充规则（`Effect.fn`、`Config`、service id 前缀），在同一 stack 内更新。
+- `pnpm check` 与 `pnpm test` 通过；`.agents/rules/topics/runtime.md` 若因本次调整需要补充规则（`Effect.fn`、`Config`、service id 前缀），在同一 stack 内更新。
 
 ## Work Log
 

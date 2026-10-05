@@ -27,6 +27,7 @@ export function useChatInputController(
       const created = new ChatInputController({
         extensions: (self) => optsRef.current.extensions(self),
         onSubmit: (text) => optsRef.current.onSubmit(text),
+        onEmptySubmit: () => optsRef.current.onEmptySubmit?.(),
         initialContent,
       });
       storeRef.current = created;

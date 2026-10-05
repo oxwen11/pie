@@ -1,7 +1,7 @@
 import os from "node:os";
 
 import { findExecutable } from "@getpie/core/executable";
-import { Duration, Effect, FileSystem, Option, Scope, Stream } from "effect";
+import { Duration, Effect, Option, Scope, Stream } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 import { SshClientMissingError, SshCommandError, SshInvalidTargetError } from "./errors";
@@ -72,13 +72,14 @@ export type FindSshCommandOptions = {
 };
 
 /** PATH lookup only — spawn uses the same search, so extra dirs would lie. */
-export const findSshCommand = (
+export const findSshCommand = Effect.fn("findSshCommand")(function* (
   input: FindSshCommandOptions = {},
-): Effect.Effect<string | undefined, never, FileSystem.FileSystem> =>
-  findExecutable(sshCommandForPlatform(input.platform ?? os.platform()), {
+) {
+  return yield* findExecutable(sshCommandForPlatform(input.platform ?? os.platform()), {
     env: input.env,
     platform: input.platform,
   });
+});
 
 export function sshClientMissingMessage(
   command: string = sshCommandForPlatform(),
@@ -90,31 +91,31 @@ export function sshClientMissingMessage(
   return `OpenSSH client not found (${command}). Install OpenSSH, ensure it is on PATH, and restart pie.`;
 }
 
-export const requireSshCommand = (
+export const requireSshCommand = Effect.fn("requireSshCommand")(function* (
   input: FindSshCommandOptions = {},
-): Effect.Effect<string, SshClientMissingError, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const platform = input.platform ?? os.platform();
-    const command = sshCommandForPlatform(platform);
-    const found = yield* findSshCommand(input);
-    if (found === undefined) {
-      return yield* new SshClientMissingError({
-        command,
-        message: sshClientMissingMessage(command, platform),
-      });
-    }
-    return found;
-  });
+) {
+  const platform = input.platform ?? os.platform();
+  const command = sshCommandForPlatform(platform);
+  const found = yield* findSshCommand(input);
+  if (found === undefined) {
+    return yield* new SshClientMissingError({
+      command,
+      message: sshClientMissingMessage(command, platform),
+    });
+  }
+  return found;
+});
 
-export const probeSshClient = (
+export const probeSshClient = Effect.fn("probeSshClient")(function* (
   input: FindSshCommandOptions = {},
-): Effect.Effect<SshClientAvailability, never, FileSystem.FileSystem> =>
-  requireSshCommand(input).pipe(
+) {
+  return yield* requireSshCommand(input).pipe(
     Effect.map((): SshClientAvailability => ({ available: true })),
     Effect.catchTag("SshClientMissingError", (error) =>
       Effect.succeed({ available: false, message: error.message } satisfies SshClientAvailability),
     ),
   );
+});
 
 export function isSshSpawnNotFound(cause: unknown): boolean {
   if (typeof cause !== "object" || cause === null) return false;
@@ -188,142 +189,136 @@ export function normalizeSshErrorMessage(input: {
   return cleanedStdout.length > 0 ? cleanedStdout : input.fallbackMessage;
 }
 
-export const collectProcessOutput = <E>(
+export const collectProcessOutput = Effect.fn("collectProcessOutput")(function* <E>(
   stream: Stream.Stream<Uint8Array, E>,
-): Effect.Effect<string, E> =>
-  stream.pipe(
+) {
+  return yield* stream.pipe(
     Stream.decodeText(),
     Stream.runFold(
       () => "",
       (acc, chunk) => acc + chunk,
     ),
   );
+});
 
 function stdinStream(input: string | undefined) {
   return input === undefined ? Stream.empty : Stream.make(encoder.encode(input));
 }
 
-const runSshCommandInScope = (
+const runSshCommandInScope = Effect.fn("runSshCommandInScope")(function* (
   target: SshTarget,
   input: RunSshCommandOptions,
   commandScope: Scope.Scope,
-): Effect.Effect<
-  SshCommandResult,
-  SshCommandError | SshClientMissingError | SshInvalidTargetError,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    const hostSpec = yield* buildSshHostSpecEffect(target);
-    const cli = { env: input.env };
-    const sshCommand = yield* requireSshCommand(cli);
-    const environment = sshSpawnEnv(input.env);
-    const args = [
-      ...baseSshArgs(target),
-      ...(input.preHostArgs ?? []),
-      hostSpec,
-      ...(input.remoteCommandArgs ?? []),
-    ];
-    const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-    yield* Effect.logDebug("ssh.command.start").pipe(
-      Effect.annotateLogs({
-        ...sshTargetLogFields(target),
-        command: [sshCommand, ...args],
-        hasStdin: input.stdin !== undefined,
-        timeoutMs: input.timeoutMs ?? DEFAULT_SSH_COMMAND_TIMEOUT_MS,
+) {
+  const hostSpec = yield* buildSshHostSpecEffect(target);
+  const cli = { env: input.env };
+  const sshCommand = yield* requireSshCommand(cli);
+  const environment = sshSpawnEnv(input.env);
+  const args = [
+    ...baseSshArgs(target),
+    ...(input.preHostArgs ?? []),
+    hostSpec,
+    ...(input.remoteCommandArgs ?? []),
+  ];
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+  yield* Effect.logDebug("ssh.command.start").pipe(
+    Effect.annotateLogs({
+      ...sshTargetLogFields(target),
+      command: [sshCommand, ...args],
+      hasStdin: input.stdin !== undefined,
+      timeoutMs: input.timeoutMs ?? DEFAULT_SSH_COMMAND_TIMEOUT_MS,
+    }),
+  );
+  const child = yield* spawner
+    .spawn(
+      ChildProcess.make(sshCommand, args, {
+        env: environment,
+        extendEnv: false,
+        stdin: {
+          stream: stdinStream(input.stdin),
+          endOnDone: true,
+        },
       }),
-    );
-    const child = yield* spawner
-      .spawn(
-        ChildProcess.make(sshCommand, args, {
-          env: environment,
-          extendEnv: false,
-          stdin: {
-            stream: stdinStream(input.stdin),
-            endOnDone: true,
-          },
-        }),
-      )
-      .pipe(
-        Effect.provideService(Scope.Scope, commandScope),
-        Effect.mapError((cause) =>
-          isSshSpawnNotFound(cause)
-            ? missingSshClientError(sshCommand)
-            : new SshCommandError({
-                command: [sshCommand, ...args],
-                exitCode: null,
-                stderr: "",
-                message:
-                  cause instanceof Error
-                    ? cause.message
-                    : `Failed to spawn SSH command for ${hostSpec}.`,
-                cause,
-              }),
-        ),
-      );
-
-    const [stdout, stderr, exitCode] = yield* Effect.all(
-      [
-        collectProcessOutput(child.stdout),
-        collectProcessOutput(child.stderr),
-        child.exitCode.pipe(Effect.map(Number)),
-      ],
-      { concurrency: "unbounded" },
-    ).pipe(
-      Effect.mapError(
-        (cause) =>
-          new SshCommandError({
-            command: [sshCommand, ...args],
-            exitCode: null,
-            stderr: "",
-            message:
-              cause instanceof Error ? cause.message : `Failed to run SSH command for ${hostSpec}.`,
-            cause,
-          }),
+    )
+    .pipe(
+      Effect.provideService(Scope.Scope, commandScope),
+      Effect.mapError((cause) =>
+        isSshSpawnNotFound(cause)
+          ? missingSshClientError(sshCommand)
+          : new SshCommandError({
+              command: [sshCommand, ...args],
+              exitCode: null,
+              stderr: "",
+              message:
+                cause instanceof Error
+                  ? cause.message
+                  : `Failed to spawn SSH command for ${hostSpec}.`,
+              cause,
+            }),
       ),
     );
 
-    if (exitCode !== 0) {
-      const diagnosticStdout = redactSshErrorOutput(stdout);
-      yield* Effect.logWarning("ssh.command.failed").pipe(
-        Effect.annotateLogs({
-          ...sshTargetLogFields(target),
+  const [stdout, stderr, exitCode] = yield* Effect.all(
+    [
+      collectProcessOutput(child.stdout),
+      collectProcessOutput(child.stderr),
+      child.exitCode.pipe(Effect.map(Number)),
+    ],
+    { concurrency: "unbounded" },
+  ).pipe(
+    Effect.mapError(
+      (cause) =>
+        new SshCommandError({
           command: [sshCommand, ...args],
-          exitCode,
-          stdout: diagnosticStdout,
-          stderr,
+          exitCode: null,
+          stderr: "",
+          message:
+            cause instanceof Error ? cause.message : `Failed to run SSH command for ${hostSpec}.`,
+          cause,
         }),
-      );
-      return yield* new SshCommandError({
+    ),
+  );
+
+  if (exitCode !== 0) {
+    const diagnosticStdout = redactSshErrorOutput(stdout);
+    yield* Effect.logWarning("ssh.command.failed").pipe(
+      Effect.annotateLogs({
+        ...sshTargetLogFields(target),
         command: [sshCommand, ...args],
         exitCode,
         stdout: diagnosticStdout,
         stderr,
-        message: normalizeSshErrorMessage({
-          stdout: diagnosticStdout,
-          stderr,
-          fallbackMessage: `SSH command failed for ${hostSpec} (exit ${exitCode}).`,
-        }),
-      });
-    }
-
-    yield* Effect.logDebug("ssh.command.succeeded").pipe(
-      Effect.annotateLogs({
-        ...sshTargetLogFields(target),
-        command: [sshCommand, ...args],
       }),
     );
-    return { stdout, stderr };
-  });
+    return yield* new SshCommandError({
+      command: [sshCommand, ...args],
+      exitCode,
+      stdout: diagnosticStdout,
+      stderr,
+      message: normalizeSshErrorMessage({
+        stdout: diagnosticStdout,
+        stderr,
+        fallbackMessage: `SSH command failed for ${hostSpec} (exit ${exitCode}).`,
+      }),
+    });
+  }
 
-export const runSshCommand = (
+  yield* Effect.logDebug("ssh.command.succeeded").pipe(
+    Effect.annotateLogs({
+      ...sshTargetLogFields(target),
+      command: [sshCommand, ...args],
+    }),
+  );
+  return { stdout, stderr };
+});
+
+export const runSshCommand = Effect.fn("runSshCommand")(function* (
   target: SshTarget,
   input: RunSshCommandOptions = {},
-): Effect.Effect<
-  SshCommandResult,
-  SshCommandError | SshClientMissingError | SshInvalidTargetError,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
-> =>
-  Effect.scopedWith((commandScope) => runSshCommandInScope(target, input, commandScope)).pipe(
+) {
+  return yield* Effect.scopedWith((commandScope) =>
+    runSshCommandInScope(target, input, commandScope),
+  ).pipe(
     Effect.timeoutOption(Duration.millis(input.timeoutMs ?? DEFAULT_SSH_COMMAND_TIMEOUT_MS)),
     Effect.flatMap((result) =>
       Option.match(result, {
@@ -346,69 +341,60 @@ export const runSshCommand = (
       }),
     ),
   );
+});
 
-export const resolveSshTarget = (
+export const resolveSshTarget = Effect.fn("resolveSshTarget")(function* (
   alias: string,
   input: FindSshCommandOptions = {},
-): Effect.Effect<
-  SshTarget,
-  SshCommandError | SshClientMissingError | SshInvalidTargetError,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    const trimmedAlias = alias.trim();
-    if (trimmedAlias.length === 0) {
-      return yield* new SshInvalidTargetError({ message: "SSH host alias is required." });
-    }
+) {
+  const trimmedAlias = alias.trim();
+  if (trimmedAlias.length === 0) {
+    return yield* new SshInvalidTargetError({ message: "SSH host alias is required." });
+  }
 
-    yield* Effect.logDebug("ssh.target.resolve.start").pipe(
-      Effect.annotateLogs({ alias: trimmedAlias }),
-    );
-    return yield* runSshCommand(
-      {
-        alias: trimmedAlias,
-        hostname: trimmedAlias,
-        username: null,
-        port: null,
-      },
-      { preHostArgs: ["-G"], env: input.env },
-    ).pipe(
-      Effect.map((result) => parseSshResolveOutput(trimmedAlias, result.stdout)),
-      Effect.tap((target) =>
-        Effect.logDebug("ssh.target.resolve.succeeded").pipe(
-          Effect.annotateLogs(sshTargetLogFields(target)),
-        ),
+  yield* Effect.logDebug("ssh.target.resolve.start").pipe(
+    Effect.annotateLogs({ alias: trimmedAlias }),
+  );
+  return yield* runSshCommand(
+    {
+      alias: trimmedAlias,
+      hostname: trimmedAlias,
+      username: null,
+      port: null,
+    },
+    { preHostArgs: ["-G"], env: input.env },
+  ).pipe(
+    Effect.map((result) => parseSshResolveOutput(trimmedAlias, result.stdout)),
+    Effect.tap((target) =>
+      Effect.logDebug("ssh.target.resolve.succeeded").pipe(
+        Effect.annotateLogs(sshTargetLogFields(target)),
       ),
-      Effect.catch((error) => {
-        if (error instanceof SshClientMissingError || error instanceof SshInvalidTargetError) {
-          return Effect.fail(error);
-        }
-        return Effect.logDebug("ssh.target.resolve.fallback").pipe(
-          Effect.annotateLogs({ alias: trimmedAlias }),
-          Effect.as({
-            alias: trimmedAlias,
-            hostname: trimmedAlias,
-            username: null,
-            port: null,
-          } satisfies SshTarget),
-        );
-      }),
-    );
-  });
+    ),
+    Effect.catch((error) => {
+      if (error instanceof SshClientMissingError || error instanceof SshInvalidTargetError) {
+        return Effect.fail(error);
+      }
+      return Effect.logDebug("ssh.target.resolve.fallback").pipe(
+        Effect.annotateLogs({ alias: trimmedAlias }),
+        Effect.as({
+          alias: trimmedAlias,
+          hostname: trimmedAlias,
+          username: null,
+          port: null,
+        } satisfies SshTarget),
+      );
+    }),
+  );
+});
 
-export const resolveSshInput = (
+export const resolveSshInput = Effect.fn("resolveSshInput")(function* (
   raw: string,
   input: FindSshCommandOptions = {},
-): Effect.Effect<
-  SshTarget,
-  SshCommandError | SshClientMissingError | SshInvalidTargetError,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem
-> =>
-  Effect.gen(function* () {
-    const parsed = parseSshInput(raw);
-    if (parsed.alias.length === 0) {
-      return yield* new SshInvalidTargetError({ message: "SSH host is required." });
-    }
-    const resolved = yield* resolveSshTarget(parsed.alias, input);
-    return overlaySshTarget(resolved, parsed);
-  });
+) {
+  const parsed = parseSshInput(raw);
+  if (parsed.alias.length === 0) {
+    return yield* new SshInvalidTargetError({ message: "SSH host is required." });
+  }
+  const resolved = yield* resolveSshTarget(parsed.alias, input);
+  return overlaySshTarget(resolved, parsed);
+});

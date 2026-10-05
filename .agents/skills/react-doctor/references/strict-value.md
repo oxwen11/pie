@@ -20,7 +20,7 @@ These three fight the stack. Anything else that fires must be fixed in code.
 | Rule | Why it stays off |
 | --- | --- |
 | `react-in-jsx-scope` | React 19 automatic JSX runtime. Adding `import React` makes an unused import that oxlint then rejects. |
-| `jsx-props-no-spreading` | `.agents/rules/ui-components.md` requires spreading props **last** on the wrapped element so callers can override defaults. |
+| `jsx-props-no-spreading` | `.agents/rules/topics/ui-components.md` requires spreading props **last** on the wrapped element so callers can override defaults. |
 | `js-cache-property-access` | The detector cannot tell a stable lookup from a value that must be re-read (`abort.signal.aborted`, layout, time). Caching those changes behavior. Hoist a local `const` yourself when the value is actually stable. |
 
 Do not add a fourth `off` to land a PR. Inline
@@ -36,12 +36,12 @@ naming the invariant the rule cannot see.
 | `rendering-hoist-jsx` | Hoist static JSX (especially SVG) out of the component | `rendering-hoist-jsx` |
 | `prefer-module-scope-pure-function` / `prefer-module-scope-static-value` | Stable pure helpers and constants live at module scope | same skill, hoist rules |
 | `js-combine-iterations` / `js-length-check-first` / `js-flatmap-filter` | One pass, length before expensive compare | `js-*` rules |
-| `no-impure-call-at-module-scope` | No work with side effects at import time | `.agents/rules/frontend-state.md` (`pie/no-let`) |
+| `no-impure-call-at-module-scope` | No work with side effects at import time | `.agents/rules/topics/frontend-state.md` (`pie/no-let`) |
 | `prefer-useReducer` | Related fields that update together → one reducer, not a handful of `useState` | composition patterns |
 | `jsx-max-depth` | Extract nested JSX into a named component | `ui-components.md` |
 | `rendering-svg-precision` | Shorten SVG path precision | `rendering-svg-precision` |
 | `zod-v4-prefer-top-level-string-formats` | Zod 4 top-level string formats (`z.email()`, not `z.string().email()`) | Zod 4 docs |
-| `unused-file` / `unused-export` / `unused-type` / `unused-dependency` / `unused-dev-dependency` / `circular-dependency` | Delete or unexport dead graph nodes; exported `*Props` that nothing imports yet still count — unexport until a caller exists | `.agents/rules/ui-components.md` |
+| `unused-file` / `unused-export` / `unused-type` / `unused-dependency` / `unused-dev-dependency` / `circular-dependency` | Delete or unexport dead graph nodes; exported `*Props` that nothing imports yet still count — unexport until a caller exists | `.agents/rules/topics/ui-components.md` |
 | `agent-tool-capability-risk` / `mcp-tool-capability-risk` | Inventory is a gate. Confirm the tool's policy matches the finding, then fix the declaration or the code | — |
 
 `buckets.compiler-cleanup` is `error` so that if React Compiler is turned on,

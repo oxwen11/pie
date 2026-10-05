@@ -21,7 +21,6 @@ import { Group } from "react-resizable-panels";
 
 import { PanelSeparator } from "@/components/layout/panel-separator";
 import { ResizablePanel } from "@/components/layout/resizable-panel";
-import Loader from "@/components/loader";
 import { useLocalOrpc } from "@/lib/environment-orpc";
 
 import { ConfirmPullRequestAction } from "./confirm-pull-request-action";
@@ -66,10 +65,7 @@ export function PullRequestPage() {
       refetchDiff: () => diff.refetch(),
     });
 
-  if (list.isPending && list.data === undefined) {
-    return <Loader />;
-  }
-
+  const listLoading = list.isPending && list.data === undefined;
   const listError = list.isError ? list.error.message : null;
 
   return (
@@ -88,6 +84,7 @@ export function PullRequestPage() {
           <PullRequestListPane
             error={listError}
             items={items}
+            loading={listLoading}
             onSelect={setSelectedRef}
             selected={selected}
           />
@@ -127,11 +124,13 @@ export function PullRequestPage() {
 function PullRequestListPane({
   error,
   items,
+  loading,
   onSelect,
   selected,
 }: {
   error: string | null;
   items: ReadonlyArray<PullRequestListItem>;
+  loading: boolean;
   onSelect: (ref: PullRequestRef) => void;
   selected: PullRequestListItem | undefined;
 }) {
@@ -162,7 +161,7 @@ function PullRequestListPane({
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-2 pb-3">
         {error !== null ? (
           <p className="text-muted-foreground px-2 py-6 text-sm">{error}</p>
-        ) : visible.length === 0 ? (
+        ) : loading ? null : visible.length === 0 ? (
           <p className="text-muted-foreground px-2 py-6 text-sm">
             {query.trim().length > 0 ? "No matching pull requests." : "No open pull requests."}
           </p>

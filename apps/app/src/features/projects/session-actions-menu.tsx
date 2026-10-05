@@ -8,12 +8,25 @@ import {
 import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Clock, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, Clock, Copy, FileText, Pencil } from "lucide-react";
 import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { RenameSessionDialog } from "@/features/projects/rename-session-dialog";
 import { useCatalogOrpc } from "@/lib/environment-orpc";
+
+function copyText(label: string, text: string): void {
+  void navigator.clipboard.writeText(text).then(
+    () => {
+      toast.success(`Copied ${label}`);
+      return undefined;
+    },
+    () => {
+      toast.error(`Could not copy ${label}`);
+      return undefined;
+    },
+  );
+}
 
 /** Session mutations live behind one actions-menu capability boundary. The
  *  menu is a right-click context menu: `render` is the row button element and
@@ -83,6 +96,37 @@ export function SessionActionsMenu({
             miscompiles to an always-matching, higher-specificity min-w-32, so a
             plain override can't win. */}
         <ContextMenuPopup align="start" className="min-w-48!">
+          <ContextMenuItem onClick={() => copyText("session ID", session.sessionId)}>
+            <Copy />
+            Copy session ID
+          </ContextMenuItem>
+          <ContextMenuItem
+            onClick={() => {
+              void orpcQueryUtils.agent.session.transcriptPath
+                .call({
+                  ref: { projectId: session.projectId, sessionId: session.sessionId },
+                })
+                .then(
+                  (result) => {
+                    if (result.path === undefined || result.path === "") {
+                      toast.error("No transcript for this session");
+                      return undefined;
+                    }
+                    copyText("transcript path", result.path);
+                    return undefined;
+                  },
+                  (error: unknown) => {
+                    toast.error(
+                      error instanceof Error ? error.message : "Could not find the transcript",
+                    );
+                    return undefined;
+                  },
+                );
+            }}
+          >
+            <FileText />
+            Copy transcript path
+          </ContextMenuItem>
           <ContextMenuItem onClick={() => setRenaming(true)}>
             <Pencil />
             Rename
@@ -117,11 +161,11 @@ export function SessionActionsMenu({
         </ContextMenuPopup>
       </ContextMenu>
       {/* Float over the row (and a trailing PR icon) instead of shifting into a second slot. */}
+      {/* react-doctor-disable-next-line no-hover-only-reveal -- :has(:focus-visible) reveals row/actions for keyboard users (browser-tested), not mouse focus. */}
       <SidebarMenuAction
-        className="md:group-hover/menu-item:bg-sidebar-accent md:group-focus-within/menu-item:bg-sidebar-accent z-10"
+        className="peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:group-hover/menu-item:bg-sidebar-accent md:group-has-focus-visible/menu-item:bg-sidebar-accent z-10 md:opacity-0 md:group-hover/menu-item:opacity-100 md:group-has-focus-visible/menu-item:opacity-100"
         disabled={setArchived.isPending}
         onClick={() => setArchived.mutate(!session.archived)}
-        showOnHover
         title={archiveLabel}
       >
         <ArchiveIcon />

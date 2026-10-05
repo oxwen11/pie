@@ -71,7 +71,7 @@ jobs:
           # would silently pick up new opt-in defaults and fail PRs.
           version: 0.9.14
           blocking: warning
-          scope: full
+          scope: changed
           # Everything except @getpie/ui. Its base components are vendored
           # wholesale from the coss registry via `shadcn add @coss/ui --overwrite`
           # and local edits are discarded on the next refresh (docs/adr/0001), so

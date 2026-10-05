@@ -94,6 +94,22 @@ rl.on("line", (line) => {
   if (msg.type !== "prompt") return;
   const text = msg.message;
   if (text === "fail") { send({ id: msg.id, type: "response", command: "prompt", success: false, error: "cannot prompt" }); return; }
+  if (text === "queue-idle") {
+    send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "queued" } });
+    send({ type: "agent_start" });
+    send({ type: "message_start", message: assistant() });
+    upd({ type: "start" });
+    upd({ type: "text_start", contentIndex: 0 });
+    upd({ type: "text_delta", contentIndex: 0, delta: "queued" });
+    upd({ type: "text_end", contentIndex: 0, content: "queued" });
+    send({ type: "message_end", message: assistant() });
+    settle();
+    return;
+  }
+  if (text === "handled") {
+    send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "handled" } });
+    return;
+  }
   if (holding && !msg.streamingBehavior) {
     send({ id: msg.id, type: "response", command: "prompt", success: false, error: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." });
     return;
@@ -188,6 +204,41 @@ layer(NodeServices.layer)("PiAgent", (it) => {
           "finish",
         ],
       );
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("streams a prompt Pi queued while the server has no turn", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const prompt = yield* agent.session.prompt({ sessionId, text: "queue-idle" });
+      assert.equal(prompt.started, true);
+      const chunks = yield* Stream.runCollect(prompt.output);
+      assert.deepEqual(
+        Array.from(chunks, (chunk) => chunk.type),
+        [
+          "start",
+          "message-metadata",
+          "text-start",
+          "text-delta",
+          "text-end",
+          "message-metadata",
+          "finish",
+        ],
+      );
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("accepts a handled prompt without opening a turn", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const prompt = yield* agent.session.prompt({ sessionId, text: "handled" });
+      assert.equal(prompt.started, false);
+      const chunks = yield* Stream.runCollect(prompt.output);
+      assert.equal(Array.from(chunks).length, 0);
       yield* agent.session.abort(sessionId);
     }),
   );
@@ -367,7 +418,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       let finishCount = 0;
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
@@ -435,7 +487,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const queued = yield* Effect.forkChild(
         Stream.runHead(
           session.events.pipe(
@@ -610,7 +663,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -632,11 +686,50 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     }),
   );
 
+  it.effect("approves registered Project resources in the Pi child", () =>
+    Effect.acquireUseRelease(
+      Effect.sync(() => fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-trust-"))),
+      (dir) =>
+        Effect.gen(function* () {
+          const file = path.join(dir, "fake-pi.js");
+          fs.writeFileSync(
+            file,
+            `#!/usr/bin/env node
+const sidIndex = process.argv.indexOf("--session-id");
+const isResume = process.argv[sidIndex + 1] === "existing";
+const hasModel = process.argv.includes("--provider") && process.argv.includes("p") && process.argv.includes("--model") && process.argv.includes("m");
+if (!process.argv.includes("--approve") || !process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
+const readline = require("node:readline");
+const rl = readline.createInterface({ input: process.stdin });
+rl.on("line", (line) => {
+  const msg = JSON.parse(line);
+  if (msg.type === "get_state") {
+    process.stdout.write(JSON.stringify({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId: "trusted" } }) + "\\n");
+  }
+});
+`,
+          );
+          fs.chmodSync(file, 0o755);
+
+          const process = yield* makePiProcess({ executable: { command: file, prefixArgs: [] } });
+          const opened = yield* process.session.create({ cwd: dir, provider: "p", modelId: "m" });
+          assert.equal(typeof opened.sessionId, "string");
+          yield* process.session.abort(opened.sessionId);
+
+          const resumed = yield* process.session.resume({ sessionId: "existing", cwd: dir });
+          assert.equal(resumed.sessionId, "existing");
+          yield* process.session.abort(resumed.sessionId);
+        }),
+      (dir) => Effect.sync(() => fs.rmSync(dir, { recursive: true, force: true })),
+    ),
+  );
+
   it.effect("PiAgent create exposes prompt output on the PiAgentRuntime event stream", () =>
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const collected = yield* Effect.forkChild(
         Stream.runCollect(
           session.events.pipe(
@@ -678,7 +771,8 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     Effect.gen(function* () {
       const executable = fakeExecutable();
       const agent = yield* makePiProcess({ executable });
-      const session = yield* makePiAgent(agent, { executable }).create({ cwd: "/tmp" });
+      const pi = yield* makePiAgent(agent, { executable });
+      const session = yield* pi.create({ cwd: "/tmp" });
       const crashSeen = yield* Deferred.make<void>();
       yield* Stream.runForEach(session.events, (event) =>
         event.body.type === "session.crashed"

@@ -89,7 +89,7 @@ export const TerminalManagerLayer: Layer.Layer<TerminalManager, never, Pty> = La
     const pty = yield* Pty;
     const records = new Map<string, TerminalRecord>();
     const tombstones = new Set<string>();
-    const mutex = Semaphore.makeUnsafe(1);
+    const mutex = yield* Semaphore.make(1);
 
     const countForSession = (ref: SessionRef): number => {
       const prefix = sessionPrefix(ref);

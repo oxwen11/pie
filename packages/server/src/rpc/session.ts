@@ -161,6 +161,19 @@ export const sessionRouter = orpc.router({
       }),
     );
   }),
+  transcriptPath: orpc.transcriptPath.effect(function* ({ input, errors }) {
+    const sessions = yield* PiAgentSessionService;
+    return yield* sessions.transcriptPath(input.ref).pipe(
+      Effect.catchTags({
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        ProjectNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `project ${e.projectId} not found` })),
+        StoreReadError: () =>
+          Effect.fail(errors.INTERNAL({ message: "Could not read the transcript directory" })),
+      }),
+    );
+  }),
   delete: orpc.delete.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     const terminals = yield* TerminalManager;

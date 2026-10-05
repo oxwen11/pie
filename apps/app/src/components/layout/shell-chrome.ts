@@ -57,10 +57,6 @@ export function shellProviderStyle(platform: Platform): ShellProviderStyle {
   };
 }
 
-/** Resize gutter between shell columns. */
-export const SHELL_GUTTER_CLASS =
-  "relative bg-transparent [-webkit-app-region:no-drag] md:my-1 w-1 after:via-border after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-linear-to-b after:from-transparent after:to-transparent after:opacity-0 after:transition-[opacity,width] hover:after:via-foreground/20 hover:after:opacity-100";
-
 /** Sidebar/card header row — reset `SidebarHeader` defaults and align with shell chrome. */
 export const SHELL_TITLEBAR_HEADER_CLASS =
   "flex h-10 shrink-0 flex-row items-center gap-2 p-0 px-4" as const;

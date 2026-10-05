@@ -5,12 +5,12 @@ import { useRef, useState, type ComponentProps } from "react";
 import { useEnvironmentOrpc } from "@/lib/environment-orpc";
 
 import { useChatSession } from "../chat-session-context";
+import { ChatImagePreview } from "./chat-image-preview";
 import { classifyMarkdownImageSource, type MarkdownImageSource } from "./chat-markdown";
 
 type MarkdownImageProps = ComponentProps<"img"> & { node?: unknown };
 
 const ASSET_STALE_TIME_MS = 4 * 60 * 1000;
-const imageClassName = "h-auto w-auto max-h-[32rem] max-w-full rounded-md object-contain";
 
 export function ChatMarkdownImage({
   alt,
@@ -22,10 +22,10 @@ export function ChatMarkdownImage({
   const source = classifyMarkdownImageSource(src);
   if (source.type === "direct") {
     return (
-      <img
+      <ChatImagePreview
         {...props}
         alt={alt ?? ""}
-        className={`${imageClassName} ${className ?? ""}`}
+        className={className}
         height={1024}
         src={source.url}
         width={1024}
@@ -92,10 +92,10 @@ function SessionMarkdownImage({
   };
 
   return (
-    <img
+    <ChatImagePreview
       {...props}
       alt={alt ?? ""}
-      className={`${imageClassName} ${className ?? ""}`}
+      className={className}
       height={1024}
       src={resolved}
       width={1024}

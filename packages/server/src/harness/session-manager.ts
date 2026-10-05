@@ -4,7 +4,7 @@ import type {
   SessionScopedEventBody,
   SessionStatus,
 } from "@getpie/contract";
-import { Context, Deferred, Effect, FileSystem, Layer, Ref, Scope } from "effect";
+import { Context, Deferred, Effect, Layer, Ref, Scope } from "effect";
 
 import { EventBus, type EventBusShape } from "../events/event-bus";
 import {
@@ -128,16 +128,12 @@ type CloseStep =
 export const makePiAgentSessionManager = (
   pi: PiAgentShape,
   bus: EventBusShape,
-): Effect.Effect<PiAgentSessionManagerShape, never, Scope.Scope | FileSystem.FileSystem> =>
+): Effect.Effect<PiAgentSessionManagerShape, never, Scope.Scope> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
-    // An adapter's availability check reads the filesystem; bind it once here
-    // so the manager's own methods stay R-free. `provideService` rather than
-    // `provide(Effect.context())` — the latter captures the whole layer-build
-    // context, `ownerScope` included, and wins the merge over a caller's.
-    const fileSystem = yield* FileSystem.FileSystem;
-    // Our sessionId → the session that owns its observable state.
+    // Complete SessionRef → the session that owns its observable state.
     const sessions = yield* Ref.make<ReadonlyMap<string, SessionEntry>>(new Map());
+    const sessionKey = (ref: SessionRef) => `${ref.projectId}\0${ref.sessionId}`;
 
     /** The session for a ref, on the write paths that are allowed to create
      * one. A session is a few Refs, so losing the creation race and discarding
@@ -146,7 +142,7 @@ export const makePiAgentSessionManager = (
       Effect.suspend(() =>
         Ref.get(sessions).pipe(
           Effect.flatMap((current) => {
-            const entry = current.get(ref.sessionId);
+            const entry = current.get(sessionKey(ref));
             if (entry?._tag === "Live") return Effect.succeed(entry.session);
             if (entry?._tag === "Closing")
               return Deferred.await(entry.done).pipe(Effect.andThen(sessionFor(ref)));
@@ -161,12 +157,12 @@ export const makePiAgentSessionManager = (
                     PiAgentSessionShape | undefined,
                     ReadonlyMap<string, SessionEntry>,
                   ] => {
-                    const raced = latest.get(ref.sessionId);
+                    const raced = latest.get(sessionKey(ref));
                     if (raced?._tag === "Live") return [raced.session, latest];
                     if (raced?._tag === "Closing") return [undefined, latest];
                     return [
                       candidate,
-                      new Map(latest).set(ref.sessionId, { _tag: "Live", session: candidate }),
+                      new Map(latest).set(sessionKey(ref), { _tag: "Live", session: candidate }),
                     ];
                   },
                 ),
@@ -186,15 +182,10 @@ export const makePiAgentSessionManager = (
     ): Effect.Effect<A> =>
       Ref.get(sessions).pipe(
         Effect.flatMap((current) => {
-          const entry = current.get(ref.sessionId);
+          const entry = current.get(sessionKey(ref));
           return entry?._tag === "Live" ? use(entry.session) : Effect.succeed(absent);
         }),
       );
-
-    const withFileSystem = <A, E, R>(
-      effect: Effect.Effect<A, E, R | FileSystem.FileSystem>,
-    ): Effect.Effect<A, E, R> =>
-      effect.pipe(Effect.provideService(FileSystem.FileSystem, fileSystem));
 
     /**
      * The heaviest thing this server does: `create`/`resume` is where an agent
@@ -208,13 +199,13 @@ export const makePiAgentSessionManager = (
      * PiAgent answers because it does not exist before then.
      */
     const acquireCreate = (input: CreateSessionInput): AcquireRuntime =>
-      withFileSystem(pi.create(input)).pipe(
+      pi.create(input).pipe(
         Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
         Effect.withSpan("pi.create"),
       );
 
     const acquireResume = (input: ResumeManagedSessionInput): AcquireRuntime =>
-      withFileSystem(pi.resume({ sessionId: input.sessionId, cwd: input.cwd })).pipe(
+      pi.resume({ sessionId: input.sessionId, cwd: input.cwd }).pipe(
         Effect.tap((runtime) => Effect.annotateCurrentSpan("agentSessionId", runtime.sessionId)),
         Effect.withSpan("pi.resume"),
       );
@@ -239,13 +230,13 @@ export const makePiAgentSessionManager = (
     // session for the same ref and resume it alongside the one still dying.
     const close = (ref: SessionRef): Effect.Effect<void> =>
       Ref.modify(sessions, (current): readonly [CloseStep, ReadonlyMap<string, SessionEntry>] => {
-        const entry = current.get(ref.sessionId);
+        const entry = current.get(sessionKey(ref));
         if (!entry) return [{ _tag: "Done" }, current];
         if (entry._tag === "Closing") return [{ _tag: "Await", done: entry.done }, current];
         const done = Deferred.makeUnsafe<void>();
         return [
           { _tag: "Release", session: entry.session, done },
-          new Map(current).set(ref.sessionId, { _tag: "Closing", done }),
+          new Map(current).set(sessionKey(ref), { _tag: "Closing", done }),
         ];
       }).pipe(
         Effect.flatMap((step) => {
@@ -254,10 +245,10 @@ export const makePiAgentSessionManager = (
           return step.session.releaseRuntime.pipe(
             Effect.ensuring(
               Ref.update(sessions, (current) => {
-                const entry = current.get(ref.sessionId);
+                const entry = current.get(sessionKey(ref));
                 if (entry?._tag !== "Closing" || entry.done !== step.done) return current;
                 const next = new Map(current);
-                next.delete(ref.sessionId);
+                next.delete(sessionKey(ref));
                 return next;
               }).pipe(Effect.andThen(Deferred.succeed(step.done, undefined))),
             ),

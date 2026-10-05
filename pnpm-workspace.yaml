@@ -87,6 +87,11 @@ catalogs:
   tailwind:
     tailwindcss: ^4.3.3
     "@tailwindcss/vite": ^4.3.3
+  # Pi packages move together. Exact pins: the coding-agent patch key below
+  # is version-specific, and a caret would admit a release the patch misses.
+  pi:
+    "@earendil-works/pi-coding-agent": 0.99.1
+    "@earendil-works/pi-tui": 0.99.1
 overrides:
   # These overrides force TRANSITIVE deps onto the catalog version — the
   # catalog alone only governs workspace package.json entries. Load-bearing:
@@ -120,8 +125,8 @@ packageExtensions:
   "@ff-labs/pi-fff":
     dependencies:
       "@sinclair/typebox": "*"
-      "@earendil-works/pi-tui": "0.85.1"
-      "@earendil-works/pi-coding-agent": "0.85.1"
+      "@earendil-works/pi-tui": "catalog:pi"
+      "@earendil-works/pi-coding-agent": "catalog:pi"
 # pnpm 11+ defaults minimumReleaseAge to 24h; disable it — the same-day
 # dependency bumps this repo does (e.g. claude-agent-sdk) would be blocked.
 minimumReleaseAge: 0
@@ -147,6 +152,7 @@ allowBuilds:
   # works inside git worktrees); the package's own postinstall would just fail.
   simple-git-hooks: false
 patchedDependencies:
+  "@earendil-works/pi-coding-agent@0.99.1": patches/@earendil-works__pi-coding-agent@0.99.1.patch
   # react-scan fetches react-grab.com/api/version from `start()` with no way to
   # opt out — the renderer CSP blocks it and logs an error on every launch. The
   # patch makes that one function return early; nothing else. On a react-scan
@@ -158,7 +164,6 @@ patchedDependencies:
   # killProcessTree, waitForChildProcess, Type, bashSchema, and resolveSpawnContext for Pie's bash tool.
   # On bump, re-check every patched file and run the isolated server RPC
   # bundle tests after rebuilding.
-  "@earendil-works/pi-coding-agent@0.85.1": patches/@earendil-works__pi-coding-agent@0.85.1.patch
   # Theme parser treated `/*` in quoted `@source ".../dist/*.js"` as a
   # comment and swallowed `@theme`. Strip comments only outside strings.
   # On bump: dist/index.js `parseDeclarations` / `parseClassSelectors`.

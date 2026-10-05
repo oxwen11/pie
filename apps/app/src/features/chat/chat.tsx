@@ -1,29 +1,25 @@
-import { cn } from "@getpie/ui/lib/utils";
-
 import { ChatModelSelect } from "@/features/chat/components/chat-model-select";
 import { ChatSessionProvider } from "@/features/chat/components/chat-session-provider";
 import { ChatTranscript } from "@/features/chat/components/chat-transcript";
+import { SlashCommandMenu } from "@/features/chat/components/input/slash-command-menu";
 import { SessionComposer } from "@/features/chat/components/session-composer";
+import { useSlashCommandState } from "@/features/chat/hooks/use-slash-command-state";
 import { type EnvironmentSessionRef, sessionRefKey } from "@/lib/session-ref";
 
-export function Chat({
-  className,
-  sessionRef,
-}: {
-  className?: string;
-  sessionRef: EnvironmentSessionRef;
-}) {
+export function Chat({ sessionRef }: { sessionRef: EnvironmentSessionRef }) {
+  const commandState = useSlashCommandState(sessionRef.ref.projectId);
   return (
     <ChatSessionProvider sessionRef={sessionRef}>
-      <div className={cn("flex min-h-0 flex-1 flex-col", className)}>
-        <ChatTranscript />
-        <div className="mx-auto w-full max-w-4xl shrink-0 px-4 pt-2 pb-4">
-          <SessionComposer
-            key={sessionRefKey(sessionRef)}
-            sessionRef={sessionRef}
-            toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
-          />
-        </div>
+      <div className="grid min-h-0 w-full flex-1 grid-cols-[minmax(0,1fr)_minmax(0,56rem)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)_auto]">
+        <ChatTranscript className="col-span-full min-h-0 min-w-0" />
+        <SessionComposer
+          className="col-start-2 mx-4 min-w-0"
+          key={sessionRefKey(sessionRef)}
+          sessionRef={sessionRef}
+          toolbar={<ChatModelSelect sessionRef={sessionRef.ref} />}
+        >
+          <SlashCommandMenu state={commandState} />
+        </SessionComposer>
       </div>
     </ChatSessionProvider>
   );

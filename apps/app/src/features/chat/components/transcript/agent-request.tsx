@@ -15,11 +15,23 @@ export function AgentRequestView({
 }) {
   switch (request.type) {
     case "question":
-      return <QuestionRequestView request={request} onRespond={onRespond} />;
+      return (
+        <div className="py-1.5">
+          <QuestionRequestView request={request} onRespond={onRespond} />
+        </div>
+      );
     case "plan":
-      return <PlanRequestView request={request} onRespond={onRespond} />;
+      return (
+        <div className="py-1.5">
+          <PlanRequestView request={request} onRespond={onRespond} />
+        </div>
+      );
     case "tool":
-      return <ToolRequestView request={request} onRespond={onRespond} />;
+      return (
+        <div className="py-1.5">
+          <ToolRequestView request={request} onRespond={onRespond} />
+        </div>
+      );
     default: {
       const exhaustive: never = request;
       return exhaustive;

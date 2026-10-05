@@ -1,0 +1,369 @@
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index 045ddb2aaa9dc0b2f1dc9c4cd81e4278a08131d2..da92b3d93de07227423220d8b66de2c76307f4b4 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -1,3 +1,9 @@
++export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.ts";
++export { builtInExtensions } from "./extensions/index.ts";
++export { bashSchema, resolveSpawnContext } from "./core/tools/bash.ts";
++export { getShellEnv, killProcessTree } from "./utils/shell.ts";
++export { waitForChildProcess } from "./utils/child-process.ts";
++export { Type } from "typebox";
+ export { type Args, parseArgs } from "./cli/args.ts";
+ export { CONFIG_DIR_NAME, getAgentDir, getDocsPath, getExamplesPath, getPackageDir, getReadmePath, VERSION, } from "./config.ts";
+ export { AgentSession, type AgentSessionConfig, type AgentSessionEvent, type AgentSessionEventListener, type ModelCycleResult, type ParsedSkillBlock, type PromptOptions, parseSkillBlock, type SessionStats, } from "./core/agent-session.ts";
+@@ -31,8 +37,7 @@ export type { CodemodeStoreEntryData, CodemodeToolDetails } from "./extensions/c
+ export type { LoadedMcpConfig, McpExposure, McpServerConfig, McpServerEntry } from "./extensions/mcp/config.ts";
+ export { createMcpExtension, type McpExtensionOptions, type McpTransportFactory } from "./extensions/mcp/index.ts";
+ export { createToolSearchExtension } from "./extensions/tool-search/index.ts";
+-export { type MainOptions, main } from "./main.ts";
+-export { InteractiveMode, type InteractiveModeOptions, type JsonAgentSessionEvent, type ModelInfo, type PrintModeOptions, RpcClient, type RpcClientOptions, type RpcCommand, type RpcEventListener, type RpcExtensionUIRequest, type RpcExtensionUIResponse, type RpcResponse, type RpcSessionState, runPrintMode, runRpcMode, } from "./modes/index.ts";
++export { type JsonAgentSessionEvent, type ModelInfo, type PrintModeOptions, RpcClient, type RpcClientOptions, type RpcCommand, type RpcEventListener, type RpcExtensionUIRequest, type RpcExtensionUIResponse, type RpcResponse, type RpcSessionState, runPrintMode, runRpcMode, } from "./modes/index.ts";
+ export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, type CustomEditorOptions, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, type RenderDiffOptions, rawKeyHint, renderDiff, SessionSelectorComponent, type SettingsCallbacks, type SettingsConfig, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, type ToolExecutionOptions, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, type VisualTruncateResult, } from "./modes/interactive/components/index.ts";
+ export { getLanguageFromPath, getMarkdownTheme, getSelectListTheme, getSettingsListTheme, highlightCode, initTheme, Theme, type ThemeAppearance, type ThemeBg, type ThemeColor, type ThemeStyle, type ThemeToken, } from "./modes/interactive/theme/theme.ts";
+ export { copyToClipboard } from "./utils/clipboard.ts";
+diff --git a/dist/index.js b/dist/index.js
+index c48934f78d61fd5f5f8008bc9e09d8c4558d330a..f4a2ca52923a181829686b61a03041a085aaaaa2 100644
+--- a/dist/index.js
++++ b/dist/index.js
+@@ -1,3 +1,9 @@
++export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.js";
++export { builtInExtensions } from "./extensions/index.js";
++export { bashSchema, resolveSpawnContext } from "./core/tools/bash.js";
++export { getShellEnv, killProcessTree } from "./utils/shell.js";
++export { waitForChildProcess } from "./utils/child-process.js";
++export { Type } from "typebox";
+ // Core session management
+ export { parseArgs } from "./cli/args.js";
+ // Config paths
+@@ -34,10 +40,8 @@ export { VIRTUAL_MODEL_STATE_ENTRY, } from "./core/virtual-models.js";
+ export { createCodemodeExtension } from "./extensions/codemode/index.js";
+ export { createMcpExtension } from "./extensions/mcp/index.js";
+ export { createToolSearchExtension } from "./extensions/tool-search/index.js";
+-// Main entry point
+-export { main } from "./main.js";
+ // Run modes for programmatic SDK usage
+-export { InteractiveMode, RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
++export { RpcClient, runPrintMode, runRpcMode, } from "./modes/index.js";
+ // UI components for extensions
+ export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
+ // Theme utilities for custom tools and extensions
+diff --git a/dist/core/tools/bash.d.ts b/dist/core/tools/bash.d.ts
+--- a/dist/core/tools/bash.d.ts
++++ b/dist/core/tools/bash.d.ts
+@@ -1,9 +1,9 @@
+ import type { AgentTool } from "@earendil-works/pi-agent-core";
+ import { type Static, Type } from "typebox";
+ import { type ShellConfig } from "../../utils/shell.ts";
+-import type { ToolDefinition } from "../extensions/types.ts";
++import type { ExtensionContext, ToolDefinition } from "../extensions/types.ts";
+ import { type TruncationResult } from "./truncate.ts";
+-declare const bashSchema: Type.TObject<{
++export declare const bashSchema: Type.TObject<{
+     command: Type.TString;
+     timeout: Type.TOptional<Type.TNumber>;
+ }>;
+@@ -69,5 +69,6 @@ export interface BashSpawnContext {
+ export type BashSpawnHook = (context: BashSpawnContext) => BashSpawnContext;
++export declare function resolveSpawnContext(command: string, cwd: string, spawnHook: BashSpawnHook | undefined, exposeSessionEnvironment: boolean, ctx: ExtensionContext | undefined): BashSpawnContext;
+ export interface BashToolOptions {
+     /** Custom operations for command execution. Default: local shell */
+     operations?: BashOperations;
+     /** Command prefix prepended to every command (for example shell setup commands) */
+diff --git a/dist/core/tools/bash.js b/dist/core/tools/bash.js
+--- a/dist/core/tools/bash.js
++++ b/dist/core/tools/bash.js
+@@ -28,4 +28,4 @@ function resolveTimeoutMs(timeout) {
+-const bashSchema = Type.Object({
++export const bashSchema = Type.Object({
+     command: Type.String({ description: "Shell command to execute" }),
+     timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (optional, no default timeout)" })),
+ });
+@@ -134,7 +134,7 @@ export function createLocalBashOperations(options) {
+ export function createLocalBashOperations(options) {
+     return createLocalShellOperations("bash", () => getShellConfig(options?.shellPath));
+ }
+-function resolveSpawnContext(command, cwd, spawnHook, exposeSessionEnvironment, ctx) {
++export function resolveSpawnContext(command, cwd, spawnHook, exposeSessionEnvironment, ctx) {
+     const env = { ...getShellEnv() };
+     delete env.PI_SESSION_ID;
+     delete env.PI_SESSION_FILE;
+diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
+index 5cf3ad39087c5c7add9ec8a1381b4f68367972e7..f58da52db465c02b74c5e6408f3fb9567fa0e847 100644
+--- a/dist/modes/interactive/theme/theme.js
++++ b/dist/modes/interactive/theme/theme.js
+@@ -6,6 +6,8 @@ import { getCustomThemesDir, getThemesDir } from "../../../config.js";
+ import { closeWatcher, watchWithErrorHandler } from "../../../utils/fs-watch.js";
+ import { highlight, supportsLanguage } from "../../../utils/syntax-highlight.js";
+ import { stripBom } from "../../../utils/text.js";
++import darkThemeJson from "./dark.json" with { type: "json" };
++import lightThemeJson from "./light.json" with { type: "json" };
+ import { generateSystemThemeColors, SYSTEM_THEME_NAME, terminalAppearance } from "./system-theme.js";
+ export { SYSTEM_THEME_NAME } from "./system-theme.js";
+ let themeJsonValidator;
+@@ -271,13 +273,7 @@ export class Theme {
+ let BUILTIN_THEMES;
+ function getBuiltinThemes() {
+     if (!BUILTIN_THEMES) {
+-        const themesDir = getThemesDir();
+-        const darkPath = path.join(themesDir, "dark.json");
+-        const lightPath = path.join(themesDir, "light.json");
+-        BUILTIN_THEMES = {
+-            dark: JSON.parse(stripBom(fs.readFileSync(darkPath, "utf-8"))),
+-            light: JSON.parse(stripBom(fs.readFileSync(lightPath, "utf-8"))),
+-        };
++        BUILTIN_THEMES = { dark: darkThemeJson, light: lightThemeJson };
+     }
+     return BUILTIN_THEMES;
+ }
+diff --git a/dist/utils/image-resize.js b/dist/utils/image-resize.js
+index 686c9f32ea6ae5858ab560014bdfe102edd78804..b07fabb23ea2ffa4db1d5896a609f357302e1586 100644
+--- a/dist/utils/image-resize.js
++++ b/dist/utils/image-resize.js
+@@ -1,4 +1,5 @@
+ import { Worker } from "node:worker_threads";
++import { isBunBinary } from "../config.js";
+ import { resizeImageInProcess } from "./image-resize-core.js";
+ function toTransferableBytes(input) {
+     // Transfer detaches the buffer, so transfer a worker-owned copy and leave the
+@@ -70,7 +71,7 @@ export async function resizeImage(inputBytes, mimeType, options) {
+     // Bun compiled executables resolve worker entrypoints by string path, not via
+     // new URL(..., import.meta.url). Try the string path first under Bun so the
+     // release binary uses the embedded worker instead of falling back in-process.
+-    if (typeof process.versions.bun === "string") {
++    if (isBunBinary) {
+         try {
+             return await resizeImageInWorker("./src/utils/image-resize-worker.ts", inputBytes, mimeType, options);
+         }
+diff --git a/dist/utils/photon.js b/dist/utils/photon.js
+index 3078895bedba898ce26c439b6123425834ca2586..586fab202f3bae969c0d44fd67a7db84bfee9bd3 100644
+--- a/dist/utils/photon.js
++++ b/dist/utils/photon.js
+@@ -33,6 +33,7 @@ function pathOrNull(file) {
+ function getFallbackWasmPaths() {
+     const execDir = path.dirname(process.execPath);
+     return [
++        path.join(path.dirname(fileURLToPath(import.meta.url)), WASM_FILENAME),
+         path.join(execDir, WASM_FILENAME),
+         path.join(execDir, "photon", WASM_FILENAME),
+         path.join(process.cwd(), WASM_FILENAME),
+diff --git a/dist/utils/syntax-highlight.js b/dist/utils/syntax-highlight.js
+index 7c40360ce63bc65d8eff063379bfce8646e9389b..a445a5f73bd4f129faaddc6db761c3e947823e1f 100644
+--- a/dist/utils/syntax-highlight.js
++++ b/dist/utils/syntax-highlight.js
+@@ -1,179 +1,4 @@
+-import hljs from "highlight.js/lib/core.js";
+-import bash from "highlight.js/lib/languages/bash.js";
+-import c from "highlight.js/lib/languages/c.js";
+-import cpp from "highlight.js/lib/languages/cpp.js";
+-import csharp from "highlight.js/lib/languages/csharp.js";
+-import dart from "highlight.js/lib/languages/dart.js";
+-import go from "highlight.js/lib/languages/go.js";
+-import groovy from "highlight.js/lib/languages/groovy.js";
+-import java from "highlight.js/lib/languages/java.js";
+-import javascript from "highlight.js/lib/languages/javascript.js";
+-import json from "highlight.js/lib/languages/json.js";
+-import kotlin from "highlight.js/lib/languages/kotlin.js";
+-import lua from "highlight.js/lib/languages/lua.js";
+-import nix from "highlight.js/lib/languages/nix.js";
+-import perl from "highlight.js/lib/languages/perl.js";
+-import php from "highlight.js/lib/languages/php.js";
+-import python from "highlight.js/lib/languages/python.js";
+-import ruby from "highlight.js/lib/languages/ruby.js";
+-import rust from "highlight.js/lib/languages/rust.js";
+-import scala from "highlight.js/lib/languages/scala.js";
+-import swift from "highlight.js/lib/languages/swift.js";
+-import typescript from "highlight.js/lib/languages/typescript.js";
+-import { decodeHtmlEntityAt } from "./html.js";
+-const eagerLanguages = {
+-    python,
+-    java,
+-    go,
+-    javascript,
+-    json,
+-    cpp,
+-    typescript,
+-    php,
+-    ruby,
+-    c,
+-    csharp,
+-    nix,
+-    bash,
+-    rust,
+-    scala,
+-    kotlin,
+-    swift,
+-    dart,
+-    groovy,
+-    perl,
+-    lua,
+-};
+-for (const [name, language] of Object.entries(eagerLanguages)) {
+-    hljs.registerLanguage(name, language);
+-}
+-let allLanguagesPromise;
+-export function loadAllHighlightLanguages() {
+-    if (!allLanguagesPromise) {
+-        allLanguagesPromise = new Promise((resolve) => {
+-            setImmediate(() => {
+-                void import("highlight.js/lib/index.js").then(() => resolve(), () => {
+-                    // Eager languages and plaintext fallback remain available.
+-                    resolve();
+-                });
+-            });
+-        });
+-    }
+-    return allLanguagesPromise;
+-}
+-const SPAN_CLOSE = "</span>";
+-const HIGHLIGHT_CLASS_PREFIX = "hljs-";
+-function getScopeFromSpanTag(tag) {
+-    const match = /\sclass\s*=\s*(?:"([^"]*)"|'([^']*)')/.exec(tag);
+-    const classValue = match?.[1] ?? match?.[2];
+-    if (!classValue) {
+-        return undefined;
+-    }
+-    for (const className of classValue.split(/\s+/)) {
+-        if (className.startsWith(HIGHLIGHT_CLASS_PREFIX)) {
+-            return className.slice(HIGHLIGHT_CLASS_PREFIX.length);
+-        }
+-    }
+-    return undefined;
+-}
+-function getScopeFormatter(scope, theme) {
+-    const exact = theme[scope];
+-    if (exact) {
+-        return exact;
+-    }
+-    const dotIndex = scope.indexOf(".");
+-    if (dotIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dotIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    const dashIndex = scope.indexOf("-");
+-    if (dashIndex !== -1) {
+-        const prefixFormatter = theme[scope.slice(0, dashIndex)];
+-        if (prefixFormatter) {
+-            return prefixFormatter;
+-        }
+-    }
+-    return undefined;
+-}
+-function getActiveFormatter(scopes, theme) {
+-    for (let i = scopes.length - 1; i >= 0; i--) {
+-        const scope = scopes[i];
+-        if (!scope) {
+-            continue;
+-        }
+-        const formatter = getScopeFormatter(scope, theme);
+-        if (formatter) {
+-            return formatter;
+-        }
+-    }
+-    return theme.default;
+-}
+-function isSpanOpenTagStart(html, index) {
+-    if (!html.startsWith("<span", index)) {
+-        return false;
+-    }
+-    const nextChar = html[index + "<span".length];
+-    return nextChar === ">" || nextChar === " " || nextChar === "\t" || nextChar === "\n" || nextChar === "\r";
+-}
+-export function renderHighlightedHtml(html, theme = {}) {
+-    let output = "";
+-    let textBuffer = "";
+-    const scopes = [];
+-    const flushText = () => {
+-        if (!textBuffer) {
+-            return;
+-        }
+-        const formatter = getActiveFormatter(scopes, theme);
+-        output += formatter ? formatter(textBuffer) : textBuffer;
+-        textBuffer = "";
+-    };
+-    let index = 0;
+-    while (index < html.length) {
+-        if (isSpanOpenTagStart(html, index)) {
+-            const tagEndIndex = html.indexOf(">", index + 5);
+-            if (tagEndIndex !== -1) {
+-                flushText();
+-                const tag = html.slice(index, tagEndIndex + 1);
+-                const scope = getScopeFromSpanTag(tag);
+-                scopes.push(scope);
+-                index = tagEndIndex + 1;
+-                continue;
+-            }
+-        }
+-        if (html.startsWith(SPAN_CLOSE, index)) {
+-            flushText();
+-            if (scopes.length > 0) {
+-                scopes.pop();
+-            }
+-            index += SPAN_CLOSE.length;
+-            continue;
+-        }
+-        if (html[index] === "&") {
+-            const decoded = decodeHtmlEntityAt(html, index);
+-            if (decoded) {
+-                textBuffer += decoded.text;
+-                index += decoded.length;
+-                continue;
+-            }
+-        }
+-        textBuffer += html[index];
+-        index++;
+-    }
+-    flushText();
+-    return output;
+-}
+-export function highlight(code, options = {}) {
+-    const html = options.language
+-        ? hljs.highlight(code, {
+-            language: options.language,
+-            ignoreIllegals: options.ignoreIllegals,
+-        }).value
+-        : hljs.highlightAuto(code, options.languageSubset).value;
+-    return renderHighlightedHtml(html, options.theme);
+-}
+-export function supportsLanguage(name) {
+-    return hljs.getLanguage(name) !== undefined;
+-}
+-//# sourceMappingURL=syntax-highlight.js.map
+\ No newline at end of file
++export function loadAllHighlightLanguages() { return Promise.resolve(); }
++export function renderHighlightedHtml(html, _theme = {}) { return html; }
++export function highlight(code, _options = {}) { return String(code ?? ""); }
++export function supportsLanguage(_name) { return false; }
+diff --git a/examples/extensions/custom-provider-anthropic/package-lock.json b/examples/extensions/custom-provider-anthropic/package-lock.json
+deleted file mode 100644
+index 0f04a4b6e990ec2354e48dd096522edbe95fe8bf..0000000000000000000000000000000000000000
+diff --git a/examples/extensions/gondolin/package-lock.json b/examples/extensions/gondolin/package-lock.json
+deleted file mode 100644
+index 8ccf39f0447d6635656ae041d9cffc842f7099cb..0000000000000000000000000000000000000000
+diff --git a/examples/extensions/sandbox/package-lock.json b/examples/extensions/sandbox/package-lock.json
+deleted file mode 100644
+index b701a1ba670ce5ea05dfcd5c5e7566ba7f703810..0000000000000000000000000000000000000000
+diff --git a/examples/extensions/with-deps/package-lock.json b/examples/extensions/with-deps/package-lock.json
+deleted file mode 100644
+index 2b01794b0f89bcebf1d6bf38cbf356d65b8fe6b9..0000000000000000000000000000000000000000
+diff --git a/package.json b/package.json
+index 22b6fdcb43e81f4eb7f782c44e4d659293dcb544..c5012a27d2bebc9358970b0cabf7c270eefefbd6 100644
+--- a/package.json
++++ b/package.json
+@@ -16,6 +16,14 @@
+ 			"types": "./dist/index.d.ts",
+ 			"import": "./dist/index.js"
+ 		},
++		"./bun/sandbox-env-setup": {
++			"types": "./dist/bun/sandbox-env-setup.d.ts",
++			"import": "./dist/bun/sandbox-env-setup.js"
++		},
++		"./bun/runtime-setup": {
++			"types": "./dist/bun/runtime-setup.d.ts",
++			"import": "./dist/bun/runtime-setup.js"
++		},
+ 		"./rpc-entry": {
+ 			"import": "./dist/bundle/rpc-entry.js"
+ 		},

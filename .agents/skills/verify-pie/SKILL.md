@@ -11,7 +11,7 @@ This file is for the next agent, cold. Follow **Launch → Doctor → Drive (fea
 
 ## Launch
 
-Two processes, **isolated `$PIE_HOME`**, default ports. Vite is hardcoded to **4190** with `strictPort: true` (`apps/app/vite.config.ts`); a second web instance cannot sit beside the first.
+Two processes, **isolated `$PIE_HOME`**, unchanged `HOME`, default ports. Vite defaults to **4190** with `strictPort: true`; Verify can pass an explicit `PIE_VITE_PORT` through Vite's native `--port`. Parallel tasks need different worktrees, `VERIFY_PIE_ROOT`, API ports and Vite ports. See [parallel verification](../../../tools/verify/README.md#parallel-verification).
 
 ```bash
 pnpm exec pie-verify web launch
@@ -44,7 +44,7 @@ What launch also does:
 - Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow and Choose project proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks. Sets `PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie` so allocate stays in the run. Does not change `HOME` or `~/.pi/agent`.
 - Hits the Vite origin once via `node:http` (`127.0.0.1` / `localhost` / `[::1]`) so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file). Do not use global `fetch` for that warmup.
 
-`PIE_PORT` may be overridden for the **server** if 4180 is yours to move — export it for **both** processes. Vite's listen port cannot move without editing `vite.config.ts`. Never use **4000**.
+`PIE_PORT` overrides the **server**, and `PIE_VITE_PORT` overrides Vite through the Verify launcher. Export both with a task-specific `VERIFY_PIE_ROOT`; the launcher forwards the API port to both processes. Defaults remain 4180/4190. Never use **4000** or the same API/Vite port. Every 4190 URL below is the default: use your run's printed app URL when overriding.
 
 If 4180 or 4190 is already taken by a process this skill did not start, launch **refuses**. Driving a shared instance corrupts the user's Projects/Sessions.
 
@@ -111,7 +111,7 @@ Stable handles (from source, not guesses):
 | Draft composer | contenteditable; placeholder **Do Anything, / for skills, @ for context** |
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty, not while Choose project) |
 | Session send | button **Send message**; while streaming with an empty draft: **Stop generating**; typing replaces Stop with **Send message** (queue follow-up) — never both |
-| Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Send** (`Steer queued message`) promotes that row to **Steer**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steer** (no Send); not transcript bubbles |
+| Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Steer** (`Steer queued message`) promotes that row to **Steering**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steering** (no Steer); not transcript bubbles |
 | Session heading | card title is the session title (prompt text after create) or **New chat**; supporting text is the project name |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
 
@@ -127,7 +127,7 @@ Proof directory (survives cleanup):
 .cursor/skills/verify-pie/evidence/<run-id>/
 ```
 
-Web is a UI surface, so `.agents/rules/verify-evidence.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
+Web is a UI surface, so `.agents/rules/workflows/acceptance.md` applies: every proof needs **before/after screenshots and a video of the drive**. Skipping either makes the proof incomplete.
 
 ```bash
 pnpm exec pie-verify web evidence init
@@ -181,13 +181,13 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 
 | Resource | Shared? |
 | --- | --- |
-| Vite 4190 | **No.** `strictPort`, IPv6 `[::1]` only. One web instance. Open `http://localhost:4190/`. |
+| Vite 4190 | Default only; `PIE_VITE_PORT` chooses a distinct port per task, still strict. Open the printed localhost URL. |
 | Server 4180 | Movable via `PIE_PORT` (both processes). Launch still refuses a taken 4180. |
 | `$PIE_HOME` | Isolated per run under `/tmp/pie-verify-web/runs/<id>/pie-home`. |
 | `$PIE_HOME/workspace/verify-pie-sample` | Run-local scaffold, registered by default; removed with the run. |
 | Desktop daemon 4000 | **Do not touch.** Different process, token auth. |
 
-If the user already has `pnpm dev` on 4180/4190 against `~/.pie` / `~/.pie_*`, **stop and tell them**. Do not point this skill at that pair.
+If 4180/4190 belong to another run, **do not adopt or stop it**. Use another worktree, a unique `VERIFY_PIE_ROOT` and distinct explicit ports. Drive through that root's generated `bin/agent-browser`, which binds its owner even when other surfaces are current. Keep the root environment for doctor/evidence/cleanup. Same-root launches and shared-worktree builds remain serial; do not parallelize shared Pi configuration mutations.
 
 ## Feature map
 

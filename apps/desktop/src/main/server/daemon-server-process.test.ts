@@ -12,8 +12,29 @@ import * as Observability from "@getpie/server/observability";
 import { Effect, FileSystem } from "effect";
 import { describe, expect, it as test } from "vitest";
 
-import { makeDaemonServerProcess, resolveServerRuntimeExecutable } from "./daemon-server-process";
+import {
+  makeDaemonServerProcess,
+  resolveDaemonCommand,
+  resolveServerRuntimeExecutable,
+} from "./daemon-server-process";
 import type { ServerProcessConfig } from "./local-server";
+
+describe("resolveDaemonCommand", () => {
+  test("uses Node under PIE_E2E when npm_node_execpath is set", () => {
+    const command = resolveDaemonCommand({
+      PIE_E2E: "1",
+      PIE_E2E_NODE: "/usr/bin/node",
+    });
+    expect(command.argv).toEqual(["/usr/bin/node"]);
+    expect(command.environment.ELECTRON_RUN_AS_NODE).toBeUndefined();
+  });
+
+  test("keeps Electron-as-Node outside PIE_E2E", () => {
+    const command = resolveDaemonCommand({}, "/opt/Pie/pie", "linux");
+    expect(command.argv).toEqual(["/opt/Pie/pie"]);
+    expect(command.environment.ELECTRON_RUN_AS_NODE).toBe("1");
+  });
+});
 
 describe("resolveServerRuntimeExecutable", () => {
   test("uses Electron's LSUIElement helper for a macOS app bundle", () => {

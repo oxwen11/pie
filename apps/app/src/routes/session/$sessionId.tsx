@@ -1,9 +1,20 @@
 import type { PrepareSessionOutput, SessionRef, WorktreeMissingErrorData } from "@getpie/contract";
+import { useSidebar } from "@getpie/ui/components/sidebar";
+import { cn } from "@getpie/ui/lib/utils";
 import { ORPCError } from "@orpc/client";
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { toast } from "sonner";
 
+import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
+import {
+  SHELL_TITLEBAR_HEADER_CLASS,
+  SHELL_TITLEBAR_LABEL_CLASS,
+} from "@/components/layout/shell-chrome";
 import { Chat } from "@/features/chat/chat";
+import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
+import { useProject } from "@/features/projects/use-projects";
+import { usePlatform } from "@/platform-context";
+import { isDesktopHost } from "@/platform-host";
 
 type SessionSearch = {
   readonly projectId?: string;
@@ -93,12 +104,44 @@ export const Route = createFileRoute("/session/$sessionId")({
 
 function Component() {
   const prepared = Route.useLoaderData();
+  const project = useProject(prepared.ref.projectId);
+  const title = useProjectSessionTitle(prepared.ref) ?? "New chat";
+  const reserveToggle = useContentPanel() !== null;
+  const { isMobile, state } = useSidebar();
+  const desktop = isDesktopHost(usePlatform());
+  const collapsedDesktop = desktop && !isMobile && state === "collapsed";
   return (
-    <Chat
-      sessionRef={{
-        environmentId: prepared.environmentId,
-        ref: prepared.ref,
-      }}
-    />
+    <>
+      {/* Desktop: this row is the drag strip, so it also clears the traffic lights. */}
+      <div
+        className={cn(
+          SHELL_TITLEBAR_HEADER_CLASS,
+          "border-b",
+          collapsedDesktop && "ps-(--shell-titlebar-content-left)",
+        )}
+        data-drag-region={desktop ? "" : undefined}
+      >
+        <div className={SHELL_TITLEBAR_LABEL_CLASS}>
+          <span className="min-w-0 truncate font-medium" title={title}>
+            {title}
+          </span>
+          {project?.name !== undefined && (
+            <span
+              className="text-muted-foreground max-w-[50%] min-w-0 truncate"
+              title={project.name}
+            >
+              {project.name}
+            </span>
+          )}
+        </div>
+        {reserveToggle ? <div aria-hidden="true" className="ms-auto size-7 shrink-0" /> : null}
+      </div>
+      <Chat
+        sessionRef={{
+          environmentId: prepared.environmentId,
+          ref: prepared.ref,
+        }}
+      />
+    </>
   );
 }

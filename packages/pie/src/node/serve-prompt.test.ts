@@ -9,6 +9,9 @@ import { afterEach, describe, expect, it } from "vitest";
 const cliBin = path.join(import.meta.dirname, "../../dist/cli.mjs");
 
 const FAKE = `#!/usr/bin/env node
+const bridge = process.env.PIE_SESSION_BRIDGE_URL;
+const bridgeToken = process.env.PIE_SESSION_BRIDGE_TOKEN;
+if (bridge && bridgeToken) fetch(bridge + "/ready", { method: "POST", headers: { authorization: "Bearer " + bridgeToken, "content-type": "application/json" }, body: "{}" }).catch(() => {});
 if (process.argv.includes("--list-models")) {
   process.stdout.write("provider       model         context\\nxai            grok-4.3      1M\\n");
   process.exit(0);

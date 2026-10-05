@@ -38,50 +38,50 @@ export type FindExecutableDeps = {
  * Windows has no execute bit at all, so there existence is the whole test —
  * which is also all `access(X_OK)` ever checked there.
  */
-export const isExecutableFile = (
+export const isExecutableFile = Effect.fn("isExecutableFile")(function* (
   fs: FileSystem.FileSystem,
   candidate: string,
   platform: NodeJS.Platform,
-): Effect.Effect<boolean> =>
-  fs.stat(candidate).pipe(
+) {
+  return yield* fs.stat(candidate).pipe(
     Effect.map(
       (info) => info.type === "File" && (platform === "win32" || (info.mode & 0o111) !== 0),
     ),
     // A candidate that cannot be stat'd (absent, unreadable dir) is not here.
     Effect.catch(() => Effect.succeed(false)),
   );
+});
 
 /**
  * The path a bare command name resolves to, or `undefined` when it is not
  * installed. An absolute `command` is taken as an explicit override and only
  * checked for executability.
  */
-export const findExecutable = (
+export const findExecutable = Effect.fn("findExecutable")(function* (
   command: string,
   deps: FindExecutableDeps = {},
-): Effect.Effect<string | undefined, never, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const { env = process.env, platform = process.platform } = deps;
-    const fs = yield* FileSystem.FileSystem;
-    const isExecutable = (candidate: string) => isExecutableFile(fs, candidate, platform);
+) {
+  const { env = process.env, platform = process.platform } = deps;
+  const fs = yield* FileSystem.FileSystem;
+  const isExecutable = (candidate: string) => isExecutableFile(fs, candidate, platform);
 
-    if (path.isAbsolute(command)) {
-      return (yield* isExecutable(command)) ? command : undefined;
+  if (path.isAbsolute(command)) {
+    return (yield* isExecutable(command)) ? command : undefined;
+  }
+
+  const names =
+    platform !== "win32" || path.extname(command)
+      ? [command]
+      : WINDOWS_EXTENSIONS.map((extension) => `${command}${extension}`);
+
+  // First hit wins, and PATH order is the answer — so this walks candidates
+  // sequentially and stops, rather than stat'ing the whole search space.
+  for (const dir of (env["PATH"] ?? "").split(pathDelimiter(platform))) {
+    if (!dir) continue;
+    for (const name of names) {
+      const candidate = path.join(dir, name);
+      if (yield* isExecutable(candidate)) return candidate;
     }
-
-    const names =
-      platform !== "win32" || path.extname(command)
-        ? [command]
-        : WINDOWS_EXTENSIONS.map((extension) => `${command}${extension}`);
-
-    // First hit wins, and PATH order is the answer — so this walks candidates
-    // sequentially and stops, rather than stat'ing the whole search space.
-    for (const dir of (env["PATH"] ?? "").split(pathDelimiter(platform))) {
-      if (!dir) continue;
-      for (const name of names) {
-        const candidate = path.join(dir, name);
-        if (yield* isExecutable(candidate)) return candidate;
-      }
-    }
-    return undefined;
-  });
+  }
+  return undefined;
+});

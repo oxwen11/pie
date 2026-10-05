@@ -5,7 +5,15 @@ import path from "node:path";
 
 import { type ElectronApplication, _electron as electron, type Page } from "@playwright/test";
 
-import { expect, linuxElectronArgs, stopDaemonFor, test, closeElectron } from "./fixtures.js";
+import {
+  awaitDesktopReady,
+  chatTest,
+  closeElectron,
+  expect,
+  linuxElectronArgs,
+  stopDaemonFor,
+  test,
+} from "./fixtures.js";
 
 function appPid(electronApp: ElectronApplication): number {
   const pid = electronApp.process().pid;
@@ -62,12 +70,12 @@ async function waitForDaemon(pieHome: string): Promise<number> {
  * These kill tests mean "kill a running server", so wait until the renderer
  * left the splash — that requires the ready handshake to have completed.
  */
-async function waitForConnectedUi(window: Page): Promise<void> {
-  // The splash carries "Starting Pie" as an aria-label, not text content,
-  // and unmounts permanently once the renderer connects.
-  await expect(window.getByRole("main", { name: "Starting Pie" })).toBeHidden({
-    timeout: 30_000,
-  });
+async function waitForConnectedUi(window: Page, pieHome?: string): Promise<void> {
+  if (pieHome) {
+    await awaitDesktopReady(window, pieHome);
+    return;
+  }
+  await expect(window.locator("#root")).toBeVisible({ timeout: 30_000 });
 }
 
 async function driveServerToFailed(window: Page, pieHome: string): Promise<void> {
@@ -119,7 +127,7 @@ test("gives a reloaded renderer document a new MessagePort", async ({ window, e2
 
   await window.reload();
   await expect(window).toHaveTitle("Pie");
-  await expect(window.locator("#root")).toBeVisible();
+  await awaitDesktopReady(window, e2ePaths.pieHome);
   await expect(window.getByText("Pie could not start")).toHaveCount(0);
   expect(readDaemonPid(e2ePaths.pieHome)).toBe(pid);
 });
@@ -190,31 +198,31 @@ test("boots the development HTTP renderer through MessagePort", async ({}, testI
   }
 });
 
-test("chats through the fake Pi executable", async ({ e2ePaths, window }) => {
-  // The app lands on /draft, the new-session surface: picking the seeded
-  // project and typing the first message creates the session and navigates
-  // into it. The picker defaults to Choose project until a project is chosen.
-  await waitForConnectedUi(window);
+chatTest(
+  "chats through the real Pi process with the e2e provider",
+  async ({ fakeReply, window }) => {
+    // The app lands on /draft, the new-session surface: picking the seeded
+    // project and typing the first message creates the session and navigates
+    // into it. The picker defaults to Choose project until a project is chosen.
+    await waitForConnectedUi(window);
 
-  await window.getByRole("combobox").filter({ hasText: "Choose project" }).click();
-  await window.getByRole("option", { name: /e2e-workspace/ }).click();
+    await window.getByRole("combobox").filter({ hasText: "Choose project" }).click();
+    await window.getByRole("option", { name: /e2e-workspace/ }).click();
 
-  const input = window.locator("[contenteditable='true']");
-  await input.fill("Desktop SDK E2E");
-  await window.locator('form button[type="submit"]').click();
+    const input = window.locator("[contenteditable='true']");
+    await input.fill("Desktop SDK E2E");
+    await window.locator('form button[type="submit"]').click();
 
-  await expect(window).toHaveURL(/\/session\/[0-9a-f-]+/);
-  // Scoped to the transcript: the prompt text also becomes the session's
-  // optimistic title in the sidebar.
-  const transcript = window.getByRole("log");
-  await expect(transcript.getByText("Desktop SDK E2E", { exact: true })).toBeVisible();
-  await expect(transcript.getByText("Desktop fake Pi reply", { exact: true })).toBeVisible();
-  await expect
-    .poll(() =>
-      fs.existsSync(e2ePaths.fakePiLog) ? fs.readFileSync(e2ePaths.fakePiLog, "utf8") : "",
-    )
-    .toContain('"type":"prompt","message":"Desktop SDK E2E"');
-});
+    await expect(window).toHaveURL(/\/session\/[0-9a-f-]+/);
+    // Scoped to the transcript: the prompt text also becomes the session's
+    // optimistic title in the sidebar.
+    const transcript = window.getByRole("log");
+    await expect(transcript.getByText("Desktop SDK E2E", { exact: true })).toBeVisible();
+    await expect(transcript.getByText(fakeReply, { exact: true })).toBeVisible({
+      timeout: 60_000,
+    });
+  },
+);
 
 test("reports a server crash and recovers on the pinned connection", async ({
   window,

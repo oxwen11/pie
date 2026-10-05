@@ -120,10 +120,8 @@ export function decodeTailscaleStatus(raw: string): TailscaleStatus {
   };
 }
 
-export const parseTailscaleStatus = (
-  raw: string,
-): Effect.Effect<TailscaleStatus, TailscaleStatusParseError> =>
-  Effect.try({
+export const parseTailscaleStatus = Effect.fn("parseTailscaleStatus")(function* (raw: string) {
+  return yield* Effect.try({
     try: () => decodeTailscaleStatus(raw),
     catch: (cause) =>
       cause instanceof TailscaleStatusParseError
@@ -133,15 +131,22 @@ export const parseTailscaleStatus = (
             cause,
           }),
   });
+});
 
-export const readTailscaleStatus = (input: FindTailscaleCommandOptions = {}) =>
-  runTailscaleCommand(["status", "--json"], TAILSCALE_STATUS_TIMEOUT_MS, input).pipe(
+export const readTailscaleStatus = Effect.fn("readTailscaleStatus")(function* (
+  input: FindTailscaleCommandOptions = {},
+) {
+  return yield* runTailscaleCommand(["status", "--json"], TAILSCALE_STATUS_TIMEOUT_MS, input).pipe(
     Effect.flatMap((result) => parseTailscaleStatus(result.stdout)),
   );
+});
 
 /** Online tailnet peers as SSH hosts. Missing CLI or status errors become `[]`. */
-export const listOnlineTailscaleSshHosts = (input: FindTailscaleCommandOptions = {}) =>
-  readTailscaleStatus(input).pipe(
+export const listOnlineTailscaleSshHosts = Effect.fn("listOnlineTailscaleSshHosts")(function* (
+  input: FindTailscaleCommandOptions = {},
+) {
+  return yield* readTailscaleStatus(input).pipe(
     Effect.map((status) => status.peers.filter((peer) => peer.online)),
     Effect.orElseSucceed((): readonly TailscalePeerHost[] => []),
   );
+});

@@ -55,30 +55,46 @@ describe("SessionRepository", () => {
     expect(read.agentSessionId).toBe("claude-uuid-1");
   });
 
-  it("round-trips pull request refs and omits an empty list", async () => {
-    const pullRequestRefs = [
-      { host: "github.com", owner: "getpie", repository: "pie", number: 99 },
-      { host: "github.com", owner: "getpie", repository: "pie", number: 109 },
+  it("round-trips pull request links and omits an empty list", async () => {
+    const pullRequests = [
+      {
+        ref: { host: "github.com", owner: "getpie", repository: "pie", number: 99 },
+        source: "agent" as const,
+        linkedAt: "2026-07-16T00:00:00.000Z",
+        excluded: false,
+        snapshot: null,
+        stack: null,
+        stackCheckedAt: null,
+      },
+      {
+        ref: { host: "github.com", owner: "getpie", repository: "pie", number: 109 },
+        source: "agent" as const,
+        linkedAt: "2026-07-16T00:00:00.000Z",
+        excluded: false,
+        snapshot: null,
+        stack: null,
+        stackCheckedAt: null,
+      },
     ];
     const read = await run(
       Effect.gen(function* () {
         const repo = yield* SessionRepository;
-        yield* repo.write({ ...meta("sess-1", "proj-a"), pullRequestRefs });
+        yield* repo.write({ ...meta("sess-1", "proj-a"), pullRequests });
         return yield* repo.read("proj-a", "sess-1");
       }),
     );
-    expect(read.pullRequestRefs).toEqual(pullRequestRefs);
+    expect(read.pullRequests).toEqual(pullRequests);
 
     await run(
       Effect.gen(function* () {
         const repo = yield* SessionRepository;
-        yield* repo.write({ ...read, pullRequestRefs: [] });
+        yield* repo.write({ ...read, pullRequests: [] });
       }),
     );
     const raw = JSON.parse(
       await fs.readFile(path.join(home, "storage", "sessions", "proj-a", "sess-1.json"), "utf8"),
     ) as { readonly data: Record<string, unknown> };
-    expect(raw.data).not.toHaveProperty("pullRequestRefs");
+    expect(raw.data.pullRequests).toEqual([]);
   });
 
   it("strips unknown extra fields on read and never writes them back", async () => {
@@ -185,6 +201,38 @@ describe("SessionRepository", () => {
     expect(raw.data.projectId).toBe("proj-a");
     // The envelope owns the version; the body must not carry a second copy.
     expect(raw.data).not.toHaveProperty("version");
+  });
+
+  it("reads legacy sessions without an agent session id without breaking the list", async () => {
+    const file = path.join(home, "storage", "sessions", "proj-a", "legacy.json");
+    await fs.mkdir(path.dirname(file), { recursive: true });
+    await fs.writeFile(
+      file,
+      JSON.stringify({
+        version: 1,
+        data: {
+          sessionId: "legacy",
+          projectId: "proj-a",
+          createdAt: "2026-07-16T00:00:00.000Z",
+        },
+      }),
+      "utf8",
+    );
+
+    const listed = await run(
+      Effect.gen(function* () {
+        const repo = yield* SessionRepository;
+        return yield* repo.list("proj-a");
+      }),
+    );
+
+    expect(listed).toEqual([
+      expect.objectContaining({
+        sessionId: "legacy",
+        projectId: "proj-a",
+      }),
+    ]);
+    expect(listed[0]?.agentSessionId).toBeUndefined();
   });
 
   it("lists all sessions of a project", async () => {

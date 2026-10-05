@@ -2,6 +2,8 @@
 
 Desktop and CLI share `resolveOrSpawnDaemon`. The same `$PIE_HOME` must converge on one backend.
 
+Playwright covers the second-Desktop same-home path in `apps/desktop/e2e/tests/daemon-attach.spec.ts`. The CLI-attach steps below remain a manual / pie-verify proof.
+
 ## How to get to it
 
 1. Start an isolated CLI daemon (`pnpm exec pie-verify cli launch` uses 4182 — **different root**). For a same-home proof, start the CLI **inside the desktop run's env** instead:

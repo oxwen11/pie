@@ -1,4 +1,4 @@
-import { Effect, Layer } from "effect";
+import { Effect, Layer, Scope } from "effect";
 import { app } from "electron";
 
 import { DesktopApplication, makeDesktopApplication } from "./application/desktop-application";
@@ -21,6 +21,7 @@ export const DesktopApplicationLive = Layer.effect(
     const ssh = yield* DesktopSsh;
     const tailscale = yield* DesktopTailscale;
     const savedRemotes = yield* ssh.listSaved;
+    const scope = yield* Scope.Scope;
     const application = makeDesktopApplication({
       server,
       ssh,
@@ -28,6 +29,7 @@ export const DesktopApplicationLive = Layer.effect(
       quit: Effect.sync(() => {
         setTimeout(() => app.quit(), 0);
       }),
+      scope,
     });
     for (const remote of savedRemotes) {
       yield* application.connectSsh(formatSshInput(remote.target), { background: true }).pipe(

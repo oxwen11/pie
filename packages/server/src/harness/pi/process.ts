@@ -5,6 +5,7 @@ import type {
   SessionPendingPrompt,
 } from "@getpie/contract";
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
+import type { Crypto, FileSystem } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
 import { v7 as uuid } from "uuid";
@@ -18,9 +19,11 @@ import {
 } from "../errors";
 import { drainQueue, streamFromQueueOne } from "../queue-stream";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
+import { PI_PROJECT_PROCESS_ARGS } from "./project-resource-policy";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
 import type { PiExecutable } from "./resolve-executable";
+import { makePiSessionToolsBridge, type PiSessionToolsShape } from "./session-tools";
 import { createPiTransform, type PiStreamItem } from "./transform";
 import { makePiTransport, type PiTransport, type PiTransportFailure } from "./transport";
 
@@ -31,7 +34,6 @@ import { makePiTransport, type PiTransport, type PiTransportFailure } from "./tr
 
 const SESSION_QUEUE_CAPACITY = 1024;
 const HANDSHAKE_TIMEOUT = "30 seconds";
-
 type PendingRequest = {
   readonly deferred: Deferred.Deferred<unknown>;
   readonly declineValue: unknown;
@@ -89,10 +91,11 @@ export interface PiProcessOptions {
 
 export interface PiProcessDependencies<R> {
   readonly makeTransport: (config: {
+    readonly tools?: PiSessionToolsShape;
     readonly sessionId: string;
     readonly cwd?: string;
     readonly args?: ReadonlyArray<string>;
-  }) => Effect.Effect<PiTransport, PiTransportError, R | Scope.Scope>;
+  }) => Effect.Effect<PiTransport, PiTransportFailure, R | Scope.Scope>;
   readonly onSpawn?: (sessionId: string, pid: number) => void;
   readonly onExit?: (sessionId: string, pid: number) => void;
 }
@@ -100,11 +103,13 @@ export interface PiProcessDependencies<R> {
 export interface PiProcess {
   readonly session: {
     readonly create: (config: {
+      readonly tools?: PiSessionToolsShape;
       readonly cwd: string;
       readonly provider?: string;
       readonly modelId?: string;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
     readonly resume: (config: {
+      readonly tools?: PiSessionToolsShape;
       readonly sessionId: string;
       readonly cwd?: string;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
@@ -393,6 +398,7 @@ export const makePiProcessWithDependencies = <R>(
       sessionId: string,
       cwd?: string,
       spawnArgs?: ReadonlyArray<string>,
+      tools?: PiSessionToolsShape,
     ): Effect.Effect<{ readonly sessionId: string }, PiTransportFailure> =>
       Effect.gen(function* () {
         const scope = yield* Scope.fork(ownerScope, "sequential");
@@ -400,6 +406,7 @@ export const makePiProcessWithDependencies = <R>(
           const transport = yield* dependencies
             .makeTransport({
               sessionId,
+              ...(tools ? { tools } : undefined),
               ...(cwd ? { cwd } : undefined),
               ...(spawnArgs && spawnArgs.length > 0 ? { args: spawnArgs } : undefined),
             })
@@ -496,7 +503,7 @@ export const makePiProcessWithDependencies = <R>(
             Effect.andThen(Queue.end(session.requests)),
             Effect.andThen(Queue.end(session.queueUpdates)),
             Effect.andThen(Queue.end(session.chunks)),
-            Effect.andThen(closeScope(session)),
+            Effect.andThen(Scope.close(session.scope, Exit.void)),
             Effect.asVoid,
           ),
         ),
@@ -505,13 +512,19 @@ export const makePiProcessWithDependencies = <R>(
     return {
       session: {
         create: (config) => {
-          const spawnArgs =
+          const modelArgs =
             config.provider && config.modelId
               ? ["--provider", config.provider, "--model", config.modelId]
-              : undefined;
-          return openSession(uuid(), config.cwd, spawnArgs);
+              : [];
+          return openSession(
+            uuid(),
+            config.cwd,
+            [...modelArgs, ...PI_PROJECT_PROCESS_ARGS],
+            config.tools,
+          );
         },
-        resume: (config) => openSession(config.sessionId, config.cwd),
+        resume: (config) =>
+          openSession(config.sessionId, config.cwd, PI_PROJECT_PROCESS_ARGS, config.tools),
         prompt: (input) =>
           Effect.gen(function* () {
             const session = yield* getSession(input.sessionId);
@@ -521,15 +534,23 @@ export const makePiProcessWithDependencies = <R>(
                   const before = yield* Ref.get(session.turnState);
                   if (before._tag === "Idle") yield* drainQueue(session.chunks);
 
+                  // Stock Pi before 0.99 omits `data`. 0.99 returns `{ disposition }`.
+                  // pie-pi-process still returns `{ started }`.
                   const admission = yield* restore(
-                    session.transport.command<{ readonly started: boolean }>({
+                    session.transport.command<
+                      { readonly started?: boolean; readonly disposition?: string } | undefined
+                    >({
                       type: "prompt",
                       message: input.text,
                       streamingBehavior: input.delivery ?? "followUp",
                     }),
                   );
+                  const started =
+                    admission == null
+                      ? true
+                      : (admission.started ?? admission.disposition === "started");
 
-                  if (!admission.started) {
+                  if (!started) {
                     const active = yield* Ref.get(session.turnState);
                     if (active._tag === "Active") {
                       return {
@@ -538,11 +559,17 @@ export const makePiProcessWithDependencies = <R>(
                         output: Stream.empty,
                       };
                     }
-                    return yield* new AgentOperationError({
-                      sessionId: input.sessionId,
-                      operation: "prompt-admission-state",
-                      cause: new Error("Pi queued a prompt without an active server turn"),
-                    });
+                    // Extension command already ran. No model turn follows.
+                    if (admission?.disposition === "handled") {
+                      return {
+                        turnId: uuid(),
+                        started: false,
+                        output: Stream.empty,
+                      };
+                    }
+                    // Pi queued this prompt while we have no turn (its run
+                    // outlived the finish we already consumed). Attach and
+                    // stream that run instead of failing the RPC.
                   }
 
                   const previous = yield* Ref.get(session.turnState);
@@ -694,17 +721,26 @@ export const makePiProcessWithDependencies = <R>(
 
 export const makePiProcess = (
   options: PiProcessOptions = {},
-): Effect.Effect<PiProcess, never, ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
+): Effect.Effect<
+  PiProcess,
+  never,
+  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Crypto.Crypto | Scope.Scope
+> =>
   makePiProcessWithDependencies({
     onSpawn: options.onSpawn,
     onExit: options.onExit,
-    makeTransport: (config) => {
-      const args = [...(options.args ?? []), ...(config.args ?? [])];
-      return makePiTransport({
-        ...(options.executable ? { executable: options.executable } : undefined),
-        sessionId: config.sessionId,
-        ...(config.cwd ? { cwd: config.cwd } : undefined),
-        ...(args.length > 0 ? { args } : undefined),
-      });
-    },
+    makeTransport: (config) =>
+      Effect.gen(function* () {
+        const bridge = config.tools ? yield* makePiSessionToolsBridge(config.tools) : undefined;
+        const args = [...(options.args ?? []), ...(config.args ?? []), ...(bridge?.args ?? [])];
+        const transport = yield* makePiTransport({
+          ...(bridge ? { env: bridge.env } : undefined),
+          ...(options.executable ? { executable: options.executable } : undefined),
+          sessionId: config.sessionId,
+          ...(config.cwd ? { cwd: config.cwd } : undefined),
+          ...(args.length > 0 ? { args } : undefined),
+        });
+        if (bridge) yield* bridge.ready.pipe(Effect.raceFirst(transport.awaitTermination));
+        return transport;
+      }),
   });

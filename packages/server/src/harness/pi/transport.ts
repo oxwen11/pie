@@ -24,6 +24,8 @@ export interface PiTransportOptions {
   /** Passed as `--session-id` — pi loads the session, creating it if missing. */
   readonly sessionId?: string;
   readonly args?: ReadonlyArray<string>;
+  /** Overlay on the child env. Does not drop `PATH`. */
+  readonly env?: Readonly<Record<string, string | undefined>>;
   readonly queueCapacity?: number;
   readonly forceKillAfter?: Duration.Input;
 }
@@ -94,8 +96,16 @@ export const makePiTransport = (
           ],
           {
             ...(options.cwd ? { cwd: options.cwd } : undefined),
-            ...(fffEnv === undefined ? undefined : { env: fffEnv, extendEnv: true }),
             forceKillAfter: options.forceKillAfter ?? DEFAULT_FORCE_KILL_AFTER,
+            // Never inherit daemon-wide authority or stale bridge credentials.
+            env: {
+              ...process.env,
+              ...fffEnv,
+              PIE_AUTH_TOKEN: undefined,
+              PIE_SESSION_BRIDGE_URL: undefined,
+              PIE_SESSION_BRIDGE_TOKEN: undefined,
+              ...options.env,
+            },
           },
         ),
       )
