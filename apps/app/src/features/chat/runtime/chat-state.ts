@@ -26,6 +26,9 @@ export type ChatStoreState = {
   retryNotice?: string;
   pendingRequests: AgentRequest[];
   pendingPrompt: SessionPendingPrompt;
+  // Texts of steer bubbles this client just inserted. Queue rows hide only
+  // these, and only while the bubble is still in the transcript.
+  optimisticSteerTexts: readonly string[];
   historyStatus: HistoryStatus;
 };
 
@@ -50,6 +53,7 @@ export class ChatState implements AiChatStateSlice {
       retryNotice: undefined,
       pendingRequests: [],
       pendingPrompt: emptyPendingPrompt,
+      optimisticSteerTexts: [],
       historyStatus: "loading",
     }));
   }

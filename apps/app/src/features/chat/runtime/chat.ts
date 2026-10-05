@@ -250,7 +250,7 @@ export class Chat {
         // left behind here could never be answered.
         this.#state.clearPendingRequests();
         this.#state.clearPendingPrompt();
-        this.#optimisticSteers = [];
+        this.#setOptimisticSteers([]);
         break;
     }
     // Status is copied off the event (the runtime stamps its post-event
@@ -286,7 +286,7 @@ export class Chat {
     this.#state.historyStatus = "settled";
     this.#state.clearPendingRequests();
     this.#state.clearPendingPrompt();
-    this.#optimisticSteers = [];
+    this.#setOptimisticSteers([]);
     this.#state.retryNotice = undefined;
     this.#state.error = new Error(
       reason === "session_deleted" ? "Session deleted" : "Session closed",
@@ -329,6 +329,7 @@ export class Chat {
       // floor is still wanted.
       if (history !== null && history.length > 0 && this.#state.messages.length === 0) {
         this.#state.messages = Array.from(history);
+        this.#dropStaleSteers();
       }
       // An empty read is still a floor: the session simply has nothing settled
       // yet. Only the absent capability (null) leaves the transcript unfounded.
@@ -521,13 +522,33 @@ export class Chat {
     return true;
   }
 
+  #setOptimisticSteers(next: Array<{ id: string; text: string }>): void {
+    this.#optimisticSteers = next;
+    this.#state.store.setState({ optimisticSteerTexts: next.map((item) => item.text) });
+  }
+
+  // A reconcile or interrupt can replace the transcript and drop the bubble.
+  // The claim must go with it, or a later echo with the same text is swallowed.
+  #dropStaleSteers(): void {
+    if (this.#optimisticSteers.length === 0) return;
+    const ids = new Set(this.#state.messages.map((message) => message.id));
+    const next = this.#optimisticSteers.filter((item) => ids.has(item.id));
+    if (next.length !== this.#optimisticSteers.length) this.#setOptimisticSteers(next);
+  }
+
   #claimSteeredEcho(messageId: string, parts: ReadonlyArray<PromptPart>): boolean {
+    this.#dropStaleSteers();
     const text = promptText(parts);
     const index = this.#optimisticSteers.findIndex((item) => item.text === text);
     if (index === -1) return false;
     const claimed = this.#optimisticSteers[index];
-    if (claimed === undefined) return false;
-    this.#optimisticSteers.splice(index, 1);
+    if (
+      claimed === undefined ||
+      !this.#state.messages.some((message) => message.id === claimed.id)
+    ) {
+      return false;
+    }
+    this.#setOptimisticSteers(this.#optimisticSteers.filter((item) => item.id !== claimed.id));
     this.#state.messages = this.#state.messages.map((message) =>
       message.id === claimed.id ? { ...message, id: messageId } : message,
     );
@@ -574,6 +595,7 @@ export class Chat {
       if (this.#state.status === "streaming" || this.#state.status === "submitted") return;
       if (this.#turnFolds.size > 0) return;
       this.#state.messages = Array.from(history);
+      this.#dropStaleSteers();
       this.#needsReconcile = false;
     } catch (reconcileError) {
       console.error("Failed to reconcile session history", reconcileError);
@@ -709,15 +731,15 @@ export class Chat {
     if (text === undefined) return;
     const messageId = generateId();
     this.#state.pushMessage(toUserMessage(messageId, [{ type: "text", text }]));
-    this.#optimisticSteers.push({ id: messageId, text });
+    this.#setOptimisticSteers([...this.#optimisticSteers, { id: messageId, text }]);
     try {
       await this.replaceQueue({
         steering: [...pending.steering, text],
         followUp: pending.followUp.filter((_, itemIndex) => itemIndex !== index),
       });
     } catch (steerError) {
-      this.#optimisticSteers = this.#optimisticSteers.filter((item) => item.id !== messageId);
       this.#state.messages = this.#state.messages.filter((message) => message.id !== messageId);
+      this.#dropStaleSteers();
       throw steerError;
     }
   };

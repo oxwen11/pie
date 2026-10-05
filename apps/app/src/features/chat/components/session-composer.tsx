@@ -44,19 +44,13 @@ export function SessionComposer({
   const { interrupt, replaceQueue, steerFollowUp, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
-  const messages = useStore(store, (s) => s.messages);
+  const optimisticSteerTexts = useStore(store, (s) => s.optimisticSteerTexts);
   const canInterrupt = status === "streaming";
   const turnInProgress = status === "submitted" || status === "streaming";
-  // A steer already in the transcript should not also sit in the queue.
-  const shownUserText = new Set(
-    messages.flatMap((message) =>
-      message.role === "user"
-        ? message.parts.flatMap((part) => (part.type === "text" ? [part.text] : []))
-        : [],
-    ),
-  );
+  // Hide only the bubble this client just inserted, not every earlier user line
+  // with the same text.
   const visiblePending = {
-    steering: pendingPrompt.steering.filter((text) => !shownUserText.has(text)),
+    steering: pendingPrompt.steering.filter((text) => !optimisticSteerTexts.includes(text)),
     followUp: pendingPrompt.followUp,
   };
   const hasQueued = visiblePending.steering.length > 0 || visiblePending.followUp.length > 0;
