@@ -1,5 +1,5 @@
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index 045ddb2aaa9dc0b2f1dc9c4cd81e4278a08131d2..da92b3d93de07227423220d8b66de2c76307f4b4 100644
+index 9f9bd7370e5ecc288de58d20e81b2a0aadb6ea4b..a8182623f7fc65fc859806a1a007900862f36bfe 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -1,3 +1,5 @@
@@ -290,18 +290,18 @@ index 7c40360ce63bc65d8eff063379bfce8646e9389b..a445a5f73bd4f129faaddc6db761c3e9
 +export function supportsLanguage(_name) { return false; }
 diff --git a/examples/extensions/custom-provider-anthropic/package-lock.json b/examples/extensions/custom-provider-anthropic/package-lock.json
 deleted file mode 100644
-index 0f04a4b6e990ec2354e48dd096522edbe95fe8bf..0000000000000000000000000000000000000000
+index bd05ded4a4e3fa90b71cd5167e46fba1060c1822..0000000000000000000000000000000000000000
 diff --git a/examples/extensions/gondolin/package-lock.json b/examples/extensions/gondolin/package-lock.json
 deleted file mode 100644
-index 8ccf39f0447d6635656ae041d9cffc842f7099cb..0000000000000000000000000000000000000000
+index cd411a5c669fa5020451ee5df7abea0fdf92b903..0000000000000000000000000000000000000000
 diff --git a/examples/extensions/sandbox/package-lock.json b/examples/extensions/sandbox/package-lock.json
 deleted file mode 100644
-index b701a1ba670ce5ea05dfcd5c5e7566ba7f703810..0000000000000000000000000000000000000000
+index 8966a1ac64e89bbf59340c3eab342432926f5886..0000000000000000000000000000000000000000
 diff --git a/examples/extensions/with-deps/package-lock.json b/examples/extensions/with-deps/package-lock.json
 deleted file mode 100644
-index 2b01794b0f89bcebf1d6bf38cbf356d65b8fe6b9..0000000000000000000000000000000000000000
+index dff4bb95909145d4d7677322458af92b48f39371..0000000000000000000000000000000000000000
 diff --git a/package.json b/package.json
-index 22b6fdcb43e81f4eb7f782c44e4d659293dcb544..c5012a27d2bebc9358970b0cabf7c270eefefbd6 100644
+index 90f4c62dcd7e5ce51134f5da9f69937eba7da02d..01ece5041cc8017d99562f279054e908d7bdae6f 100644
 --- a/package.json
 +++ b/package.json
 @@ -16,6 +16,14 @@
