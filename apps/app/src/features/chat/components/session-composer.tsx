@@ -1,8 +1,9 @@
 import { PromptInputButton, PromptInputSubmit } from "@getpie/ui/ai-elements/prompt-input";
 import { CardFrameFooter, CardFrameHeader } from "@getpie/ui/components/card";
+import { cn } from "@getpie/ui/lib/utils";
 import { useQuery } from "@tanstack/react-query";
 import { GitBranchIcon, SquareIcon } from "lucide-react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type PropsWithChildren, type ReactNode } from "react";
 import { useStore } from "zustand";
 
 import { useChatHandle } from "@/features/chat/runtime/use-chat-handle";
@@ -12,6 +13,7 @@ import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import { ChatComposerFrame } from "./chat-composer-frame";
 import { ChatInputQueue } from "./chat-input-queue";
+import { omitEchoedFollowUps } from "./chat-input-queue-model";
 import { useChatSession } from "./chat-session-context";
 import { useChatComposerController } from "./input/use-chat-composer-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
@@ -19,15 +21,18 @@ import { useChatInputMultiline } from "./input/use-chat-input-multiline";
 
 // Live-session input bar. Stop and Send are mutually exclusive: empty streaming
 // → Stop; any draft (or idle) → Send (queues a follow-up while a turn is in
-// flight). prompt comes from ChatSessionProvider. The header lists queued
+// flight). Empty Enter steers the first follow-up. The header lists queued
 // prompts; the footer shows the workspace's git availability and branch.
 export function SessionComposer({
+  children,
+  className,
   sessionRef,
   toolbar,
-}: {
+}: PropsWithChildren<{
+  className?: string;
   sessionRef: EnvironmentSessionRef;
   toolbar?: ReactNode;
-}) {
+}>) {
   const orpcQueryUtils = useEnvironmentOrpc();
   const branch = useQuery(
     orpcQueryUtils.git.branch.queryOptions({ input: { ref: sessionRef.ref } }),
@@ -36,11 +41,12 @@ export function SessionComposer({
     branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
   const chat = useChatHandle(sessionRef);
-  const { prompt, interrupt, replaceQueue, steerFollowUp, store } = useChatSession();
+  const { interrupt, replaceQueue, steerFollowUp, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
   const messages = useStore(store, (s) => s.messages);
   const canInterrupt = status === "streaming";
+  const turnInProgress = status === "submitted" || status === "streaming";
   // A steer already in the transcript should not also sit in the queue.
   const shownUserText = new Set(
     messages.flatMap((message) =>
@@ -55,6 +61,28 @@ export function SessionComposer({
   };
   const hasQueued = visiblePending.steering.length > 0 || visiblePending.followUp.length > 0;
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
+  const turnInProgressRef = useLatestRef(turnInProgress);
+  const pendingRef = useLatestRef(pendingPrompt);
+  // Follow-ups whose queue echo has not landed. Empty Enter before that echo
+  // waits and steers the first follow-up when it does.
+  const inflightFollowUps = useRef<string[]>([]);
+  const steerOnEcho = useRef(false);
+
+  useEffect(() => {
+    if (!turnInProgress) {
+      inflightFollowUps.current = [];
+      steerOnEcho.current = false;
+      return;
+    }
+    inflightFollowUps.current = omitEchoedFollowUps(inflightFollowUps.current, pendingPrompt);
+    if (pendingPrompt.followUp.length === 0) {
+      if (inflightFollowUps.current.length === 0) steerOnEcho.current = false;
+      return;
+    }
+    if (!steerOnEcho.current) return;
+    steerOnEcho.current = false;
+    steerFollowUp(0);
+  }, [turnInProgress, pendingPrompt, steerFollowUp]);
 
   const controller = useChatComposerController({
     initialContent: chat.composerDraft,
@@ -65,9 +93,31 @@ export function SessionComposer({
       // Missing workspace: don't send, don't clear. A running turn still
       // accepts the send as a follow-up.
       if (workspaceUnavailableRef.current) return false;
-      prompt(text, canInterrupt ? "followUp" : undefined);
+      const busy = turnInProgressRef.current;
+      if (busy) inflightFollowUps.current.push(text);
+      void chat.prompt(text, busy ? "followUp" : undefined).catch((error: unknown) => {
+        if (busy) {
+          const index = inflightFollowUps.current.lastIndexOf(text);
+          if (index !== -1) inflightFollowUps.current.splice(index, 1);
+          if (inflightFollowUps.current.length === 0 && pendingRef.current.followUp.length === 0) {
+            steerOnEcho.current = false;
+          }
+        }
+        console.error("Failed to prompt", error);
+      });
       chat.setComposerDraft(undefined);
       return undefined;
+    },
+    onEmptySubmit: () => {
+      if (!turnInProgressRef.current) return;
+      const pending = pendingRef.current;
+      if (pending.followUp.length > 0) {
+        steerOnEcho.current = false;
+        steerFollowUp(0);
+        return;
+      }
+      inflightFollowUps.current = omitEchoedFollowUps(inflightFollowUps.current, pending);
+      if (inflightFollowUps.current.length > 0) steerOnEcho.current = true;
     },
   });
 
@@ -76,7 +126,7 @@ export function SessionComposer({
 
   return (
     <ChatComposerFrame
-      className="mt-2 mb-4 shrink-0"
+      className={cn("mt-2 mb-4", className)}
       controller={controller}
       footer={
         <CardFrameFooter className="px-3 py-2">
@@ -109,7 +159,9 @@ export function SessionComposer({
         />
       }
       toolbar={toolbar}
-    />
+    >
+      {children}
+    </ChatComposerFrame>
   );
 }
 

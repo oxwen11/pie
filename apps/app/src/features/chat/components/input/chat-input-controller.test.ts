@@ -11,6 +11,30 @@ const makeController = () =>
   });
 
 describe("ChatInputController", () => {
+  it("calls onEmptySubmit instead of onSubmit when there is nothing to send", async () => {
+    const onSubmit = vi.fn<(text: string) => void>();
+    const onEmptySubmit = vi.fn<() => void>();
+    const controller = new ChatInputController({
+      extensions: () => createChatBaseExtensions(),
+      onSubmit,
+      onEmptySubmit,
+    });
+
+    await controller.submit();
+    controller.editor.commands.setContent("<p>   </p>");
+    await controller.submit();
+
+    expect(onEmptySubmit).toHaveBeenCalledTimes(2);
+    expect(onSubmit).not.toHaveBeenCalled();
+
+    controller.editor.commands.setContent("<p>hi</p>");
+    await controller.submit();
+    expect(onSubmit).toHaveBeenCalledWith("hi");
+    expect(onEmptySubmit).toHaveBeenCalledTimes(2);
+
+    controller.dispose();
+  });
+
   it("reports content on the same threshold submit() uses", () => {
     const controller = makeController();
 

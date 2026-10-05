@@ -11,10 +11,12 @@
   failure, security risk, compatibility cost, unmet requirement, or tool constraint.
 - Check that tests assert changed behavior and that [acceptance](acceptance.md)
   covers the identified risks. Missing evidence is not proof of correctness.
+  The author of the reviewed version cannot supply its independent review.
+  A blocked or unexecuted check is a gap, not a pass.
 - Keep public interfaces focused and remove unused wrappers left by this change.
   Cite automated diagnostics rather than copying lint rules into the review.
   Discuss a bad rule instead of suppressing checks just to pass.
 
 For a request to review **and merge**, first follow
-[review-and-merge-pr.md](review-and-merge-pr.md), including its CI-first ordering
+[pull-requests.md](pull-requests.md), including its CI-first ordering
 and authorized scope. This guide does not grant merge permission.

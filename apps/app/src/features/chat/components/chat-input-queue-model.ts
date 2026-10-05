@@ -25,6 +25,24 @@ export function removeQueuedItem(
   return { ...pending, [kind]: items.filter((_, itemIndex) => itemIndex !== index) };
 }
 
+/** Drop in-flight follow-ups the server has already echoed into `pending`. */
+export function omitEchoedFollowUps(
+  inflight: readonly string[],
+  pending: SessionPendingPrompt,
+): string[] {
+  const counts = new Map<string, number>();
+  for (const text of [...pending.steering, ...pending.followUp]) {
+    counts.set(text, (counts.get(text) ?? 0) + 1);
+  }
+  const rest: string[] = [];
+  for (const text of inflight) {
+    const seen = counts.get(text) ?? 0;
+    if (seen > 0) counts.set(text, seen - 1);
+    else rest.push(text);
+  }
+  return rest;
+}
+
 export function promoteQueuedFollowUp(
   pending: SessionPendingPrompt,
   index: number,

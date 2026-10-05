@@ -19,6 +19,7 @@ import {
 } from "../errors";
 import { drainQueue, streamFromQueueOne } from "../queue-stream";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
+import { PI_PROJECT_PROCESS_ARGS } from "./project-resource-policy";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
 import type { PiExecutable } from "./resolve-executable";
@@ -33,7 +34,6 @@ import { makePiTransport, type PiTransport, type PiTransportFailure } from "./tr
 
 const SESSION_QUEUE_CAPACITY = 1024;
 const HANDSHAKE_TIMEOUT = "30 seconds";
-
 type PendingRequest = {
   readonly deferred: Deferred.Deferred<unknown>;
   readonly declineValue: unknown;
@@ -512,13 +512,19 @@ export const makePiProcessWithDependencies = <R>(
     return {
       session: {
         create: (config) => {
-          const spawnArgs =
+          const modelArgs =
             config.provider && config.modelId
               ? ["--provider", config.provider, "--model", config.modelId]
-              : undefined;
-          return openSession(uuid(), config.cwd, spawnArgs, config.tools);
+              : [];
+          return openSession(
+            uuid(),
+            config.cwd,
+            [...modelArgs, ...PI_PROJECT_PROCESS_ARGS],
+            config.tools,
+          );
         },
-        resume: (config) => openSession(config.sessionId, config.cwd, undefined, config.tools),
+        resume: (config) =>
+          openSession(config.sessionId, config.cwd, PI_PROJECT_PROCESS_ARGS, config.tools),
         prompt: (input) =>
           Effect.gen(function* () {
             const session = yield* getSession(input.sessionId);
@@ -528,16 +534,23 @@ export const makePiProcessWithDependencies = <R>(
                   const before = yield* Ref.get(session.turnState);
                   if (before._tag === "Idle") yield* drainQueue(session.chunks);
 
-                  // Stock pi CLI omits `data`; pie-pi-process returns `{ started }`.
-                  const admission = (yield* restore(
-                    session.transport.command<{ readonly started: boolean } | undefined>({
+                  // Stock Pi before 0.99 omits `data`. 0.99 returns `{ disposition }`.
+                  // pie-pi-process still returns `{ started }`.
+                  const admission = yield* restore(
+                    session.transport.command<
+                      { readonly started?: boolean; readonly disposition?: string } | undefined
+                    >({
                       type: "prompt",
                       message: input.text,
                       streamingBehavior: input.delivery ?? "followUp",
                     }),
-                  )) ?? { started: true };
+                  );
+                  const started =
+                    admission == null
+                      ? true
+                      : (admission.started ?? admission.disposition === "started");
 
-                  if (!admission.started) {
+                  if (!started) {
                     const active = yield* Ref.get(session.turnState);
                     if (active._tag === "Active") {
                       return {
@@ -546,11 +559,17 @@ export const makePiProcessWithDependencies = <R>(
                         output: Stream.empty,
                       };
                     }
-                    return yield* new AgentOperationError({
-                      sessionId: input.sessionId,
-                      operation: "prompt-admission-state",
-                      cause: new Error("Pi queued a prompt without an active server turn"),
-                    });
+                    // Extension command already ran. No model turn follows.
+                    if (admission?.disposition === "handled") {
+                      return {
+                        turnId: uuid(),
+                        started: false,
+                        output: Stream.empty,
+                      };
+                    }
+                    // Pi queued this prompt while we have no turn (its run
+                    // outlived the finish we already consumed). Attach and
+                    // stream that run instead of failing the RPC.
                   }
 
                   const previous = yield* Ref.get(session.turnState);
