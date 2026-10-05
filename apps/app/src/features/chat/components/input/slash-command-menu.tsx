@@ -10,6 +10,7 @@ import { BoxIcon, FileTextIcon, TerminalIcon } from "lucide-react";
 import { Fragment, useEffect, useId } from "react";
 
 import { useLatestRef } from "@/hooks/use-latest-ref";
+import { HighlightedMatch } from "@/lib/highlighted-match";
 
 import {
   allowSlashCommandSuggestion,
@@ -124,11 +125,19 @@ function SlashCommandPopup({
                     <Icon className="size-3.5 shrink-0" aria-hidden />
                     <span className="flex min-w-0 flex-1 items-center gap-2">
                       <span className="max-w-[60%] shrink-0 truncate">
-                        {slashCommandLabel(item.command)}
+                        <HighlightedMatch
+                          text={slashCommandLabel(item.command)}
+                          ranges={item.match?.field === "name" ? item.match.ranges : undefined}
+                        />
                       </span>
                       {item.description ? (
                         <span className="text-muted-foreground ms-auto min-w-0 flex-1 truncate">
-                          {item.description}
+                          <HighlightedMatch
+                            text={item.description}
+                            ranges={
+                              item.match?.field === "description" ? item.match.ranges : undefined
+                            }
+                          />
                         </span>
                       ) : null}
                     </span>
