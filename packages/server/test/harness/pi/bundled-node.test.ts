@@ -18,6 +18,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("bundled Pi host module
       const piProcess = yield* fs.readFileString(piProcessBundle);
 
       // tsdown folds PI_BUNDLED_NODE so the embedded-module branch is always selected.
+      // codeSplitting is off, so the fold stays in server.js instead of a sibling chunk.
       assert.match(server, /usesEmbeddedModules = [^;]+ \|\| true/);
       assert.match(server, /virtualModules: await getVirtualModules\(\)/);
       assert.match(server, /tryNative: false/);

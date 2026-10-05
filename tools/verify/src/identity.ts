@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { findRepoRoot } from "./runtime/process.ts";
+import { envPort, findRepoRoot } from "./runtime/process.ts";
 
 export type SurfaceId = "web" | "cli" | "desktop";
 
@@ -69,13 +69,13 @@ export const WEB: WebIdentity = {
   foreignPorts: [4180, 4190],
   forbiddenPiePorts: { 4000: WEB_4000 },
   takenHint:
-    "Vite is pinned to 4190 (strict). Two web instances cannot share it.\n  Do not drive a foreign pie / Vite — refuse rather than hijack.",
+    "Choose distinct PIE_PORT and PIE_VITE_PORT values for each verification root.\n  Do not drive a foreign pie / Vite — refuse rather than hijack.",
   warnTaken: [],
   pidFiles: ["pids/server.pid", "pids/vite.pid"],
   build: "core",
   allowServe: false,
   needsDisplay: false,
-  vitePort: VITE_PORT,
+  vitePort: envPort("PIE_VITE_PORT", VITE_PORT),
   sample: {
     name: "verify-pie-sample",
     marker: ".verify-pie-scaffold",

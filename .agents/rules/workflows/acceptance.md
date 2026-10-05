@@ -32,9 +32,13 @@ The [web dev recipe](../../skills/verify/SKILL.md) covers the two-process local 
   state, not only a final frame. Tests, snapshots, or prose do not replace either.
 - Non-UI server, contract, CLI, storage, and tooling proof uses command results,
   logs, or `evidence side-effects`. CLI verification has no browser requirement.
-- Do not present mocked or manually edited state as runtime proof. Verify's
+- Do not present mocked or manually edited state as runtime proof. A check that
+  did not execute, including a sandbox or socket failure, is a gap. Verify's
   run-local sample Project is approved except for Import project: launch with
   `--replace --empty-projects` and drive the real import flow.
+- Public screenshots and video show the relevant UI only. Crop or redact local
+  paths, identifiers, credentials, daemon records, and unrelated diagnostics
+  before upload. Before/after frames are that drive, not a simulated older baseline.
 
 ## Capture and delivery
 

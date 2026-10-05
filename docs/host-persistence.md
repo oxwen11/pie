@@ -137,7 +137,7 @@ same `projects.json` write as import).
 | Retention     | Removing a Project still does not delete the folder. There is no uninstall cleanup of `~/Pie`                                                                                                           |
 
 Tests use `layerPaths(home)` so the chat root sits under the temp `$PIE_HOME`.
-Verify sets `HOME` under the run so `~/Pie` resolves inside that run.
+Verify sets `PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie` and leaves `HOME` unchanged.
 
 ### Session metadata
 
@@ -425,6 +425,37 @@ the whole run; it no longer probes the operator's home for a same-named legacy
 sample. Interrupted runs are retained with the rest of `$PIE_HOME` until normal
 Verify cleanup. Uninstall behavior is unchanged.
 
+## Parallel Verify ownership
+
+Parallel tasks use separate worktrees and the existing caller-selected roots:
+`VERIFY_PIE_ROOT` (Web), `VERIFY_PIE_CLI_ROOT`, or `VERIFY_PIE_DESKTOP_ROOT`.
+Each keeps the existing `<root>/runs/<run-id>/` layout, run-local `pie-home`,
+`meta.json`, logs, PID files, browser configuration and `<root>/current` pointer.
+Defaults, data formats, umask permissions, sensitivity and evidence retention
+are unchanged. No new registry, lock file, schema or migration is added.
+
+Web can bind a distinct explicit Vite port using `PIE_VITE_PORT`, forwarded to
+Vite's native CLI; its recorded port/app URL already exist in metadata. Each
+root's generated browser script binds that root, worktree, browser session and
+evidence directory, rather than resolving another task's ambient current run.
+Launch reuse/replacement and cleanup reject foreign roots/worktrees/surfaces
+or corrupt metadata. Explicit cleanup targets that run and cannot fall back to
+another current run. Canonical-path checks account for filesystem aliases and
+reject symlinks escaping the root. Run data is removed; evidence remains.
+
+One owner still serializes lifecycle commands per root and builds per worktree.
+There is no concurrent same-root launch protocol. Older versions can read the
+unchanged files but do not provide these binding/cleanup guarantees; finish the
+owned runs before downgrading the helper. Failed/corrupt runs are not silently
+adopted or reset and may require owner diagnosis. `HOME` and Pi configuration
+remain shared: normal inference can use existing credentials, but auth/settings/
+package mutations require separate authorization and serialization. In particular,
+`persistDefaultPiModel` writes the shared Pi default when creating a Session with
+an explicit model or changing its model. Those operations must be serial even
+when their `PIE_HOME` values differ; subsequent turns can run in parallel. Verify
+does not suppress that existing product behavior or promise settings isolation.
+No new uninstall or Pi-transcript deletion behavior is introduced.
+
 ## Development Electron installation
 
 Desktop `dev` and `preview` (including `pie-verify desktop launch`) invoke
@@ -467,7 +498,7 @@ managed socket trees with the run; no migration or separate uninstall is added.
 
 ## Verify automatic browser recording
 
-Web and Desktop Verify pin agent-browser 0.37.1. The run's shim starts recording
+Web and Desktop Verify pin agent-browser 0.38.1. The run's shim starts recording
 before its first browser command and retains the same take for later commands:
 
 ```text

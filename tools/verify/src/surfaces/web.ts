@@ -35,10 +35,15 @@ export const webSurface: Surface = {
 
 async function startWeb(ctx: LaunchCtx): Promise<void> {
   const web = expectLaunch(ctx, "web");
-  const server = spawnLogged("pnpm", ["dev"], path.join(web.runDir, "logs/server.log"), {
-    cwd: path.join(web.repo, "packages/pie"),
-    env: web.env,
-  });
+  const server = spawnLogged(
+    "pnpm",
+    ["dev", "--port", String(web.piePort)],
+    path.join(web.runDir, "logs/server.log"),
+    {
+      cwd: path.join(web.repo, "packages/pie"),
+      env: web.env,
+    },
+  );
   if (server.pid === undefined) {
     throw new Error("failed to spawn pie serve");
   }
@@ -52,10 +57,15 @@ async function startWeb(ctx: LaunchCtx): Promise<void> {
     );
   }
 
-  const vite = spawnLogged("pnpm", ["dev"], path.join(web.runDir, "logs/vite.log"), {
-    cwd: path.join(web.repo, "apps/app"),
-    env: { ...process.env, PIE_PORT: String(web.piePort) },
-  });
+  const vite = spawnLogged(
+    "pnpm",
+    ["dev", "--port", String(web.vitePort)],
+    path.join(web.runDir, "logs/vite.log"),
+    {
+      cwd: path.join(web.repo, "apps/app"),
+      env: web.env,
+    },
+  );
   if (vite.pid === undefined) {
     throw new Error("failed to spawn vite");
   }
@@ -72,7 +82,7 @@ async function startWeb(ctx: LaunchCtx): Promise<void> {
   console.log(`  sample  ${web.sample.path}`);
   console.log(`  logs    ${path.join(web.runDir, "logs")}`);
   console.log(`  doctor  ${WEB.bin} doctor`);
-  for (const line of driveHintLines(WEB)) {
+  for (const line of driveHintLines({ ...WEB, vitePort: web.vitePort })) {
     console.log(line);
   }
 }
@@ -126,7 +136,7 @@ async function inspectWeb(runDir: string, meta: RunMeta): Promise<ProbeOk> {
       `  vite    pid ${vitePid}`,
       `  node    v${process.versions.node}`,
       "  ticket  /api/ws-ticket 200",
-      ...driveHintLines(WEB),
+      ...driveHintLines({ ...WEB, vitePort: web.vitePort }),
       warn,
     ],
   };

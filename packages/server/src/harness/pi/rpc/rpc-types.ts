@@ -1,5 +1,5 @@
 /**
- * Vendored from @earendil-works/pi-coding-agent v0.87.1
+ * Vendored from @earendil-works/pi-coding-agent v0.99.1
  * (`packages/coding-agent/src/modes/rpc/rpc-types.ts`).
  * Pie owns this command table.
  */
@@ -144,7 +144,7 @@ export type RpcResponse =
       type: "response";
       command: "prompt";
       success: true;
-      data: { started: boolean };
+      data: { started: boolean; disposition?: "started" | "queued" | "handled" };
     }
   | { id?: string; type: "response"; command: "steer"; success: true }
   | { id?: string; type: "response"; command: "follow_up"; success: true }

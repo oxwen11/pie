@@ -2,12 +2,7 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import {
-  generateWorktreeBranchName,
-  isValidWorktreeKey,
-  repoWorktreeGroupKey,
-  worktreeDirectory,
-} from "../src/git/worktree";
+import { isValidWorktreeKey, repoWorktreeGroupKey, worktreeDirectory } from "../src/git/worktree";
 
 describe("worktree paths", () => {
   it("matches Cursor-style layout under PIE_HOME", () => {
@@ -19,10 +14,6 @@ describe("worktree paths", () => {
     expect(worktreeDirectory(worktreesDir, repoRoot, worktreeKey)).toBe(
       path.join(worktreesDir, "pie", worktreeKey),
     );
-  });
-
-  it("builds pie/ branch names from a hex suffix", () => {
-    expect(generateWorktreeBranchName("a50b231d")).toBe("pie/a50b231d");
   });
 
   it("validates worktree directory keys", () => {
