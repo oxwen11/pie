@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-20.
+Last audited: 2026-10-05.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -564,6 +564,25 @@ writes which Pie intentionally does not own:
    when no transcript is found. It writes no transcript or Pie metadata in that
    case. Concurrent lookups use Pi's recursive mkdir; empty directories have no
    migration or cleanup and remain after Pie is downgraded or uninstalled.
+
+   **Daemon cold transcript open** is a Developer-approved exception: while a
+   Pie session holds no live Pi child and none is starting, that session may
+   call `SessionManager.findById` and then `SessionManager.open` in the daemon
+   process (`packages/server/src/harness/session.ts`). Pi 0.99.1 still owns the
+   file format. `open` is not read-only. On Pi 0.99.1 it may rewrite the
+   transcript when repairing or migrating it:
+
+   | Property      | Current contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+   | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | Path          | The same Pi transcript file `findById` returns. Pie does not pass `--session-dir`. Lookup tries the canonical cwd (`realpath`) and, if that differs, the unresolved cwd. Default directory is `$PI_CODING_AGENT_DIR/sessions/--<encoded-cwd>--/` (`PI_CODING_AGENT_DIR` defaults to `~/.pi/agent`).                                                                                                                                                                                                                                   |
+   | Owner         | Pi owns the schema and the bytes. The Pie session is an approved caller of `findById` / `open` only while it does not hold a Pi child.                                                                                                                                                                                                                                                                                                                                                                                                |
+   | Trigger       | Cold `getMessages` or `getModelState` when no Pi process is held or starting. The first such read opens once; later cold reads on that Pie session reuse the in-memory `SessionManager`. `findById` still mkdir's a missing default session directory, same as copy-transcript-path, and writes no transcript if the id is absent.                                                                                                                                                                                                    |
+   | Repair writes | Only inside Pi's `open`, and only for these cases. A final parsed entry with no trailing newline is repaired by appending one `\n` (`appendFileSync`) after the header is validated. A header version below 3 (missing counts as 1) is migrated in memory and the whole file is rewritten by `_rewriteFile` (`openSync` with `"w"`, then one JSON line plus `\n` per entry). A zero-byte file is rewritten with a version-3 session header at that same path. A non-empty file that is not a Pi session throws and is left unchanged. |
+   | Atomicity     | Newline repair is one append. `_rewriteFile` truncates then rewrites; it is not temp-file plus rename. A crash during that rewrite can leave a short file.                                                                                                                                                                                                                                                                                                                                                                            |
+   | Concurrency   | One Pie session holds at most one daemon `SessionManager`. A held or still-starting Pi child is the only reader; the daemon does not `open` then. Starting or releasing the child drops the daemon handle first so the two do not both keep the file. There is no lock against another daemon or a user `pi` on the same file. A cold read that already opened may still fold its in-memory copy after the handle is dropped; it does not append.                                                                                     |
+   | Compatibility | Migrated files stay at version 3. Pie downgrade does not reverse the migration, the added newline, or a header written into a previously empty file. Older JSONL readers can still read the rewritten lines if they tolerate version 3. Further `open` side effects in a newer Pi need a new persistence decision.                                                                                                                                                                                                                    |
+   | Retention     | Pie session delete and uninstall do not remove the transcript or directories `findById` created. Permissions follow the process umask. Transcripts may contain prompts and tool output; this path does not copy them into Pie logs.                                                                                                                                                                                                                                                                                                   |
+
 2. **Workspace mutation.** Agent tools and commands may create, edit, rename, or
    delete arbitrary files under the selected project/worktree and may invoke
    other host tools with their own state. The paths and data structures are
@@ -571,8 +590,9 @@ writes which Pie intentionally does not own:
    extension runtime; Pie transports those requests and responses.
 
 Pie session deletion does not delete Pi native data or undo workspace changes.
-Any design that starts depending on Pi's physical files rather than its public
-runtime behavior requires a new Developer-approved persistence decision.
+Daemon cold transcript open, above, is the approved dependence on Pi's session
+file. Any further design that depends on Pi's physical files rather than its
+public runtime behavior requires a new Developer-approved persistence decision.
 
 ## Current retention and migration gaps
 
