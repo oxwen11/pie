@@ -28,7 +28,7 @@ export class Paths extends Context.Service<
     readonly logsDir: string;
     /** `~/Pie` — parent for `project.allocateChatProjectDir` chat folders (`type: "chat"`). */
     readonly chatProjectsDir: string;
-    /** `storage/ssh-environments.json` — Desktop and CLI saved SSH hosts. */
+    /** `storage/ssh-environments.json` — Desktop saved SSH hosts. */
     readonly sshEnvironmentsFile: string;
   }
 >()("Paths") {}

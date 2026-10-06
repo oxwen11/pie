@@ -1,5 +1,4 @@
-import path from "node:path";
-
+import { makeJsonDocument } from "@getpie/effect-json-store";
 import { resolvePieHome, sshEnvironmentsFile } from "@getpie/server/daemon";
 import {
   connectSshEnvironment,
@@ -19,17 +18,7 @@ import {
   type SshHostDiscoveryError,
   type SshTarget,
 } from "@getpie/ssh";
-import {
-  Context,
-  Data,
-  Effect,
-  FileSystem,
-  Layer,
-  Ref,
-  Scope,
-  Semaphore,
-  type PlatformError,
-} from "effect";
+import { Context, Data, Effect, FileSystem, Layer, Ref, Schema, Scope, Semaphore } from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { LoginShellEnvironment } from "../server/login-shell-environment";
@@ -79,25 +68,6 @@ type LiveSshSession = {
   readonly target: SshTarget;
   readonly environmentId: string;
   readonly connected: SshConnectedEnvironment;
-};
-
-type SavedFileData = {
-  readonly environments: ReadonlyArray<{
-    readonly id: string;
-    readonly alias: string;
-    readonly hostname: string;
-    readonly username: string | null;
-    readonly port: number | null;
-  }>;
-};
-
-type SavedFile = {
-  readonly version: 1;
-  readonly data: SavedFileData;
-};
-
-type SavedState = {
-  readonly environments: readonly SavedSshEnvironment[];
 };
 
 type SshConnection = DesktopSshConnectResult["connection"];
@@ -159,97 +129,39 @@ const fetchEnvironmentId = (connection: SshConnection): Effect.Effect<string, Ss
     });
   });
 
-function parseEnvironments(value: unknown): SavedSshEnvironment[] {
-  if (!Array.isArray(value)) return [];
-  const environments: SavedSshEnvironment[] = [];
-  for (const raw of value) {
-    const entry: unknown = raw;
-    if (typeof entry !== "object" || entry === null) continue;
-    if (!("id" in entry) || typeof entry.id !== "string" || entry.id.length === 0) continue;
-    if (!("alias" in entry) || typeof entry.alias !== "string" || entry.alias.length === 0) {
-      continue;
-    }
-    if (
-      !("hostname" in entry) ||
-      typeof entry.hostname !== "string" ||
-      entry.hostname.length === 0
-    ) {
-      continue;
-    }
-    const username = "username" in entry ? entry.username : null;
-    const port = "port" in entry ? entry.port : null;
-    if (username !== null && typeof username !== "string") continue;
-    if (port !== null && (typeof port !== "number" || !Number.isInteger(port))) continue;
-    environments.push({
-      id: entry.id,
-      target: {
-        alias: entry.alias,
-        hostname: entry.hostname,
-        username,
-        port,
-      },
-    });
-  }
-  return environments;
-}
+const SavedEnvironmentRecord = Schema.Struct({
+  id: Schema.NonEmptyString,
+  alias: Schema.NonEmptyString,
+  hostname: Schema.NonEmptyString,
+  username: Schema.NullOr(Schema.String),
+  port: Schema.NullOr(Schema.Int),
+});
+const SavedEnvironmentsSchema = Schema.Struct({
+  environments: Schema.Array(SavedEnvironmentRecord),
+});
 
-function parseSavedData(value: unknown): SavedState {
-  if (typeof value !== "object" || value === null) {
-    return { environments: [] };
-  }
-  const record = value as { environments?: unknown };
-  return { environments: parseEnvironments(record.environments) };
-}
+const toSaved = (record: typeof SavedEnvironmentRecord.Type): SavedSshEnvironment => ({
+  id: record.id,
+  target: {
+    alias: record.alias,
+    hostname: record.hostname,
+    username: record.username,
+    port: record.port,
+  },
+});
 
-function parseSavedFile(raw: string): SavedState {
-  try {
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) {
-      return { environments: [] };
-    }
-    const record = parsed as { version?: unknown; data?: unknown; environments?: unknown };
-    if (record.version !== 1) {
-      return { environments: [] };
-    }
-    if ("data" in record) return parseSavedData(record.data);
-    return parseSavedData(record);
-  } catch {
-    return { environments: [] };
-  }
-}
+const fromSaved = (entry: SavedSshEnvironment): typeof SavedEnvironmentRecord.Type => ({
+  id: entry.id,
+  alias: entry.target.alias,
+  hostname: entry.target.hostname,
+  username: entry.target.username,
+  port: entry.target.port,
+});
 
-function serializeSavedFile(state: SavedState): string {
-  const file: SavedFile = {
-    version: 1,
-    data: {
-      environments: state.environments.map((entry) => ({
-        id: entry.id,
-        alias: entry.target.alias,
-        hostname: entry.target.hostname,
-        username: entry.target.username,
-        port: entry.target.port,
-      })),
-    },
-  };
-  return `${JSON.stringify(file, null, 2)}\n`;
-}
-
-const readSaved = (filePath: string): Effect.Effect<SavedState, never, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    const raw = yield* fs.readFileString(filePath).pipe(Effect.orElseSucceed(() => ""));
-    return raw.length === 0 ? { environments: [] } : parseSavedFile(raw);
-  });
-
-const writeSaved = (
-  filePath: string,
-  state: SavedState,
-): Effect.Effect<void, PlatformError.PlatformError, FileSystem.FileSystem> =>
-  Effect.gen(function* () {
-    const fs = yield* FileSystem.FileSystem;
-    yield* fs.makeDirectory(path.dirname(filePath), { recursive: true });
-    yield* fs.writeFileString(filePath, serializeSavedFile(state));
-    yield* fs.chmod(filePath, SAVED_FILE_MODE);
+const persistError = (filePath: string, cause: unknown) =>
+  new SshPersistError({
+    message: `Failed to persist SSH environments to ${filePath}.`,
+    cause,
   });
 
 export function makeDesktopSsh(input: {
@@ -264,7 +176,7 @@ export function makeDesktopSsh(input: {
   ) => Effect.Effect<string, SshReadinessError>;
 }): Effect.Effect<
   DesktopSsh["Service"],
-  never,
+  SshPersistError,
   Scope.Scope | FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
 > {
   return Effect.gen(function* () {
@@ -273,6 +185,17 @@ export function makeDesktopSsh(input: {
       FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
     >();
     const filePath = input.persistPath;
+    const fs = yield* FileSystem.FileSystem;
+    const saved = yield* makeJsonDocument({
+      path: filePath,
+      schema: SavedEnvironmentsSchema,
+      defaults: { environments: [] },
+    }).pipe(Effect.mapError((cause) => persistError(filePath, cause)));
+    // ponytail: library write does not take a mode; pin 0600 after open and each save.
+    const pinMode = fs
+      .chmod(filePath, SAVED_FILE_MODE)
+      .pipe(Effect.mapError((cause) => persistError(filePath, cause)));
+    yield* pinMode;
     const liveRef = yield* Ref.make(new Map<string, LiveSshSession>());
     const persistGate = yield* Semaphore.make(1);
     const cli = { env: input.env };
@@ -283,23 +206,19 @@ export function makeDesktopSsh(input: {
       mutate: (environments: readonly SavedSshEnvironment[]) => readonly SavedSshEnvironment[],
     ) =>
       persistGate.withPermit(
-        Effect.gen(function* () {
-          const saved = yield* readSaved(filePath);
-          yield* writeSaved(filePath, { environments: mutate(saved.environments) }).pipe(
+        saved
+          .update((current) => ({
+            environments: mutate(current.environments.map(toSaved)).map(fromSaved),
+          }))
+          .pipe(
             Effect.tapError(() =>
               Effect.logError("ssh.environments.persist.failed").pipe(
                 Effect.annotateLogs({ path: filePath }),
               ),
             ),
-            Effect.mapError(
-              (error) =>
-                new SshPersistError({
-                  message: `Failed to persist SSH environments to ${filePath}.`,
-                  cause: error,
-                }),
-            ),
-          );
-        }).pipe(Effect.provide(platform)),
+            Effect.andThen(pinMode),
+            Effect.mapError((cause) => persistError(filePath, cause)),
+          ),
       );
 
     const resultFromLive = (live: LiveSshSession): DesktopSshConnectResult => ({
@@ -344,10 +263,7 @@ export function makeDesktopSsh(input: {
 
     return DesktopSsh.of({
       client,
-      listSaved: readSaved(filePath).pipe(
-        Effect.provide(platform),
-        Effect.map((state) => state.environments),
-      ),
+      listSaved: saved.get.pipe(Effect.map((state) => state.environments.map(toSaved))),
       connect: (raw) =>
         Effect.gen(function* () {
           const missingMessage = client.available ? undefined : client.message;
@@ -392,25 +308,22 @@ export function makeDesktopSsh(input: {
                   );
                   return resultFromLive(live);
                 }
-                yield* writeSaved(filePath, {
-                  environments: [
-                    ...(yield* readSaved(filePath)).environments.filter((entry) => entry.id !== id),
-                    { id, target },
-                  ],
-                }).pipe(
-                  Effect.tapError(() =>
-                    Effect.logError("ssh.environments.persist.failed").pipe(
-                      Effect.annotateLogs({ path: filePath }),
+                yield* saved
+                  .update((current) => ({
+                    environments: [
+                      ...current.environments.filter((entry) => entry.id !== id),
+                      fromSaved({ id, target }),
+                    ],
+                  }))
+                  .pipe(
+                    Effect.tapError(() =>
+                      Effect.logError("ssh.environments.persist.failed").pipe(
+                        Effect.annotateLogs({ path: filePath }),
+                      ),
                     ),
-                  ),
-                  Effect.mapError(
-                    (error) =>
-                      new SshPersistError({
-                        message: `Failed to persist SSH environments to ${filePath}.`,
-                        cause: error,
-                      }),
-                  ),
-                );
+                    Effect.andThen(pinMode),
+                    Effect.mapError((cause) => persistError(filePath, cause)),
+                  );
                 yield* adoptLive({ id, target, environmentId, connected });
                 yield* Effect.log("ssh.environment.connected").pipe(
                   Effect.annotateLogs({
