@@ -77,11 +77,12 @@ function TabStrip({
        * The scroller sizes to its content and shrinks — it is deliberately not
        * `flex-1`. "+" is its sibling, so it stays pinned just past the last
        * visible tab instead of scrolling off the end with them. `scrollbar-hide`
-       * because a bar here would eat the height it scrolls in.
+       * because a bar here would eat the height it scrolls in. `py-1` because
+       * overflow-x clips the y axis too, which would cut the active tab's shadow.
        */}
       <div
         ref={scroller}
-        className="scrollbar-hide flex min-w-0 items-center gap-1 overflow-x-auto"
+        className="scrollbar-hide flex min-w-0 items-center gap-1 overflow-x-auto py-1"
       >
         {panels.map((panel) => (
           <Tab key={panel.id} panel={panel} active={panel.id === activeId} session={session} />
@@ -131,10 +132,10 @@ function Tab({
       // Browser-style tabs: a fixed width that shrinks before the strip scrolls,
       // and a raised card surface for the current one.
       className={cn(
-        "group/tab flex h-8 w-60 min-w-24 shrink items-center gap-1 rounded-lg ps-2.5 pe-1.5 text-sm",
+        "group/tab flex h-8 w-60 min-w-24 shrink items-center gap-1 rounded-lg border ps-2.5 pe-1.5 text-sm",
         active
-          ? "bg-card text-foreground ring-border shadow-xs ring-1"
-          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+          ? "bg-card text-foreground shadow-xs"
+          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground border-transparent",
       )}
       // A middle click closes the tab, the way every tabbed thing does.
       onAuxClick={(event) => {
