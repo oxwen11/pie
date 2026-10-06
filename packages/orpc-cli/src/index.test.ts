@@ -4,7 +4,7 @@ import { Command, CommanderError } from "commander";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { cli, createCli, type CliJsonSchema } from "./index";
+import { cli, createCommanderCli, type CliJsonSchema } from "./index";
 
 const Create = z.object({ path: z.string().min(1) });
 const Show = z.object({
@@ -105,7 +105,7 @@ async function run(program: Command, argv: readonly string[]) {
   }
 }
 
-describe("createCli", () => {
+describe("createCommanderCli", () => {
   it("registers only cli() procedures and maps options into call input", async () => {
     let created: unknown;
     let listed = false;
@@ -118,7 +118,7 @@ describe("createCli", () => {
       },
     };
     const base = implement(contract);
-    const program = createCli({
+    const program = createCommanderCli({
       name: "pie",
       router: base.router({
         project: {
@@ -162,7 +162,7 @@ describe("createCli", () => {
       },
     };
     const base = implement(contract);
-    const program = createCli({
+    const program = createCommanderCli({
       router: base.router({
         session: {
           show: base.session.show.handler(({ input }) => {
@@ -201,7 +201,7 @@ describe("createCli", () => {
     const again = implement({
       session: { list: oc.meta(cli({})).input(List) },
     });
-    const negatedProgram = createCli({
+    const negatedProgram = createCommanderCli({
       router: again.router({
         session: {
           list: again.session.list.handler(({ input }) => {
@@ -227,7 +227,7 @@ describe("createCli", () => {
       },
     };
     const base = implement(contract);
-    const program = createCli({
+    const program = createCommanderCli({
       router: base.router({
         project: {
           create: base.project.create.handler(({ input }) => {
@@ -266,7 +266,7 @@ describe("createCli", () => {
       project: { create: oc.meta(cli({})).input(Create) },
     };
     const base = implement(contract);
-    const program = createCli({
+    const program = createCommanderCli({
       router: base.router({
         project: {
           create: base.project.create.handler(() => {
@@ -298,7 +298,7 @@ describe("createCli", () => {
       session: { create: oc.meta(cli({})).input(Worktree) },
     };
     const base = implement(contract);
-    const program = createCli({
+    const program = createCommanderCli({
       router: base.router({
         session: {
           create: base.session.create.handler(({ input }) => {
@@ -337,6 +337,6 @@ describe("createCli", () => {
       },
     });
 
-    expect(() => createCli({ program, router, toJsonSchema })).toThrow(/project create/);
+    expect(() => createCommanderCli({ program, router, toJsonSchema })).toThrow(/project create/);
   });
 });

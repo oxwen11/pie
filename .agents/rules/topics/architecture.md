@@ -12,7 +12,7 @@ Dependencies flow from app/runtime packages toward shared leaves, not back:
 | `packages/contract` | Shared wire vocabulary and Effect schemas; no runtime/app dependencies |
 | `packages/server` | Domain services, Pi runtime, RPC, HTTP/WS, daemon |
 | `packages/client` | Typed oRPC WebSocket client |
-| `packages/orpc-cli` | Opt-in Commander CLI over an implemented oRPC router. Not the product `pie` CLI. |
+| `packages/orpc-cli` | Opt-in oRPC CLI metadata, with Commander and Effect CLI adapters. Not the product `pie` CLI. |
 | `packages/ui` | Shared UI; import through package subpaths |
 | `packages/ssh` | SSH launch and loopback tunnels; no Electron, renderer, or oRPC |
 | `packages/tailscale` | Discovery/Serve integration; no Electron, renderer, or oRPC; never log CLI stderr |

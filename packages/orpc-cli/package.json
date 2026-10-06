@@ -5,7 +5,8 @@
   "description": "Opt-in Commander CLI over an implemented oRPC router",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./effect": "./src/effect.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
@@ -16,7 +17,8 @@
   "dependencies": {
     "@orpc/contract": "catalog:orpc",
     "@orpc/server": "catalog:orpc",
-    "commander": "^14.0.3"
+    "commander": "^14.0.3",
+    "effect": "catalog:effect"
   },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",
