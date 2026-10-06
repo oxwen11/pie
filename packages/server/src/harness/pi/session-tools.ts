@@ -13,7 +13,7 @@ import {
   Schema,
   type Scope,
 } from "effect";
-import { HttpIncomingMessage, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import { HttpIncomingMessage, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { PiTransportError } from "../errors";
 import { sessionToolsExtension } from "./session-tools-extension";

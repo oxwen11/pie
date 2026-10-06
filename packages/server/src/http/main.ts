@@ -4,7 +4,7 @@ import "zod/compile";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { Effect } from "effect";
-import { Command } from "effect/unstable/cli";
+import { Command } from "effect/cli";
 
 import pkg from "../../package.json" with { type: "json" };
 import { runServe, serveFlags } from "./serve";
