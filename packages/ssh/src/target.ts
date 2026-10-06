@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+import { decodeDaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { Effect } from "effect";
 
 import { SshInvalidTargetError } from "./errors";
@@ -212,10 +213,7 @@ export function parseRemoteLaunchOutput(stdout: string): RemoteLaunchResult | un
       typeof record.hostname === "string" && record.hostname.trim().length > 0
         ? record.hostname.trim()
         : undefined;
-    const compatibilityKey =
-      typeof record.compatibilityKey === "string" && record.compatibilityKey.length > 0
-        ? record.compatibilityKey
-        : undefined;
+    const compatibilityKey = decodeDaemonCompatibilityKey(record.compatibilityKey);
     return {
       remotePort: record.remotePort,
       token: record.token,

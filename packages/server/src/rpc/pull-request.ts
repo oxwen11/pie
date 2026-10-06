@@ -45,6 +45,7 @@ const catchCurrentRead = <E extends PullRequestReadErrors>(errors: E) =>
 const resolveLinkedCwd = <
   E extends {
     SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown;
+    INTERNAL: (input: { data: { message: string } }) => unknown;
     STALE_CONTEXT: (input: { message: string }) => unknown;
   },
 >(
@@ -55,13 +56,14 @@ const resolveLinkedCwd = <
   Effect.gen(function* () {
     const sessions = yield* PiAgentSessionService;
     const projects = yield* ProjectService;
-    const links = yield* sessions
-      .pullRequestsFor(ref)
-      .pipe(
-        Effect.catch(() =>
+    const links = yield* sessions.pullRequestsFor(ref).pipe(
+      Effect.catchTags({
+        SessionNotFound: () =>
           Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
-        ),
-      );
+        StoreReadError: () =>
+          Effect.fail(errors.INTERNAL({ data: { message: "Session store could not be read" } })),
+      }),
+    );
     if (
       !links.some(
         (link) => !link.excluded && pullRequestKey(link.ref) === pullRequestKey(pullRequest),
@@ -72,9 +74,12 @@ const resolveLinkedCwd = <
       );
     return yield* projects.findById(ref.projectId).pipe(
       Effect.map((project) => project.path),
-      Effect.catch(() =>
-        Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Project is unavailable" } })),
-      ),
+      Effect.catchTags({
+        ProjectNotFound: () =>
+          Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Project is unavailable" } })),
+        StoreReadError: () =>
+          Effect.fail(errors.INTERNAL({ data: { message: "Session store could not be read" } })),
+      }),
     );
   });
 
@@ -144,7 +149,7 @@ export const pullRequestRouter = orpc.router({
           SessionNotFound: () =>
             Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
           StoreReadError: () =>
-            Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
+            Effect.fail(errors.INTERNAL({ data: { message: "Session store could not be read" } })),
           StoreWriteError: () =>
             Effect.fail(errors.STORE_WRITE_FAILED({ message: "Association could not be saved" })),
         }),
