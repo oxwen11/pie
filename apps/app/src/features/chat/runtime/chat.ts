@@ -701,6 +701,9 @@ export class Chat {
       });
       if (!receipt.started) {
         this.#state.messages = this.#state.messages.filter((message) => message.id !== messageId);
+        // No turn started for this prompt (queued into a running turn, or an
+        // extension command handled it). A running turn re-stamps the phase.
+        if (this.#state.status === "submitted") this.#setStatus("ready");
       }
     } catch (promptError) {
       this.#state.error =
