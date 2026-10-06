@@ -20,6 +20,7 @@ import { ConnectionSwitcher } from "@/features/connections/connection-switcher";
 import { ProjectList } from "@/features/projects/project-list";
 import { RecentList } from "@/features/projects/recent-list";
 import { usePlatform } from "@/platform-context";
+import { isDesktopHost } from "@/platform-host";
 
 function AppNavMenuItem({ item }: { readonly item: AppNavItem }) {
   const { icon: Icon, label, search, to } = item;
@@ -36,6 +37,7 @@ function AppNavMenuItem({ item }: { readonly item: AppNavItem }) {
 
 export function AppSidebar() {
   const platform = usePlatform();
+  const desktop = isDesktopHost(platform);
   const { isMobile } = useSidebar();
   const pageSidebar = useRouterState({
     select: ({ matches }) => hasPageSidebar(matches),
@@ -51,9 +53,13 @@ export function AppSidebar() {
       <div className="bg-card flex h-full min-h-0 w-full flex-col">
         {pageSidebar ? null : (
           <SidebarHeader className="p-0" data-drag-region="">
-            <div className="flex h-10 shrink-0 flex-row items-center gap-2 px-4">
-              <BrandMark />
-            </div>
+            {/* Desktop: the title row shows traffic lights, so the list carries
+                the mark. Web hosts it in the title row instead. */}
+            {desktop ? (
+              <div className="flex h-10 shrink-0 flex-row items-center gap-2 px-4">
+                <BrandMark />
+              </div>
+            ) : null}
             <SidebarMenu className="px-2 pb-1">
               <AppNavMenuItem item={appNav.home} />
             </SidebarMenu>

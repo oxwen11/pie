@@ -4,6 +4,7 @@ import { LazyMotion, domMax } from "motion/react";
 import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
 
 import { AppRail } from "@/components/layout/app-rail";
+import { BrandMark } from "@/components/layout/brand-mark";
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
 import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
@@ -11,7 +12,7 @@ import { ShellContentPanel } from "@/components/layout/shell-content";
 import { ShellSidebarPanel } from "@/components/layout/shell-sidebar";
 import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
 import { usePlatform } from "@/platform-context";
-import { isDesktopHost, isDesktopMacosHost } from "@/platform-host";
+import { isDesktopMacosHost } from "@/platform-host";
 
 interface AppShellContextValue {
   readonly contentPanel: {
@@ -105,32 +106,28 @@ export function AppShellBody({ children }: AppShellBodyProps) {
   );
 
   const platform = usePlatform();
-  const desktop = isDesktopHost(platform);
   const macos = isDesktopMacosHost(platform);
   return (
     <AppShellContext value={context}>
       <div className="flex min-h-0 w-full flex-1 flex-col">
-        {desktop ? (
-          <header
-            className={cn("flex shrink-0 items-center pe-4", !macos && "h-10 ps-1")}
-            data-drag-region=""
-            style={
-              macos
-                ? {
-                    height: platform.windowChrome.titlebarHeight,
-                    paddingInlineStart: platform.windowChrome.toggleInset,
-                  }
-                : undefined
-            }
-          >
-            <ShellSidebarToggle />
-            <ContentPanelToggle className="ms-auto" />
-          </header>
-        ) : (
-          <div className="pointer-events-none fixed end-5 top-1 z-50 flex h-10 items-center [-webkit-app-region:initial]">
-            <ContentPanelToggle className="pointer-events-auto [-webkit-app-region:no-drag]" />
-          </div>
-        )}
+        {/* Isomorphic title row: the leading slot is the macOS traffic lights
+            or, without them, the product mark. */}
+        <header
+          className={cn("flex shrink-0 items-center gap-2 pe-4", !macos && "h-10 ps-2")}
+          data-drag-region=""
+          style={
+            macos
+              ? {
+                  height: platform.windowChrome.titlebarHeight,
+                  paddingInlineStart: platform.windowChrome.toggleInset,
+                }
+              : undefined
+          }
+        >
+          {macos ? null : <BrandMark />}
+          <ShellSidebarToggle />
+          <ContentPanelToggle className="ms-auto" />
+        </header>
         <div className={cn("flex min-h-0 w-full flex-1 md:py-1 md:pe-1", macos && "md:pt-0")}>
           <AppRail />
           {/* One persistent border encloses the session list, main and content

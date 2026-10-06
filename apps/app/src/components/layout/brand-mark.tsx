@@ -3,7 +3,7 @@ import type { ReactElement } from "react";
 
 import pieMarkUrl from "@/assets/pie-mark.svg?url";
 
-// Product mark. The rail owns the traffic-light corner, so this can sit in the list.
+// Product mark. The shell title row owns it on hosts without traffic lights.
 export function BrandMark({ className }: { className?: string }): ReactElement {
   return (
     <div className={cn("flex h-7 items-center gap-2 select-none", className)}>
