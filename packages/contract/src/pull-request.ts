@@ -243,6 +243,7 @@ const sessionNotFound = {
 
 const currentErrors = {
   SESSION_NOT_FOUND: sessionNotFound,
+  INTERNAL: sessionNotFound,
   MISSING_GH: {},
   UNAUTHENTICATED: {},
   RATE_LIMITED: {},
@@ -262,6 +263,7 @@ const listErrors = {
 
 const actionErrors = {
   SESSION_NOT_FOUND: sessionNotFound,
+  INTERNAL: sessionNotFound,
   STALE_CONTEXT: {},
   MISSING_GH: {},
   UNAUTHENTICATED: {},

@@ -113,12 +113,16 @@ const cwdErrors = {
   SESSION_NOT_FOUND: {
     data: toStandardSchema(Schema.Struct({ message: Schema.String })),
   },
+  INTERNAL: {
+    data: toStandardSchema(Schema.Struct({ message: Schema.String })),
+  },
 };
 
 const branchErrors = {
   PATH_ESCAPE: cwdErrors.PATH_ESCAPE,
   GIT_FAILED: cwdErrors.GIT_FAILED,
   SESSION_NOT_FOUND: cwdErrors.SESSION_NOT_FOUND,
+  INTERNAL: cwdErrors.INTERNAL,
 };
 
 const reviewErrors = {
