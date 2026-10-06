@@ -13,6 +13,8 @@ export default defineConfig({
   },
   platform: "node",
   format: ["esm"],
+  // Package is `"type": "module"`; emit `.js` instead of `.mjs`.
+  fixedExtension: false,
   deps: {
     // Keep `@oxlint/plugins` and Node builtins as runtime imports so oxlint
     // and the bundled plugins share one copy of the plugin API.

@@ -6,7 +6,7 @@ import path from "node:path";
 import { createPieClient } from "@getpie/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-const cliBin = path.join(import.meta.dirname, "../../dist/cli.mjs");
+const cliBin = path.join(import.meta.dirname, "../../dist/cli.js");
 
 const FAKE = `#!/usr/bin/env node
 const bridge = process.env.PIE_SESSION_BRIDGE_URL;
@@ -86,7 +86,7 @@ describe("shipped pie serve prompt", () => {
     children.length = 0;
   });
 
-  it("listModels and pairing prompt work from dist/cli.mjs", { timeout: 30_000 }, async () => {
+  it("listModels and pairing prompt work from dist/cli.js", { timeout: 30_000 }, async () => {
     const fakeDir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-serve-"));
     const fakePi = path.join(fakeDir, "fake-pi.js");
     fs.writeFileSync(fakePi, FAKE);

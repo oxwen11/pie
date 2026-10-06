@@ -1,6 +1,7 @@
 {
   "name": "pie",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "turbo run dev",
     "watch": "turbo watch dev",

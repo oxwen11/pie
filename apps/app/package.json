@@ -53,6 +53,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
+    "@getpie/test": "workspace:*",
     "@getpie/typescript": "workspace:*",
     "@tailwindcss/vite": "catalog:tailwind",
     "@tanstack/router-plugin": "catalog:",
