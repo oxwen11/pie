@@ -8,7 +8,7 @@ import url from "node:url";
 
 import { describe, it } from "vitest";
 
-const extension = url.fileURLToPath(new URL("./fixtures/loadout-extension.mjs", import.meta.url));
+const extension = url.fileURLToPath(new URL("./fixtures/loadout-extension.js", import.meta.url));
 const cli = url.fileURLToPath(
   new URL("../../../node_modules/@earendil-works/pi-coding-agent/dist/cli.js", import.meta.url),
 );
