@@ -119,7 +119,7 @@ describe("createCommanderCli", () => {
       }),
     });
 
-    await run(program, ["session", "show", "--ref.project-id", "p1", "--ref.session-id", "s1"]);
+    await run(program, ["session", "show", "--ref", '{"projectId":"p1","sessionId":"s1"}']);
     expect(shown).toEqual({ ref: { projectId: "p1", sessionId: "s1" } });
 
     const listedResult = await run(program, [
