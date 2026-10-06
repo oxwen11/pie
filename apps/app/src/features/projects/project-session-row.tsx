@@ -31,20 +31,14 @@ export function ProjectSessionRow({
   const observe = usePullRequestRow(session, true);
 
   return (
-    <SidebarMenuItem ref={observe}>
+    <SidebarMenuItem className="flex items-center gap-1" ref={observe}>
       <SessionActionsMenu
         environmentId={environmentId}
         isActive={isActive}
         session={session}
         render={
           <SidebarMenuButton
-            // Hover-only archive must not keep the default pe-8 gap; a PR icon
-            // is a lasting action and still needs that padding.
-            className={
-              pullRequest === undefined
-                ? "md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
-                : "pe-24"
-            }
+            className="min-w-0 flex-1 md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
             isActive={active}
             onClick={() => {
               navigate({

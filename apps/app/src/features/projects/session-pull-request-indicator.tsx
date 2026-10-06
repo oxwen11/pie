@@ -84,8 +84,10 @@ export function SessionPullRequestIndicator({
   const { Icon, color, badge, href, description } = view;
   return (
     <SidebarMenuAction
-      // aspect-square would make a wide badge as tall as it is wide, below the title.
-      className="aspect-auto h-5 w-auto max-w-24 gap-1 px-1 text-xs"
+      // In-flow (static) so the row button shrinks to the badge's real width;
+      // the absolute default forced a fixed pe-24 reservation and early truncation.
+      // after:hidden — the default -inset-2 hit area would escape a static box.
+      className="static me-1 aspect-auto h-5 w-auto max-w-24 shrink-0 gap-1 px-1 text-xs after:hidden"
       render={
         <a
           aria-label={description}
