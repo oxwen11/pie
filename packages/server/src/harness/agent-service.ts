@@ -17,15 +17,7 @@ export class PiAgentService extends Context.Service<PiAgentService, PiAgentServi
 
 export const makePiAgentService = (): PiAgentServiceShape => ({
   commands: Effect.fn("PiAgentService.commands")(function* (cwd?: string) {
-    return yield* Effect.tryPromise({
-      try: () => listAvailablePiCommands(cwd),
-      catch: (cause) =>
-        new AgentOperationError({
-          sessionId: "",
-          operation: "list-commands",
-          cause,
-        }),
-    });
+    return yield* listAvailablePiCommands(cwd);
   }),
   listModels: Effect.fn("PiAgentService.listModels")(function* (cwd?: string) {
     return yield* listAvailablePiModels(cwd ?? getAgentDir());
