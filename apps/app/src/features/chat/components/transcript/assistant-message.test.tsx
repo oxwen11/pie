@@ -13,6 +13,15 @@ const imagePart = (src: string) => ({
   url: src,
 });
 
+/** Settled backdrop color of the live overlay node — under load the open
+ *  transition lags and React may replace the captured node, so poll this. */
+const liveOverlayBg = () => {
+  const overlay = document.querySelector(
+    '.chat-image-preview-dialog [data-rmiz-modal-overlay="visible"]',
+  );
+  return overlay instanceof HTMLElement ? getComputedStyle(overlay).backgroundColor : "";
+};
+
 afterEach(() => document.documentElement.classList.remove("dark"));
 
 describe("AssistantMessage", () => {
@@ -48,11 +57,16 @@ describe("AssistantMessage", () => {
       const dialog = page.getByRole("dialog");
       const modal = await dialog.findElement();
       await expect.element(dialog).toHaveClass(/chat-image-preview-dialog/);
-      const overlay = dialog.element().querySelector('[data-rmiz-modal-overlay="visible"]');
-      if (!(overlay instanceof HTMLElement)) throw new Error("Image preview did not open");
+      // Jump rmiz's open transition to its end, then read the settled backdrop
+      // from the live node — under CI load the transition may lag and the
+      // captured node can be replaced, so neither is safe to poll directly.
       await expect
-        .poll(() => getComputedStyle(overlay).backgroundColor)
-        .toBe("rgba(0, 0, 0, 0.75)");
+        .poll(() => document.querySelector("[data-rmiz-modal-overlay]")?.dataset.rmizModalOverlay)
+        .toBe("visible");
+      for (const animation of dialog.element().getAnimations({ subtree: true })) {
+        animation.finish();
+      }
+      await expect.poll(liveOverlayBg, { timeout: 5000 }).toBe("rgba(0, 0, 0, 0.75)");
       const zoomed = dialog.element().querySelector("[data-rmiz-modal-img]");
       if (!(zoomed instanceof HTMLElement)) throw new Error("Zoomed image is missing");
       expect(zoomed.getAttribute("src")).toBe(src);
@@ -87,16 +101,18 @@ describe("AssistantMessage", () => {
     );
     await page.getByRole("img", { name: "result.png" }).click();
     const modalEl = await page.getByRole("dialog").findElement();
-    const overlay = modalEl.querySelector("[data-rmiz-modal-overlay]");
-    if (!(overlay instanceof HTMLElement)) throw new Error("Image preview did not open");
-    await expect.poll(() => overlay.dataset.rmizModalOverlay).toBe("visible");
-    await expect.poll(() => getComputedStyle(overlay).backgroundColor).toBe("rgba(0, 0, 0, 0.75)");
+    await expect
+      .poll(() => modalEl.querySelector("[data-rmiz-modal-overlay]")?.dataset.rmizModalOverlay)
+      .toBe("visible");
+    for (const animation of modalEl.getAnimations({ subtree: true })) {
+      animation.finish();
+    }
+    await expect.poll(liveOverlayBg, { timeout: 5000 }).toBe("rgba(0, 0, 0, 0.75)");
 
-    // The captured overlay node must survive the media query flipping while
-    // the dialog is open: a zoomMargin prop change mid-dialog breaks it.
+    // The backdrop must survive the media query flipping while the dialog is
+    // open: a zoomMargin prop change mid-dialog rebuilds the overlay subtree.
     await page.viewport(1280, 800);
-    await expect.poll(() => getComputedStyle(overlay).backgroundColor).toBe("rgba(0, 0, 0, 0.75)");
-    expect(overlay.isConnected).toBe(true);
+    await expect.poll(liveOverlayBg, { timeout: 5000 }).toBe("rgba(0, 0, 0, 0.75)");
   });
 
   it("does not render SVG file parts", async () => {
