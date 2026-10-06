@@ -1,6 +1,6 @@
 # Sidebar sessions
 
-The left sidebar is how a user finds chats. **Recent** lists sessions from **Choose project** / allocate. Each imported project is a collapsible group under **Projects**. Sessions are newest-first. The shell treats the session-route loader ref as the single source for the active row, card heading, and content panel.
+The left sidebar is how a user finds chats. **Recent** lists sessions from **Choose project** / allocate. Each imported project is a collapsible group under **Projects**. Sessions are newest-first. The shell treats the session-route loader ref as the single source for the active row, titlebar heading, and content panel.
 
 ## Sub-features
 
@@ -11,7 +11,7 @@ The left sidebar is how a user finds chats. **Recent** lists sessions from **Cho
 - **Open session** — row label is `session.title ?? "New chat"`. Status dots: **A turn is running in this session**, **Waiting for your action**, **Session crashed**.
 - **Actions menu** — right-click a session row. **Copy session ID**, **Copy transcript path**, **Rename**, and **Archive** / **Restore**. Copy session ID puts the pie session UUID on the clipboard. Copy transcript path asks the daemon for Pi's `<timestamp>_<agentSessionId>.jsonl` under the session cwd and copies that path, or toasts **No transcript for this session** when Pi has not opened the session. Archive of the open session returns to `/draft?projectId=`.
 - **Hover archive** — **Archive** (show-on-hover float button). Same mutation as the menu. Clicking it on the open session returns to `/draft?projectId=`.
-- **Rename dialog** — field placeholder **New chat**; saves a trimmed non-empty title (card heading and row update from `session.renamed`).
+- **Rename dialog** — field placeholder **New chat**; saves a trimmed non-empty title (titlebar heading and row update from `session.renamed`).
 
 ## How to get to it (user POV)
 

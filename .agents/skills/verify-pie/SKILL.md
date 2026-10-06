@@ -112,7 +112,7 @@ Stable handles (from source, not guesses):
 | Draft send | submit control, **no aria-label** — snapshot it after typing (disabled while empty, not while Choose project) |
 | Session send | button **Send message**; while streaming with an empty draft: **Stop generating**; typing replaces Stop with **Send message** (queue follow-up) — never both |
 | Session queue | Frame above composer: **N queued messages**, one row each; follow-up **Steer** (`Steer queued message`) promotes that row to **Steering**; **Edit queued message** / **Remove queued message**; steering rows labeled **Steering** (no Steer); not transcript bubbles |
-| Session heading | card title is the session title (prompt text after create) or **New chat**; supporting text is the project name |
+| Session heading | window titlebar heading is the session title (prompt text after create) or **New chat**; project is an icon labeled **Project: \<name\>**, not text beside the title |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
 
 Do not call `agent.session.create` / `project.create` over raw RPC to "skip" the UI. Those are the production procedures the page already uses; driving them from a script is not a user path. After a UI action, **do** read `$PIE_HOME` to confirm the side effect.

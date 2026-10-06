@@ -1,19 +1,13 @@
 import type { PrepareSessionOutput, SessionRef, WorktreeMissingErrorData } from "@getpie/contract";
-import { cn } from "@getpie/ui/lib/utils";
 import { ORPCError } from "@orpc/client";
 import { createFileRoute, redirect } from "@tanstack/react-router";
+import { FolderIcon } from "lucide-react";
 import { toast } from "sonner";
 
-import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
-import {
-  SHELL_TITLEBAR_HEADER_CLASS,
-  SHELL_TITLEBAR_LABEL_CLASS,
-} from "@/components/layout/shell-chrome";
+import { ShellTitle } from "@/components/layout/app-shell";
 import { Chat } from "@/features/chat/chat";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
-import { usePlatform } from "@/platform-context";
-import { isDesktopHost } from "@/platform-host";
 
 type SessionSearch = {
   readonly projectId?: string;
@@ -105,32 +99,25 @@ function Component() {
   const prepared = Route.useLoaderData();
   const project = useProject(prepared.ref.projectId);
   const title = useProjectSessionTitle(prepared.ref) ?? "New chat";
-  const reserveToggle = useContentPanel() !== null;
-  const desktop = isDesktopHost(usePlatform());
   return (
     <>
-      {/* Drag strip. Traffic lights sit on the rail, not this column. */}
-      <div
-        className={cn(SHELL_TITLEBAR_HEADER_CLASS, "border-b")}
-        data-drag-region={desktop ? "" : undefined}
-      >
-        <div className={SHELL_TITLEBAR_LABEL_CLASS}>
-          <span className="min-w-0 truncate font-medium" title={title}>
+      <ShellTitle>
+        <h1
+          className="m-0 flex max-w-full min-w-0 items-center gap-1 self-center text-sm leading-6 font-medium"
+          data-app-shell-titlebar-content=""
+        >
+          <span
+            aria-label={project === undefined ? undefined : `Project: ${project.name}`}
+            className="flex size-7 shrink-0 items-center justify-center [-webkit-app-region:no-drag]"
+            role="img"
+          >
+            <FolderIcon className="size-4" />
+          </span>
+          <span className="min-w-0 truncate" title={title}>
             {title}
           </span>
-          {project?.name !== undefined && (
-            <span
-              className="text-muted-foreground max-w-[50%] min-w-0 truncate"
-              title={project.name}
-            >
-              {project.name}
-            </span>
-          )}
-        </div>
-        {reserveToggle && !desktop ? (
-          <div aria-hidden="true" className="ms-auto size-9 shrink-0" />
-        ) : null}
-      </div>
+        </h1>
+      </ShellTitle>
       <Chat
         sessionRef={{
           environmentId: prepared.environmentId,
