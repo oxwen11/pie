@@ -9,7 +9,7 @@ export type ChatImagePreviewProps = Omit<ComponentProps<"img">, "src"> & { src: 
 
 export function ChatImagePreview({ alt, className, src, ...props }: ChatImagePreviewProps) {
   return (
-    <Zoom classDialog="chat-image-preview-dialog" wrapElement="span" zoomMargin={24}>
+    <Zoom classDialog="chat-image-preview-dialog" wrapElement="span" zoomMargin={80}>
       <img alt={alt ?? ""} className={cn(imageClassName, className)} src={src} {...props} />
     </Zoom>
   );
