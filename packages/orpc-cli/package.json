@@ -16,15 +16,19 @@
   },
   "dependencies": {
     "@orpc/contract": "catalog:orpc",
-    "@orpc/server": "catalog:orpc",
-    "commander": "^14.0.3",
-    "effect": "catalog:effect"
+    "@orpc/server": "catalog:orpc"
   },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",
     "@orpc/experimental-effect": "catalog:orpc",
     "@types/node": "catalog:",
+    "commander": "^14.0.3",
+    "effect": "catalog:effect",
     "typescript": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "commander": "^14.0.3",
+    "effect": "catalog:effect"
   }
 }
