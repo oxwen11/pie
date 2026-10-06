@@ -611,24 +611,14 @@ Daemon cold transcript open, above, is the approved dependence on Pi's session
 file. Any further design that depends on Pi's physical files rather than its
 public runtime behavior requires a new Developer-approved persistence decision.
 
-## Proposed: background bash logs (not approved)
-
-Developer approval is still required. This is not an inventory contract.
-
-Proposed location, using the existing `$PIE_HOME` override and
-`config/paths.ts` `logsDirectory` (`0700` directory, `0600` file):
-
-`$PIE_HOME/logs/bash/<sessionId>/<pid>.log`
-
-- Owner is the daemon user. The walk `lstat`s each directory and refuses a
-  symlink or a directory owned by another uid. The file is created with
-  `O_CREAT|O_EXCL|O_NOFOLLOW`, not by appending to a path under `os.tmpdir()`.
-- Contents are command stdout and stderr, which may include secrets.
-- A foreground command deletes its log when the tool result already contains
-  the output. A background log stays until a later cleanup decision. Session
-  deletion does not remove it. Uninstall does not remove `$PIE_HOME`.
-- `process.exit` kills background processes, so a daemon restart drops both the
-  job and its completion message.
+Background bash logs are OS temp, not a `$PIE_HOME` store:
+`os.tmpdir()/pie/<sessionId>/bash/<pid>.log`. Directories are `0700` and the
+file is `0600`. Creation `lstat`s the `pie` root and each component below it,
+refuses a symlink or a directory owned by another user, and creates the file
+with `O_CREAT|O_EXCL|O_NOFOLLOW`. A mismatch fails closed. A foreground
+command deletes its log when the tool result already contains the output. A
+background log stays until the OS cleans temp. Session deletion does not
+remove it. Aborting the turn backgrounds the command instead of killing it.
 
 ## Current retention and migration gaps
 

@@ -18,13 +18,6 @@ import {
   waitForChildProcess,
 } from "@earendil-works/pi-coding-agent";
 
-import {
-  LOG_FILE_MODE,
-  LOGS_DIRECTORY_MODE,
-  logsDirectory,
-  resolvePieHome,
-} from "../../config/paths";
-
 const BLOCKED_EXACT = new Set(["PORT", "ELECTRON_RENDERER_PORT", "ELECTRON_RUN_AS_NODE"]);
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const TAIL_BYTES = 100 * 1024;
@@ -61,13 +54,8 @@ export function filterPiBashEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return next;
 }
 
-export function bashLogPath(home: string, sessionId: string, jobId: string): string {
-  return path.join(
-    logsDirectory(home),
-    "bash",
-    safeSegment(sessionId),
-    `${safeSegment(jobId)}.log`,
-  );
+export function bashLogPath(sessionId: string, jobId: string): string {
+  return path.join(os.tmpdir(), "pie", safeSegment(sessionId), "bash", `${safeSegment(jobId)}.log`);
 }
 
 function safeSegment(value: string): string {
@@ -126,7 +114,7 @@ function createOwnedDir(pathname: string): void {
   }
   if (!stat) {
     try {
-      fs.mkdirSync(pathname, { mode: LOGS_DIRECTORY_MODE });
+      fs.mkdirSync(pathname, { mode: 0o700 });
     } catch (error) {
       if (errno(error) !== "EEXIST") throw error;
     }
@@ -136,16 +124,25 @@ function createOwnedDir(pathname: string): void {
   if (stat.isSymbolicLink() || !stat.isDirectory() || (uid !== undefined && stat.uid !== uid)) {
     refuseLog("not a real directory owned by this user");
   }
+  const flags =
+    fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0) | (fs.constants.O_DIRECTORY ?? 0);
+  const fd = fs.openSync(pathname, flags);
+  try {
+    fs.fchmodSync(fd, 0o700);
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
-export function openBashLog(home: string, logPath: string): fs.WriteStream {
-  const root = path.resolve(home);
+export function openBashLog(logPath: string, root = path.join(os.tmpdir(), "pie")): fs.WriteStream {
+  const pieRoot = path.resolve(root);
   const file = path.resolve(logPath);
   const dir = path.dirname(file);
-  if (dir !== root && !dir.startsWith(`${root}${path.sep}`)) refuseLog("escapes the home");
-  createOwnedDir(root);
-  const relative = path.relative(root, dir);
-  let current = root;
+  if (dir !== pieRoot && !dir.startsWith(`${pieRoot}${path.sep}`))
+    refuseLog("escapes the pie root");
+  createOwnedDir(pieRoot);
+  const relative = path.relative(pieRoot, dir);
+  let current = pieRoot;
   if (relative !== "") {
     for (const part of relative.split(path.sep)) {
       if (part === "" || part === "." || part === "..") refuseLog("bad segment");
@@ -160,7 +157,7 @@ export function openBashLog(home: string, logPath: string): fs.WriteStream {
     (fs.constants.O_NOFOLLOW ?? 0);
   let fd: number;
   try {
-    fd = fs.openSync(file, flags, LOG_FILE_MODE);
+    fd = fs.openSync(file, flags, 0o600);
   } catch (error) {
     const code = errno(error);
     if (code === "EEXIST" || code === "ELOOP") refuseLog("not a new file");
@@ -389,7 +386,6 @@ export async function executePieBash(input: {
   runInBackground?: boolean;
   yieldMs?: number;
   signal?: AbortSignal;
-  logRoot: string;
   logPath: (pid: number) => string;
   onBackgroundExit?: (message: string) => void;
 }): Promise<PieBashResult> {
@@ -420,7 +416,7 @@ export async function executePieBash(input: {
   const logPath = input.logPath(pid);
   let log: fs.WriteStream;
   try {
-    log = openBashLog(input.logRoot, logPath);
+    log = openBashLog(logPath);
   } catch (error) {
     killProcessTree(pid);
     livePids.delete(pid);
@@ -449,11 +445,7 @@ export async function executePieBash(input: {
   const yielded = new Promise<"yield">((resolve) => {
     yieldNow = () => resolve("yield");
   });
-  const onAbort = () => {
-    if (killReason) return;
-    killReason = "abort";
-    killProcessTree(pid);
-  };
+  const onAbort = () => yieldNow();
   if (input.signal) {
     input.signal.addEventListener("abort", onAbort, { once: true });
     if (input.signal.aborted) onAbort();
@@ -490,7 +482,6 @@ export async function executePieBash(input: {
     const empty = killReason || (result.ok && result.code !== 0) ? "" : "(no output)";
     const text = rendered.text || empty;
     if (!rendered.details) unlinkQuiet(logPath);
-    if (killReason === "abort") throw new Error(appendStatus(text, "Command aborted"));
     if (killReason === "timeout") {
       throw new Error(
         appendStatus(text, `Command timed out after ${input.timeoutSeconds} seconds`),
@@ -548,7 +539,7 @@ export function piBashExtension(cwd: string): ExtensionFactory {
     const base = createBashToolDefinition(cwd);
     pi.registerTool({
       ...base,
-      description: `${base.description} If it is still running after ${BACKGROUND_AFTER_MS / 1000} seconds, this call returns its pid and log path. Set run_in_background to return immediately. A timeout or an aborted turn kills the command instead of backgrounding it.`,
+      description: `${base.description} If it is still running after ${BACKGROUND_AFTER_MS / 1000} seconds, or the turn is aborted, this call returns its pid and log path. Set run_in_background to return immediately. A timeout kills the command instead of backgrounding it.`,
       promptGuidelines: [
         ...(base.promptGuidelines ?? []),
         `Commands still running after ${BACKGROUND_AFTER_MS / 1000} seconds move to the background and return a pid and log path. Read that file for later output. Stop a background command with \`kill -- -<pid>\`.`,
@@ -563,13 +554,8 @@ export function piBashExtension(cwd: string): ExtensionFactory {
           timeoutSeconds: params.timeout,
           runInBackground: params.run_in_background,
           signal,
-          logRoot: resolvePieHome(),
           logPath: (pid) =>
-            bashLogPath(
-              resolvePieHome(),
-              ctx.sessionManager.getSessionId() ?? "unknown",
-              String(pid),
-            ),
+            bashLogPath(ctx.sessionManager.getSessionId() ?? "unknown", String(pid)),
           onBackgroundExit: (message) => {
             try {
               pi.sendUserMessage(message, { deliverAs: "followUp" });
