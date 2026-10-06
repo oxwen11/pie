@@ -11,6 +11,7 @@ import { AppSidebar } from "@/components/layout/app-sidebar";
 import { CardPanel } from "@/components/layout/card-panel";
 import { browserPanel } from "@/components/layout/content-panel/panels/browser-panel";
 import { ContentPanelSessionProvider } from "@/components/layout/content-panel/react/session-provider";
+import { PageSidebarProvider } from "@/components/layout/page-sidebar";
 import { PullRequestDemandProvider } from "@/components/layout/pull-request-demand-provider";
 import { contentPanel } from "@/content-panel";
 import { filePanel } from "@/features/files/file-panel";
@@ -31,7 +32,7 @@ export const Route = createRootRouteWithContext<RouterAppContext>()({
   component: RootLayout,
 });
 
-// Global shell: left sidebar + floating card panel; every route renders in the card.
+// Global shell: icon rail beside one bordered frame for the route sidebar and main.
 function RootLayout() {
   // This is the shell's one route-identity seam for the card: the content
   // panel derives from the authoritative session-route ref. Page headings
@@ -69,20 +70,22 @@ function RootLayout() {
       <AppShell>
         <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
           {/*
-           * One EnvironmentOrpcProvider for chat + content panel. Sidebar stays on the
-           * outer local QueryClient above the router.
+           * One EnvironmentOrpcProvider for chat + content panel. Page sidebars retain
+           * their route's providers through the portal; chat navigation stays local.
            */}
-          <AppShellBody>
-            <AppShellSidebar>
-              <AppSidebar />
-            </AppShellSidebar>
-            <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
-              <AppShellMain>
-                <CardPanel />
-              </AppShellMain>
-              <AppShellSessionPanel />
-            </EnvironmentOrpcProvider>
-          </AppShellBody>
+          <PageSidebarProvider>
+            <AppShellBody>
+              <AppShellSidebar>
+                <AppSidebar />
+              </AppShellSidebar>
+              <EnvironmentOrpcProvider orpc={environmentRpc.for(environmentId)}>
+                <AppShellMain>
+                  <CardPanel />
+                </AppShellMain>
+                <AppShellSessionPanel />
+              </EnvironmentOrpcProvider>
+            </AppShellBody>
+          </PageSidebarProvider>
         </ContentPanelSessionProvider>
       </AppShell>
     </PullRequestDemandProvider>

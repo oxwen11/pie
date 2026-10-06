@@ -3,8 +3,6 @@ import { cn } from "@getpie/ui/lib/utils";
 import { XIcon } from "lucide-react";
 import type React from "react";
 
-import { useShellTitlebar } from "@/components/layout/shell-chrome";
-
 export type SchedulePanelProps = React.ComponentProps<"aside">;
 
 export function SchedulePanel({ className, ...props }: SchedulePanelProps) {
@@ -20,13 +18,11 @@ export function SchedulePanel({ className, ...props }: SchedulePanelProps) {
 export type SchedulePanelHeaderProps = React.ComponentProps<"header">;
 
 export function SchedulePanelHeader({ className, ...props }: SchedulePanelHeaderProps) {
-  const titlebar = useShellTitlebar();
   return (
     <header
       className={cn("flex h-10 shrink-0 items-center gap-2 border-b px-3", className)}
       data-slot="schedule-panel-header"
       {...props}
-      data-drag-region={titlebar.dragRegion}
     />
   );
 }

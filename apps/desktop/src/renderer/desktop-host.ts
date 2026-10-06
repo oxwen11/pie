@@ -1,7 +1,8 @@
-import type { ServerStatusFeed, Platform } from "@getpie/app";
+import type { ServerStatusFeed, Platform, PlatformBase } from "@getpie/app";
 import { consumeEventIterator } from "@orpc/client";
 
 import type { ServerConnection, DesktopBootstrap } from "../shared/desktop-rpc";
+import { MACOS_TITLEBAR_HEIGHT_PX, MACOS_TOGGLE_INSET_PX } from "../shared/macos-window-chrome";
 import type { DesktopClient } from "./desktop-client";
 
 function isAbortError(error: unknown): boolean {
@@ -80,61 +81,73 @@ export function createDesktopHost(
     },
   };
 
-  return {
-    platform: {
-      visibility,
-      quit: () => {
-        void client.app.quit().catch((error: unknown) => {
-          if (!isAbortError(error)) console.error("Failed to request desktop quit", error);
-        });
-      },
-      os: bootstrap.os,
-      hostname: bootstrap.hostname,
-      ssh: {
-        client: bootstrap.sshClient,
-        environments: {
-          getSnapshot: () => environments,
-          subscribe: (listener) => {
-            const controller = new AbortController();
-            let revision = environments.revision;
-            const unsubscribe = consumeEventIterator(
-              client.environments.subscribe({ after: revision }, { signal: controller.signal }),
-              {
-                onEvent: (snapshot) => {
-                  if (snapshot.revision <= revision) return;
-                  revision = snapshot.revision;
-                  environments = snapshot;
-                  listener(snapshot);
-                },
-                onError: (error) => {
-                  if (!controller.signal.aborted && !isAbortError(error)) {
-                    console.error("Desktop environment stream failed", error);
-                  }
-                },
-              },
-            );
-
-            return () => {
-              controller.abort();
-              void unsubscribe().catch((error: unknown) => {
-                if (!isAbortError(error)) {
-                  console.error("Failed to unsubscribe from desktop environments", error);
-                }
-              });
-            };
-          },
-        },
-        discoverHosts: () => client.environments.discoverSshHosts(),
-        connect: (target) => client.environments.connectSsh({ target }),
-        remove: (id) => client.environments.removeSsh({ id }),
-      },
-      tailscale: {
-        client: bootstrap.tailscaleClient,
-        snapshot: () => client.tailscale.snapshot(),
-        enableServe: () => client.tailscale.enableServe(),
-        disableServe: () => client.tailscale.disableServe(),
-      },
+  const shared: PlatformBase = {
+    visibility,
+    quit: () => {
+      void client.app.quit().catch((error: unknown) => {
+        if (!isAbortError(error)) console.error("Failed to request desktop quit", error);
+      });
     },
+    hostname: bootstrap.hostname,
+    ssh: {
+      client: bootstrap.sshClient,
+      environments: {
+        getSnapshot: () => environments,
+        subscribe: (listener) => {
+          const controller = new AbortController();
+          let revision = environments.revision;
+          const unsubscribe = consumeEventIterator(
+            client.environments.subscribe({ after: revision }, { signal: controller.signal }),
+            {
+              onEvent: (snapshot) => {
+                if (snapshot.revision <= revision) return;
+                revision = snapshot.revision;
+                environments = snapshot;
+                listener(snapshot);
+              },
+              onError: (error) => {
+                if (!controller.signal.aborted && !isAbortError(error)) {
+                  console.error("Desktop environment stream failed", error);
+                }
+              },
+            },
+          );
+
+          return () => {
+            controller.abort();
+            void unsubscribe().catch((error: unknown) => {
+              if (!isAbortError(error)) {
+                console.error("Failed to unsubscribe from desktop environments", error);
+              }
+            });
+          };
+        },
+      },
+      discoverHosts: () => client.environments.discoverSshHosts(),
+      connect: (target) => client.environments.connectSsh({ target }),
+      remove: (id) => client.environments.removeSsh({ id }),
+    },
+    tailscale: {
+      client: bootstrap.tailscaleClient,
+      snapshot: () => client.tailscale.snapshot(),
+      enableServe: () => client.tailscale.enableServe(),
+      disableServe: () => client.tailscale.disableServe(),
+    },
+  };
+  const platform: Platform =
+    bootstrap.os === "macos"
+      ? {
+          ...shared,
+          os: bootstrap.os,
+          windowChrome: {
+            titlebarHeight: MACOS_TITLEBAR_HEIGHT_PX,
+            toggleInset: MACOS_TOGGLE_INSET_PX,
+          },
+        }
+      : { ...shared, os: bootstrap.os };
+
+  return {
+    platform,
     server,
     refreshServer: () => client.server.connection(),
     status: {

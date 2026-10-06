@@ -8,11 +8,12 @@ import { useContentPanel } from "@/components/layout/content-panel/react/hooks";
 import {
   SHELL_TITLEBAR_HEADER_CLASS,
   SHELL_TITLEBAR_LABEL_CLASS,
-  useShellTitlebar,
 } from "@/components/layout/shell-chrome";
 import { Chat } from "@/features/chat/chat";
 import { useProjectSessionTitle } from "@/features/projects/use-project-sessions";
 import { useProject } from "@/features/projects/use-projects";
+import { usePlatform } from "@/platform-context";
+import { isDesktopHost } from "@/platform-host";
 
 type SessionSearch = {
   readonly projectId?: string;
@@ -105,13 +106,13 @@ function Component() {
   const project = useProject(prepared.ref.projectId);
   const title = useProjectSessionTitle(prepared.ref) ?? "New chat";
   const reserveToggle = useContentPanel() !== null;
-  const titlebar = useShellTitlebar();
+  const desktop = isDesktopHost(usePlatform());
   return (
     <>
-      {/* Desktop: this row is the drag strip, so it also clears the traffic lights. */}
+      {/* Drag strip. Traffic lights sit on the rail, not this column. */}
       <div
-        className={cn(SHELL_TITLEBAR_HEADER_CLASS, "border-b", titlebar.insetClassName)}
-        data-drag-region={titlebar.dragRegion}
+        className={cn(SHELL_TITLEBAR_HEADER_CLASS, "border-b")}
+        data-drag-region={desktop ? "" : undefined}
       >
         <div className={SHELL_TITLEBAR_LABEL_CLASS}>
           <span className="min-w-0 truncate font-medium" title={title}>
@@ -126,7 +127,9 @@ function Component() {
             </span>
           )}
         </div>
-        {reserveToggle ? <div aria-hidden="true" className="ms-auto size-7 shrink-0" /> : null}
+        {reserveToggle && !desktop ? (
+          <div aria-hidden="true" className="ms-auto size-9 shrink-0" />
+        ) : null}
       </div>
       <Chat
         sessionRef={{

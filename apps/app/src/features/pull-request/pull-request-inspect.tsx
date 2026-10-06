@@ -19,7 +19,6 @@ import { PullRequestSummary } from "./pull-request-summary";
 export function PullRequestInspect({
   actionPending = false,
   diff,
-  dragRegion,
   onAction,
   onRefresh,
   postActionRefreshFailed = false,
@@ -28,8 +27,6 @@ export function PullRequestInspect({
 }: {
   actionPending?: boolean;
   diff: UseQueryResult<PullRequestDiff>;
-  /** Full-page titlebar only. The session panel has no shell sidebar. */
-  dragRegion?: "";
   onAction?: (action: PullRequestAction) => void;
   onRefresh: () => void;
   postActionRefreshFailed?: boolean;
@@ -38,10 +35,7 @@ export function PullRequestInspect({
 }) {
   return (
     <Tabs className="flex min-h-0 flex-1 flex-col gap-0 overflow-hidden" defaultValue="summary">
-      <div
-        className="flex h-11 shrink-0 items-center gap-2 border-b px-3"
-        data-drag-region={dragRegion}
-      >
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3">
         <span className="relative me-1">
           <GitPullRequestIcon className="text-muted-foreground size-4" />
           <span className="bg-pull-request-open ring-background absolute -right-1 -bottom-0.5 size-2 rounded-full ring-2" />
