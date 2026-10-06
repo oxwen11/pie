@@ -353,6 +353,7 @@ export default defineConfig({
         "tools/verify/bin/**",
         "apps/desktop/scripts/**",
         "packages/server/test/harness/pi/fixtures/registration-provider.js",
+        "packages/server/test/harness/pi/fixtures/loadout-extension.js",
       ],
       rules: {
         "typescript/no-unsafe-argument": "off",

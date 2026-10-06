@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@getpie/ui/lib/utils";
+import { cjk } from "@streamdown/cjk";
 import { code } from "@streamdown/code";
 import {
   cloneElement,
@@ -415,7 +416,7 @@ const components: Components = {
 
 // Fenced code and tables stay on Streamdown's built-ins so 2.6 max-height,
 // streaming auto-scroll, and download controls apply.
-const streamdownPlugins = { code };
+const streamdownPlugins = { code, cjk };
 
 export const Response = memo(
   (props: ResponseProps) => {

@@ -1,4 +1,5 @@
 import { code } from "@streamdown/code";
+import { defaultRemarkPlugins } from "streamdown";
 import { beforeAll, describe, expect, it } from "vitest";
 import { render } from "vitest-browser-react";
 import { page } from "vitest/browser";
@@ -66,6 +67,29 @@ describe("Response streamdown 2.6", () => {
     await render(<Response isAnimating>Hello **streamdown** world</Response>);
     await expect.element(page.getByText("Hello")).toBeVisible();
     expect(page.getByText("Hello").element().closest("[data-sd-animate]")).not.toBeNull();
+  });
+
+  it("keeps CJK punctuation out of autolink hrefs", async () => {
+    const url = "https://github.com/oxwen11/pie/pull/453";
+    await render(
+      <Response animated={false} remarkPlugins={Object.values(defaultRemarkPlugins)}>
+        {`见 ${url}。导致找不到`}
+      </Response>,
+    );
+
+    const link = page.getByRole("link");
+    await expect.element(link).toHaveAttribute("href", url);
+    expect(link.element().textContent).toBe(url);
+    expect(link.element().parentElement?.textContent).toContain("。导致找不到");
+  });
+
+  it("leaves an explicit link destination that contains an ideographic full stop", async () => {
+    const href = "https://example.com/a。";
+    await render(<Response animated={false}>{`[说明](${href})`}</Response>);
+
+    await expect
+      .element(page.getByRole("link"))
+      .toHaveAttribute("href", "https://example.com/a%E3%80%82");
   });
 
   it("accepts a custom code download filename through controls", async () => {
