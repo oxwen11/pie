@@ -3,8 +3,8 @@ import assert from "node:assert/strict";
 import { it } from "@effect/vitest";
 import type { PullRequestRef, PullRequestStackExpected } from "@getpie/contract/pull-request";
 import { Context, Effect, Fiber, Layer, Sink, Stream } from "effect";
+import { ChildProcessSpawner } from "effect/process";
 import { TestClock } from "effect/testing";
-import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { makeGitHubCliAdapter } from "../src/pull-request/github-cli";
 import { SUMMARY_PULL_REQUEST_FIELDS } from "../src/pull-request/github-summary";

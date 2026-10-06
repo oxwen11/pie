@@ -4,7 +4,7 @@ import {
   type ElectronRegistration,
 } from "@getpie/contract/resource-monitoring";
 import { ByteSize, Effect } from "effect";
-import { HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import { HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { SessionImageAssets } from "../assets";
 import { bearerToken, type TicketStore, tokensMatch } from "./auth";

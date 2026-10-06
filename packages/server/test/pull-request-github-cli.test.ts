@@ -1,5 +1,5 @@
 import { Effect, Sink, Stream } from "effect";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/process";
 import { describe, expect, it } from "vitest";
 
 import {
