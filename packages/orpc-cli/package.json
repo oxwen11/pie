@@ -1,0 +1,40 @@
+{
+  "name": "@getpie/orpc-cli",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Opt-in CLI adapters over an implemented oRPC router",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./commander": "./src/commander.ts",
+    "./effect": "./src/effect.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "git clean -xdf node_modules dist .turbo"
+  },
+  "dependencies": {
+    "@orpc/contract": "catalog:orpc",
+    "@orpc/server": "catalog:orpc"
+  },
+  "devDependencies": {
+    "@getpie/typescript": "workspace:*",
+    "@orpc/experimental-effect": "catalog:orpc",
+    "@types/node": "catalog:",
+    "commander": "catalog:",
+    "effect": "catalog:effect",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "commander": "catalog:",
+    "effect": "catalog:effect"
+  },
+  "peerDependenciesMeta": {
+    "commander": {
+      "optional": true
+    }
+  }
+}
