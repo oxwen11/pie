@@ -18,6 +18,9 @@ catalog:
   "@vitejs/plugin-react": ^6.1.1
   ai: ^7.0.99
   cn: ^0.2.6
+  # Single Commander major for the oRPC CLI adapter. Exact pin so a caret
+  # cannot pull a second major into the peer graph.
+  commander: 14.0.3
   lucide-react: ^1.45.0
   p-queue: ^9.3.3
   react-error-boundary: ^6.1.5
