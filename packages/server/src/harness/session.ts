@@ -42,9 +42,6 @@ import { inSession } from "./session-identity";
  * process, and a crashed runtime leaves a session that is still queryable and
  * can start over.
  *
- * Cold reads reuse one opened file read instead of starting that
- * process. The session decides which: a held runtime, else the injected read.
- *
  * A private collaborator of {@link PiAgentSessionManager}: no Context tag.
  * It does not spawn a process itself — the manager hands it an `acquire` —
  * but it is the only thing that decides *when* one is opened, so
@@ -151,7 +148,6 @@ export type PiAgentSessionShape = {
   ) => Effect.Effect<AgentModelState | undefined, AgentOperationError | SessionClosed>;
 };
 
-/** Test seam. Production passes the PiAgent file read. */
 export type SessionColdRead = (
   agentSessionId: string,
   cwd: string,
@@ -168,7 +164,7 @@ export const makePiAgentSession = (
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
     const state = yield* Ref.make(initialSessionState);
-    // Dropped when a process starts or stops, because that rewrites the file.
+    // A live process rewrites the file, so this cache must not outlive it.
     let cold:
       | { readonly messages: ReadonlyArray<PieUIMessage>; readonly model: AgentModelState }
       | undefined;

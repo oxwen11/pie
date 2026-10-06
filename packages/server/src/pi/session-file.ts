@@ -22,7 +22,6 @@ const sessionFile = (agentSessionId: string, cwd: string): string | undefined =>
   );
 };
 
-/** Cold transcript read. Missing file is `SessionNotResumable`; a throw is an operation error. */
 export const readPiSessionFile = (
   agentSessionId: string,
   cwd: string,
