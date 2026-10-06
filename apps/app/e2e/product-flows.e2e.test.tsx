@@ -102,7 +102,7 @@ describe("sidebar and content panel", () => {
     await waitForText(FIRST_PROMPT);
     await page
       .getByTestId("sidebar")
-      .getByText(FIRST_PROMPT, { exact: true })
+      .getByRole("button", { name: FIRST_PROMPT })
       .click({ button: "right" });
     await page.getByRole("menuitem", { name: "Rename" }).click();
     await waitForText("Rename session");
@@ -208,7 +208,7 @@ describe("session archive", () => {
 
     await page
       .getByTestId("sidebar")
-      .getByText("e2e archive me", { exact: true })
+      .getByRole("button", { name: "e2e archive me" })
       .click({ button: "right" });
     await page.getByRole("menuitem", { name: "Archive" }).click();
 
