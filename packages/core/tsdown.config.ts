@@ -6,4 +6,6 @@ export default defineConfig({
   format: ["esm"],
   dts: true,
   clean: true,
+  // Package is `"type": "module"`; emit `.js` instead of `.mjs`.
+  fixedExtension: false,
 });

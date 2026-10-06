@@ -12,9 +12,7 @@ import { makePiAgent } from "../../../src/harness/pi/agent";
 import { makePiProcess } from "../../../src/harness/pi/process";
 import { PiSessionTools, type PiSessionToolsShape } from "../../../src/harness/pi/session-tools";
 
-const provider = url.fileURLToPath(
-  new URL("./fixtures/registration-provider.mjs", import.meta.url),
-);
+const provider = url.fileURLToPath(new URL("./fixtures/registration-provider.js", import.meta.url));
 const cli = url.fileURLToPath(
   new URL("../../../node_modules/@earendil-works/pi-coding-agent/dist/cli.js", import.meta.url),
 );
