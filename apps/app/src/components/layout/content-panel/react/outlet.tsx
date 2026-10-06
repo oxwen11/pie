@@ -4,6 +4,7 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@getpie/ui/components/me
 import { cn } from "@getpie/ui/lib/utils";
 import { Maximize2Icon, Minimize2Icon, PlusIcon, XIcon } from "lucide-react";
 import { type ComponentProps, useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import type { OpenPanel } from "../model/content-panel";
 import { type ContentPanelSession, useContentPanel, usePanelSnapshot } from "./hooks";
@@ -14,9 +15,16 @@ import type { AnyPanelView } from "./view";
  * particular panel — everything it shows comes off the snapshot. The shared
  * shell frame owns the outer border and corners; this column owns its content.
  */
-export type ContentPanelOutletProps = ComponentProps<"aside">;
+export type ContentPanelOutletProps = ComponentProps<"aside"> & {
+  /** Titlebar slot the tab strip portals into; nothing renders until it mounts. */
+  readonly tabStripTarget: HTMLElement | null;
+};
 
-export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletProps): ReactNode {
+export function ContentPanelOutlet({
+  className,
+  tabStripTarget,
+  ...props
+}: ContentPanelOutletProps): ReactNode {
   const presentation = usePanelSnapshot((snapshot) => snapshot.presentation);
   const session = useContentPanel();
 
@@ -34,7 +42,9 @@ export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletPr
       )}
       {...props}
     >
-      <TabStrip presentation={presentation} session={session} />
+      {tabStripTarget === null
+        ? null
+        : createPortal(<TabStrip presentation={presentation} session={session} />, tabStripTarget)}
       <PanelBody session={session} />
     </aside>
   );
@@ -62,7 +72,7 @@ function TabStrip({
   }, [activeId]);
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-12">
+    <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden ps-1.5">
       {/*
        * The scroller sizes to its content and shrinks — it is deliberately not
        * `flex-1`. "+" is its sibling, so it stays pinned just past the last
