@@ -74,6 +74,31 @@ describe("AssistantMessage", () => {
     },
   );
 
+  it("keeps the overlay opaque when the sm breakpoint flips while the preview is open", async () => {
+    await page.viewport(390, 800);
+    const canvas = document.createElement("canvas");
+    canvas.width = 1600;
+    canvas.height = 1200;
+    const src = canvas.toDataURL("image/png");
+    await render(
+      <div className="mx-auto w-full max-w-4xl p-4">
+        <AssistantMessage parts={[imagePart(src)]} isStreaming={false} showActions={false} />
+      </div>,
+    );
+    await page.getByRole("img", { name: "result.png" }).click();
+    const modalEl = await page.getByRole("dialog").findElement();
+    const overlay = modalEl.querySelector("[data-rmiz-modal-overlay]");
+    if (!(overlay instanceof HTMLElement)) throw new Error("Image preview did not open");
+    await expect.poll(() => overlay.dataset.rmizModalOverlay).toBe("visible");
+    await expect.poll(() => getComputedStyle(overlay).backgroundColor).toBe("rgba(0, 0, 0, 0.75)");
+
+    // The captured overlay node must survive the media query flipping while
+    // the dialog is open: a zoomMargin prop change mid-dialog breaks it.
+    await page.viewport(1280, 800);
+    await expect.poll(() => getComputedStyle(overlay).backgroundColor).toBe("rgba(0, 0, 0, 0.75)");
+    expect(overlay.isConnected).toBe(true);
+  });
+
   it("does not render SVG file parts", async () => {
     await render(
       <AssistantMessage
