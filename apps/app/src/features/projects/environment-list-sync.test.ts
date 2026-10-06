@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createEnvironmentRpc } from "@/lib/environment-rpc";
 import { createAppQueryClient } from "@/lib/orpc";
 
-import { createEnvironmentCatalog } from "./environment-catalog";
+import { createEnvironmentListSync } from "./environment-list-sync";
 
 type Call = {
   readonly environmentId?: string;
@@ -43,7 +43,7 @@ function catalogLink(calls: Call[], subscriptions: Subscription[]): ClientLink<P
   };
 }
 
-describe("createEnvironmentCatalog", () => {
+describe("createEnvironmentListSync", () => {
   it("warms projects and sessions for every started Environment", async () => {
     const calls: Call[] = [];
     const subscriptions: Subscription[] = [];
@@ -60,11 +60,11 @@ describe("createEnvironmentCatalog", () => {
       resolveRemote: (id) => (id === "env-remote" ? remote : undefined),
       createRemoteLink: () => catalogLink(calls, subscriptions),
     });
-    const catalog = createEnvironmentCatalog(rpc);
+    const listSync = createEnvironmentListSync(rpc);
 
-    catalog.start("env-local");
+    listSync.start("env-local");
     rpc.sync(new Map([["env-remote", remote]]));
-    catalog.start("env-remote");
+    listSync.start("env-remote");
 
     await vi.waitFor(() => {
       expect(calls).toEqual(
@@ -77,7 +77,7 @@ describe("createEnvironmentCatalog", () => {
       );
     });
 
-    catalog.stop("env-remote");
+    listSync.stop("env-remote");
     expect(
       subscriptions.find(({ environmentId }) => environmentId === "env-remote")?.signal?.aborted,
     ).toBe(true);
@@ -85,7 +85,7 @@ describe("createEnvironmentCatalog", () => {
       subscriptions.find(({ environmentId }) => environmentId === "env-local")?.signal?.aborted,
     ).toBe(false);
 
-    catalog.dispose();
+    listSync.dispose();
     expect(
       subscriptions.find(({ environmentId }) => environmentId === "env-local")?.signal?.aborted,
     ).toBe(true);
