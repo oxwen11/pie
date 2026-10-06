@@ -2,6 +2,16 @@
 import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
 
 export default function loadoutExtension(pi) {
+  // Stands in for an extension tool installed after the session was created.
+  if (process.env.LOADOUT_PROBE_TOOL) {
+    pi.registerTool({
+      name: "probe_tool",
+      label: "probe_tool",
+      description: "Loadout probe",
+      parameters: { type: "object", properties: {} },
+      execute: async () => ({ content: [{ type: "text", text: "probe ok" }], details: {} }),
+    });
+  }
   pi.registerCommand("drop-bash", {
     handler: () => pi.setActiveTools(pi.getActiveTools().filter((name) => name !== "bash")),
   });

@@ -15,7 +15,7 @@ const cli = url.fileURLToPath(
 
 type Frame = Record<string, unknown>;
 
-function startPi(dir: string, args: ReadonlyArray<string>) {
+function startPi(dir: string, args: ReadonlyArray<string>, env: NodeJS.ProcessEnv = {}) {
   const child = childProcess.spawn(
     process.execPath,
     [
@@ -34,7 +34,7 @@ function startPi(dir: string, args: ReadonlyArray<string>) {
     ],
     {
       cwd: dir,
-      env: { ...process.env, PI_CODING_AGENT_DIR: dir },
+      env: { ...process.env, ...env, PI_CODING_AGENT_DIR: dir },
       stdio: ["pipe", "pipe", "ignore"],
     },
   );
@@ -76,7 +76,7 @@ function startPi(dir: string, args: ReadonlyArray<string>) {
 }
 
 describe("installed Pi resume", () => {
-  it("restores the session's recorded tool loadout instead of the default tools", async () => {
+  it("restores the recorded loadout and keeps extension tools added since", async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-resume-loadout-"));
     try {
       const created = startPi(dir, ["--provider", "loadout-test", "--model", "model"]);
@@ -92,11 +92,12 @@ describe("installed Pi resume", () => {
       await created.close();
 
       // Pie resumes by id without --tools, so Pi starts from its default tools.
-      const resumed = startPi(dir, ["--session-id", sessionId]);
+      const resumed = startPi(dir, ["--session-id", sessionId], { LOADOUT_PROBE_TOOL: "1" });
       const tools = await resumed.loadout();
       await resumed.close();
       assert.ok(tools.includes("read"));
       assert.equal(tools.includes("bash"), false);
+      assert.ok(tools.includes("probe_tool"));
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }

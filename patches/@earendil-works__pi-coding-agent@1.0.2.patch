@@ -1,17 +1,34 @@
 diff --git a/dist/core/agent-session.js b/dist/core/agent-session.js
-index 33338d518743ba2fd4ee2d710c5496a6ddcd1856..86657064eaead81317e1c41e04606e7ecc8c38aa 100644
+index 33338d518743ba2fd4ee2d710c5496a6ddcd1856..5cafd057a0fae8632caa4fae539917f199005500 100644
 --- a/dist/core/agent-session.js
 +++ b/dist/core/agent-session.js
-@@ -198,7 +198,8 @@ export class AgentSession {
-             activeToolNames: this._initialActiveToolNames,
-             includeAllExtensionTools: true,
+@@ -200,6 +200,11 @@ export class AgentSession {
          });
--        if (this._initialActiveToolNames === undefined)
-+        // Resuming with the default tool set restores the transcript loadout (e.g. tools tool_search loaded).
-+        if (this._initialActiveToolNames === undefined || this._usesDefaultTools)
+         if (this._initialActiveToolNames === undefined)
              this._restoreToolsFromTranscript();
++        else if (this._usesDefaultTools) {
++            // Resuming with the default tool set restores the transcript loadout (e.g. tools tool_search
++            // loaded) and, like reload(), keeps extension tools that activate on registration.
++            this._restoreToolsFromTranscript(this.getActiveToolNames().filter((name) => !this._baseToolDefinitions.has(name) && this._isActivatedOnRegistration(name)));
++        }
      }
      get modelRuntime() {
+         return this._modelRuntime;
+@@ -1329,12 +1334,12 @@ export class AgentSession {
+      * Tools reachable only from other tools are never declared, but they do not depend on the active
+      * set, so the transcript's declarations are the whole loadout.
+      */
+-    _restoreToolsFromTranscript() {
++    _restoreToolsFromTranscript(keepToolNames = []) {
+         this._pendingToolNames.clear();
+         const current = getCurrentSystemMessage(this.sessionManager.buildSessionContext().messages);
+         if (!current)
+             return;
+-        const names = (current.toolsAdded ?? []).map((tool) => tool.name);
++        const names = [...(current.toolsAdded ?? []).map((tool) => tool.name), ...keepToolNames];
+         this._pendingToolNames = new Set(names.filter((name) => this._isAllowedTool(name)));
+         this._setActiveTools(names);
+     }
 diff --git a/dist/core/tools/bash.d.ts b/dist/core/tools/bash.d.ts
 index 64be599a321c7486ebe8c9a21608ad8ce61f7778..1c71ff8e9c3bebad9cdb0bdf8d22f3db3ce34ce0 100644
 --- a/dist/core/tools/bash.d.ts
