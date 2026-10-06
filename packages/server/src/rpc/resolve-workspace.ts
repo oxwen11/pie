@@ -21,7 +21,10 @@ export const resolveWorkspaceCwd = (
   });
 
 export const catchWorkspaceResolveErrors = <
-  E extends { SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown },
+  E extends {
+    SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown;
+    INTERNAL: (input: { data: { message: string } }) => unknown;
+  },
 >(
   errors: E,
 ) =>
@@ -40,14 +43,17 @@ export const catchWorkspaceResolveErrors = <
       ),
     StoreReadError: (error: StoreReadError) =>
       Effect.fail(
-        errors.SESSION_NOT_FOUND({
+        errors.INTERNAL({
           data: { message: `session store read failed: ${error.file}` },
         }),
       ),
   });
 
 export const resolveWorkspaceCwdOrFail = <
-  E extends { SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown },
+  E extends {
+    SESSION_NOT_FOUND: (input: { data: { message: string } }) => unknown;
+    INTERNAL: (input: { data: { message: string } }) => unknown;
+  },
 >(
   input: WorkspaceQuery,
   errors: E,

@@ -258,7 +258,7 @@ async function main() {
       process.exit(1);
     }
   }
-  const compatibilityKey = typeof record.compatibilityKey === "string" ? record.compatibilityKey : "";
+  const compatibilityKey = typeof record.compatibilityKey === "string" && /^githash:[0-9a-f]{8}$/.test(record.compatibilityKey) ? record.compatibilityKey : "";
   process.stdout.write(JSON.stringify({ remotePort: port, token: token, hostname: os.hostname(), compatibilityKey: compatibilityKey }) + "\\n");
 }
 main();
