@@ -63,6 +63,7 @@ const readFileErrors = {
   BINARY_FILE: { data: pathData },
   READ_FAILED: { data: pathData },
   SESSION_NOT_FOUND: { data: sessionNotFoundData },
+  INTERNAL: { data: sessionNotFoundData },
 };
 
 const readTreeErrors = {
@@ -70,6 +71,7 @@ const readTreeErrors = {
   NOT_DIRECTORY: { data: pathData },
   READ_FAILED: { data: pathData },
   SESSION_NOT_FOUND: { data: sessionNotFoundData },
+  INTERNAL: { data: sessionNotFoundData },
 };
 
 /**

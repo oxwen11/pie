@@ -7,17 +7,17 @@ import { applySessionListEvent } from "./session-list-cache";
 
 const RESUBSCRIBE_DELAY_MS = 1000;
 
-export type EnvironmentCatalog = {
+export type EnvironmentListSync = {
   start(environmentId: string): void;
   stop(environmentId: string): void;
   dispose(): void;
 };
 
 /**
- * Keeps every connected daemon's project/session catalog warm and converged,
+ * Keeps every connected Environment's project and session lists warm,
  * independent of which Environment the React tree currently renders.
  */
-export function createEnvironmentCatalog(environmentRpc: EnvironmentRpc): EnvironmentCatalog {
+export function createEnvironmentListSync(environmentRpc: EnvironmentRpc): EnvironmentListSync {
   const workers = new Map<string, AbortController>();
 
   const start = (environmentId: string): void => {

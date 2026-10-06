@@ -56,6 +56,40 @@ export function decodeDaemonCompatibilityKey(value: unknown): DaemonCompatibilit
   return typeof value === "string" && isGitHashDaemonCompatibilityKey(value) ? value : undefined;
 }
 
+/** Discovery record written to `daemon.pid`. `startedAt` is epoch millis. */
+export type DaemonDiscoveryRecord = {
+  readonly pid: number;
+  readonly address: string;
+  readonly token: string;
+  readonly startedAt: number;
+  readonly compatibilityKey?: DaemonCompatibilityKey;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+/** Same rules as the launcher: missing or garbage is undefined, a bad key is omitted. */
+export function parseDaemonDiscoveryRecord(value: unknown): DaemonDiscoveryRecord | undefined {
+  if (!isRecord(value)) return undefined;
+  const candidate = value;
+  if (
+    typeof candidate.pid !== "number" ||
+    typeof candidate.address !== "string" ||
+    typeof candidate.token !== "string"
+  ) {
+    return undefined;
+  }
+  const compatibilityKey = decodeDaemonCompatibilityKey(candidate.compatibilityKey);
+  return {
+    pid: candidate.pid,
+    address: candidate.address,
+    token: candidate.token,
+    startedAt: typeof candidate.startedAt === "number" ? candidate.startedAt : 0,
+    ...(compatibilityKey === undefined ? undefined : { compatibilityKey }),
+  };
+}
+
 /** Read the statically embedded key; source entry points must inject it too. */
 export function embeddedDaemonCompatibilityKey(
   value: unknown = process.env.PIE_DAEMON_COMPATIBILITY_KEY,

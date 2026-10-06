@@ -11,7 +11,7 @@ import { contentPanel } from "./content-panel";
 import { ChatManager } from "./features/chat/runtime/chat-manager";
 import { ChatManagerProvider } from "./features/chat/runtime/chat-manager-provider";
 import { OrpcChatSessionTransport } from "./features/chat/runtime/chat-transport";
-import { createEnvironmentCatalog } from "./features/projects/environment-catalog";
+import { createEnvironmentListSync } from "./features/projects/environment-list-sync";
 import { createTerminalPanel } from "./features/terminal/terminal-panel";
 import { parseEnvironmentId } from "./lib/environment-id";
 import { createEnvironmentRpc } from "./lib/environment-rpc";
@@ -173,30 +173,30 @@ function AppRuntime({
         );
       }),
   );
-  const environmentCatalog = useStable(() => createEnvironmentCatalog(environmentRpc));
+  const environmentListSync = useStable(() => createEnvironmentListSync(environmentRpc));
 
   useEffect(() => {
-    environmentCatalog.start(environmentId);
+    environmentListSync.start(environmentId);
     const feed = platform.ssh?.environments;
-    if (feed === undefined) return () => environmentCatalog.dispose();
+    if (feed === undefined) return () => environmentListSync.dispose();
     const sync = () => {
       const live = new Map(
         feed.getSnapshot().remotes.map((remote) => [remote.environmentId, remote.connection]),
       );
       environmentRpc.sync(live, (id) => {
-        environmentCatalog.stop(id);
+        environmentListSync.stop(id);
         chatManager.forgetEnvironment(id);
         contentPanel.forgetAllForEnvironment(id);
       });
-      for (const id of live.keys()) environmentCatalog.start(id);
+      for (const id of live.keys()) environmentListSync.start(id);
     };
     sync();
     const unsubscribe = feed.subscribe(sync);
     return () => {
       unsubscribe();
-      environmentCatalog.dispose();
+      environmentListSync.dispose();
     };
-  }, [platform.ssh, environmentId, environmentRpc, environmentCatalog, chatManager]);
+  }, [platform.ssh, environmentId, environmentRpc, environmentListSync, chatManager]);
 
   useEffect(() => contentPanel.register(createTerminalPanel(environmentRpc)), [environmentRpc]);
   const router = useStable(() =>

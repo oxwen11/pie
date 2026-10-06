@@ -524,6 +524,19 @@ export async function executePieBash(input: {
   };
 }
 
+/** Hidden model-context notice. History closes the previous run on this type. */
+export const BACKGROUND_BASH_CUSTOM_TYPE = "pie.bash.background";
+
+export function deliverBackgroundExit(
+  pi: Pick<ExtensionAPI, "sendMessage">,
+  message: string,
+): void {
+  pi.sendMessage(
+    { customType: BACKGROUND_BASH_CUSTOM_TYPE, content: message, display: false },
+    { triggerTurn: true, deliverAs: "followUp" },
+  );
+}
+
 const pieBashSchema = Type.Object({
   ...bashSchema.properties,
   run_in_background: Type.Optional(
@@ -558,7 +571,7 @@ export function piBashExtension(cwd: string): ExtensionFactory {
             bashLogPath(ctx.sessionManager.getSessionId() ?? "unknown", String(pid)),
           onBackgroundExit: (message) => {
             try {
-              pi.sendUserMessage(message, { deliverAs: "followUp" });
+              deliverBackgroundExit(pi, message);
             } catch {
               // session already closed
             }
