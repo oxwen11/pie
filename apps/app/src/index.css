@@ -1,4 +1,5 @@
 @import "@getpie/ui/globals.css";
+@import "react-medium-image-zoom/dist/styles.css";
 @import "tw-shimmer";
 
 /* PieLoader mark size. Relative to the surrounding text size; 0.7em ≈ 10px at
@@ -123,17 +124,35 @@
   }
 }
 
-/* Image previews stay translucent black with readable controls in either theme. */
-.chat-image-preview {
-  color-scheme: dark;
-  --popover: rgb(0 0 0 / 80%);
-  --popover-foreground: var(--color-white);
-  --foreground: var(--color-white);
-  --muted: transparent;
-  --muted-foreground: rgb(255 255 255 / 70%);
-  --accent: rgb(255 255 255 / 12%);
-  --border: rgb(255 255 255 / 15%);
-  --ring: var(--color-white);
+/* Image previews float on a translucent black backdrop in either theme. */
+.chat-image-preview-dialog [data-rmiz-modal-overlay="visible"] {
+  background-color: rgb(0 0 0 / 75%);
+}
+
+.chat-image-preview-dialog [data-rmiz-modal-img] {
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 15%),
+    0 25px 50px -12px rgb(0 0 0 / 50%);
+}
+
+[data-rmiz-btn-zoom],
+[data-rmiz-btn-unzoom] {
+  width: 44px;
+  height: 44px;
+  padding: 11px;
+  border-radius: var(--radius-lg);
+  background-color: rgb(0 0 0 / 65%);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 20%);
+}
+
+[data-rmiz-btn-unzoom]:hover {
+  background-color: rgb(0 0 0 / 80%);
+}
+
+[data-rmiz-btn-zoom]:focus-visible,
+[data-rmiz-btn-unzoom]:focus-visible {
+  outline: 2px solid var(--color-white);
 }
 
 /* TipTap Placeholder extension renders via ::before on the empty first paragraph. */
