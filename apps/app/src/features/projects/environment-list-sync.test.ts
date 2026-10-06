@@ -17,7 +17,7 @@ type Subscription = {
   readonly signal?: AbortSignal;
 };
 
-function catalogLink(calls: Call[], subscriptions: Subscription[]): ClientLink<PieClientContext> {
+function fakeLink(calls: Call[], subscriptions: Subscription[]): ClientLink<PieClientContext> {
   return {
     call: async (path, _input, options) => {
       const joined = path.join(".");
@@ -55,10 +55,10 @@ describe("createEnvironmentListSync", () => {
     };
     const rpc = createEnvironmentRpc({
       localId: "env-local",
-      localLink: catalogLink(calls, subscriptions),
+      localLink: fakeLink(calls, subscriptions),
       queryClient,
       resolveRemote: (id) => (id === "env-remote" ? remote : undefined),
-      createRemoteLink: () => catalogLink(calls, subscriptions),
+      createRemoteLink: () => fakeLink(calls, subscriptions),
     });
     const listSync = createEnvironmentListSync(rpc);
 
