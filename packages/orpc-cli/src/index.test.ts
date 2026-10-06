@@ -5,7 +5,8 @@ import { Command, CommanderError } from "commander";
 import { Schema } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
-import { cli, completionScript, createCommanderCli, readCliCommands, renderOutput } from "./index";
+import { createCommanderCli } from "./commander";
+import { cli, completionScript, readCliCommands, renderOutput } from "./index";
 
 const Create = Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) });
 const Show = Schema.Struct({
@@ -340,6 +341,23 @@ describe("createCommanderCli", () => {
     ]);
     expect(bad.exitCode).not.toBe(0);
     expect(completionScript("pie", await readCliCommands({ run: procedure }))).toContain("run");
+
+    const finite = await createCommanderCli({
+      router: {
+        run: os
+          .meta(cli())
+          .input(Schema.Struct({ n: Schema.Number }))
+          .handler(() => "no"),
+      },
+    });
+    const infinite = await run(finite, ["run", "--n", "Infinity"]);
+    expect(infinite.exitCode).not.toBe(0);
+
+    const first = os.meta(cli()).handler(() => "a");
+    const second = os.meta(cli()).handler(() => "b");
+    await expect(
+      createCommanderCli({ router: { listModels: first, "list-models": second } }),
+    ).rejects.toThrow(/registered twice/);
   });
 
   it("renders object arrays as a table on a tty", () => {

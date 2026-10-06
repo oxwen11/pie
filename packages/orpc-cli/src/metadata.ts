@@ -192,6 +192,17 @@ export function parseJson(text: string): CliValue {
   return parsed;
 }
 
+function isJsonValue(value: unknown): value is CliValue {
+  return (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    Array.isArray(value) ||
+    typeof value === "object"
+  );
+}
+
 function collect(router: AnyRouter): ReadonlyArray<{
   procedure: AnyProcedure;
   path: readonly string[];
@@ -490,10 +501,9 @@ export function coercePrimitive(
 ): CliValue {
   if (kind === "integer") return parseInteger(value);
   if (kind === "number") {
-    if (value.trim() === "" || Number.isNaN(Number(value))) {
-      throw new CliUsageError(`expected a number, got "${value}"`);
-    }
-    return Number(value);
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) throw new CliUsageError(`expected a number, got "${value}"`);
+    return parsed;
   }
   if (kind === "boolean") return value !== "false";
   if (kind === "date") return parseDate(value);
@@ -570,20 +580,6 @@ async function ttyAsk(field: CliField): Promise<string> {
   } finally {
     rl.close();
   }
-}
-
-function isJsonValue(value: unknown): value is CliValue {
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  ) {
-    return true;
-  }
-  if (Array.isArray(value)) return value.every(isJsonValue);
-  if (typeof value === "object") return Object.values(value).every(isJsonValue);
-  return false;
 }
 
 function assign(target: InputObject, path: string, value: CliValue): void {

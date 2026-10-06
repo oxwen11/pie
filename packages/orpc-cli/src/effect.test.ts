@@ -6,7 +6,8 @@ import { Command } from "effect/unstable/cli";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { describe, expect, it, vi } from "vitest";
 
-import { cli, createEffectCli } from "./index";
+import { createEffectCli } from "./effect";
+import { cli } from "./index";
 
 const Create = Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) });
 const Show = Schema.Struct({

@@ -10,5 +10,3 @@ export {
   type CliMeta,
 } from "./metadata";
 export { completionScript } from "./completion";
-export { createCommanderCli } from "./commander";
-export { createEffectCli } from "./effect";
