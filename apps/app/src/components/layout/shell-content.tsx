@@ -53,7 +53,7 @@ export function ShellContentPanel({
       />
       <aside
         className={cn(
-          "flex min-h-0 flex-col overflow-hidden md:py-1 md:pe-1",
+          "flex min-h-0 flex-col overflow-hidden",
           maximized ? "min-w-0 flex-1" : "min-w-0",
         )}
         data-slot="content-panel-column"
