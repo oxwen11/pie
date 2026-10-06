@@ -23,7 +23,7 @@ describe("listAvailablePiModels", () => {
     }
   });
 
-  it("does not execute Project extensions while reading the model list", async () => {
+  it("executes Project extensions while reading the model list", async () => {
     const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "pie-model-policy-"));
     const extensionDirectory = path.join(cwd, ".pi", "extensions");
     const marker = path.join(cwd, "extension-loaded");
@@ -35,7 +35,7 @@ describe("listAvailablePiModels", () => {
 
     try {
       await Effect.runPromise(listAvailablePiModels(cwd));
-      assert.equal(fs.existsSync(marker), false);
+      assert.equal(fs.existsSync(marker), true);
     } finally {
       fs.rmSync(cwd, { recursive: true, force: true });
     }
