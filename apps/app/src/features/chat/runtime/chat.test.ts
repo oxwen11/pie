@@ -402,6 +402,38 @@ describe("Chat prompting", () => {
     expect(assistantText(defined(messages[1]))).toBe("reply");
     expect(chat.store.getState().status).toBe("ready");
   });
+
+  // A delivered steer is a new `start` in the same turn. The fold must not
+  // keep the previous assistant parts under that new id.
+  it("starts a steered segment without the previous assistant text", async () => {
+    const { chat, attach, live } = makeChat();
+    await attach({});
+    live(1, { type: "session.turn.started", turnId: "turn-1", phase: "running" });
+    const first = [
+      { type: "start", messageId: "asst-1" } as const,
+      ...textChunks("t", "FIRST"),
+      { type: "finish" } as const,
+    ];
+    for (const [index, chunk] of first.entries()) {
+      live(2 + index, { type: "session.message.chunk", turnId: "turn-1", chunk });
+    }
+    await settle();
+    live(7, {
+      type: "session.prompt.submitted",
+      messageId: "steer-1",
+      parts: [{ type: "text", text: "STEER" }],
+      phase: "running",
+    });
+    const second = [{ type: "start", messageId: "asst-2" } as const, ...textChunks("t2", "SECOND")];
+    for (const [index, chunk] of second.entries()) {
+      live(8 + index, { type: "session.message.chunk", turnId: "turn-1", chunk });
+    }
+    await settle();
+
+    const messages = chat.store.getState().messages;
+    expect(messages.map((message) => message.role)).toEqual(["assistant", "user", "assistant"]);
+    expect(messages.map((message) => assistantText(message))).toEqual(["FIRST", "STEER", "SECOND"]);
+  });
 });
 
 describe("Chat interruption", () => {
