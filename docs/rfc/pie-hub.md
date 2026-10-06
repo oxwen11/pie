@@ -457,11 +457,38 @@ commented out for months, and a stale second consumer silently taking events. He
 persist before any push, answer after persist regardless of delivery, always arm and
 monitor the alarm sweep, and run exactly one consumer.
 
-**Header auth is precedented but not yet proven in this design, so a local prototype stays a gate before implementation. Still unverified:** the daemon-side `ws` pattern with the same Worker-then-DO forwarding as above;
-`wrangler dev` supports hibernating WebSockets; WebSocket `send` is covered by
-output gates (ack-after-persist); wake-up latency for held delivery. Deployment is a
-production operation and needs the operator's explicit consent; this RFC authorizes
-none.
+### Phase 0 prototype result (local `wrangler dev`, 2026-10-06)
+
+A throwaway Worker plus one SQLite Durable Object (kept outside the repository) and
+a Node `ws` client exercised the contract's transport. All 14 checks passed, with
+these observations:
+
+- **Header auth works.** A Node `ws` client sends `Authorization: Bearer ...` on the
+  upgrade; a wrong token gets 401 from the Worker; the Worker forwards the original
+  request to the object, which trusts it and calls `acceptWebSocket`.
+- **Heartbeat without waking.** `setWebSocketAutoResponse("ping", "pong")` answered
+  in about 50 ms and `getWebSocketAutoResponseTimestamp` recorded it, so missed
+  heartbeats can be judged from an alarm without per-ping code.
+- **Hibernation and wake.** After 20 idle seconds the object was re-initialised (its
+  constructor ran again) while the socket stayed open; the next operator event
+  reached the socket in 15-18 ms. Keep the constructor cheap, and do not generate
+  random values at module scope (workerd rejects it).
+- **Persist, push, ack.** Events are inserted with `INSERT OR IGNORE` before the push;
+  a duplicate id returned `duplicate: true` and did not reset an acked event; an
+  event stays `pending` until acked and `attempts` increments on every redelivery,
+  including across test runs (SQLite persisted).
+- **Hold.** Events injected with no socket stayed `pending` and were delivered
+  oldest first on reconnect; unacked events were redelivered.
+- **Replaced socket.** A second connection closed the first with code 4101, but
+  `getWebSockets()` still listed the closing socket and an event was first sent to
+  it; the fix is to deliver only to `OPEN` sockets not marked replaced (stored in the
+  attachment). The old socket took about 10 seconds to finish closing locally.
+
+**Still unverified:** whether WebSocket `send` is held by output gates until the
+write is persisted (the acks above prove ordering in our code, not the gate); behavior
+and latency on Cloudflare's network rather than local `wrangler dev`; Free-plan
+quota behavior under real use. Deployment is a production operation and needs the
+operator's explicit consent; this RFC authorizes none.
 
 Node-only and a Worker/DO adapter are not both built: the Worker is the single V1
 host. `packages/hub` therefore uses Web APIs and DO storage, not `node:fs` or
@@ -519,12 +546,10 @@ Candidate rules needing explicit approval:
 This RFC is one documentation slice. Implementation starts only after the decisions
 it needs and the worksheet are confirmed. Phases land independently.
 
-### Phase 0: prototype (no deploy)
+### Phase 0: prototype (no deploy) — done locally
 
-A local `wrangler dev` Durable Object accepts a hibernating WebSocket from a Node
-client with header auth, writes SQLite before acking, and survives hibernation and
-reconnect. It answers the four unverified items in section 8. No repository code is
-shipped from it.
+Result in section 8. Remaining before implementation: a deployed-network check of
+output-gate behavior and latency, with the operator's consent.
 
 ### Phase 1: connection, events and hold
 
