@@ -111,15 +111,12 @@ describe("createCommanderCli", () => {
     let listed = false;
     const contract = {
       project: {
-        create: oc
-          .meta(cli({ description: "Register a project", options: { path: { alias: "p" } } }))
-          .input(Create),
+        create: oc.meta(cli({ description: "Register a project" })).input(Create),
         list: oc.input(z.object({ archived: z.boolean().optional() })),
       },
     };
     const base = implement(contract);
     const program = createCommanderCli({
-      name: "pie",
       router: base.router({
         project: {
           create: base.project.create.handler(({ input }) => {
@@ -158,7 +155,7 @@ describe("createCommanderCli", () => {
     const contract = {
       session: {
         show: oc.meta(cli({ description: "Show" })).input(Show),
-        list: oc.meta(cli({ alias: "ls" })).input(List),
+        list: oc.meta(cli()).input(List),
       },
     };
     const base = implement(contract);
@@ -183,7 +180,7 @@ describe("createCommanderCli", () => {
 
     const listedResult = await run(program, [
       "session",
-      "ls",
+      "list",
       "--count",
       "2",
       "--tag",
@@ -322,21 +319,5 @@ describe("createCommanderCli", () => {
     const daemon = await run(program, ["daemon", "start"]);
     expect(daemon.exitCode).toBe(0);
     expect(started).toBe(true);
-  });
-
-  it("throws when a generated command collides with an existing one", () => {
-    const contract = {
-      project: { create: oc.meta(cli({})).input(Create) },
-    };
-    const base = implement(contract);
-    const program = new Command();
-    program.command("project").command("create");
-    const router = base.router({
-      project: {
-        create: base.project.create.handler(() => ({})),
-      },
-    });
-
-    expect(() => createCommanderCli({ program, router, toJsonSchema })).toThrow(/project create/);
   });
 });

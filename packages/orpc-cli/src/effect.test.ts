@@ -96,20 +96,23 @@ describe("createEffectCli", () => {
         started = true;
       }),
     );
-    const command = createEffectCli({
-      name: "pie",
-      router: base.router({
-        project: {
-          create: base.project.create.handler(({ input }) => {
-            created = input;
-            return input;
+    const command = Command.make("pie").pipe(
+      Command.withSubcommands([
+        ...createEffectCli({
+          router: base.router({
+            project: {
+              create: base.project.create.handler(({ input }) => {
+                created = input;
+                return input;
+              }),
+              list: base.project.list.handler(() => []),
+            },
           }),
-          list: base.project.list.handler(() => []),
-        },
-      }),
-      toJsonSchema,
-      commands: [daemon],
-    });
+          toJsonSchema,
+        }),
+        daemon,
+      ]),
+    );
 
     const result = await run(command, ["project", "create", "--path", "/tmp/pie"]);
     expect(created).toEqual({ path: "/tmp/pie" });
@@ -123,32 +126,23 @@ describe("createEffectCli", () => {
     let shown: unknown;
     const contract = { session: { show: oc.meta(cli({})).input(Show) } };
     const base = implement(contract);
-    const command = createEffectCli({
-      name: "pie",
-      router: base.router({
-        session: {
-          show: base.session.show.handler(({ input }) => {
-            shown = input;
-            return input;
+    const command = Command.make("pie").pipe(
+      Command.withSubcommands(
+        createEffectCli({
+          router: base.router({
+            session: {
+              show: base.session.show.handler(({ input }) => {
+                shown = input;
+                return input;
+              }),
+            },
           }),
-        },
-      }),
-      toJsonSchema,
-    });
+          toJsonSchema,
+        }),
+      ),
+    );
 
     await run(command, ["session", "show", "--ref.project-id", "p1", "--ref.session-id", "s1"]);
     expect(shown).toEqual({ ref: { projectId: "p1", sessionId: "s1" } });
-  });
-
-  it("throws when a sibling reuses a generated command name", () => {
-    const contract = { project: { create: oc.meta(cli({})).input(Create) } };
-    const base = implement(contract);
-    const router = base.router({
-      project: { create: base.project.create.handler(() => ({})) },
-    });
-    const project = Command.make("project");
-    expect(() =>
-      createEffectCli({ name: "pie", router, toJsonSchema, commands: [project] }),
-    ).toThrow(/project/);
   });
 });

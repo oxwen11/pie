@@ -8,18 +8,8 @@ import {
   type Context,
 } from "@orpc/server";
 
-export interface CliOptionMeta {
-  alias?: string;
-  description?: string;
-  hidden?: boolean;
-}
-
 export interface CliMeta {
   description?: string;
-  /** Command alias, not an option alias. */
-  alias?: string;
-  /** Keys are schema paths: `path`, `ref.projectId`. */
-  options?: Readonly<Record<string, CliOptionMeta>>;
 }
 
 export interface CliJsonSchema {
@@ -47,8 +37,6 @@ export interface CliField {
   schema: CliJsonSchema;
   required: boolean;
   description: string;
-  alias?: string;
-  hidden?: boolean;
   kind: FieldKind;
   choices?: readonly string[];
   integer: boolean;
@@ -91,13 +79,13 @@ const [cliPlugin, getCliMeta] = defineMeta(
   "~cli",
   (incoming: CliMeta, current: CliMeta | undefined): CliMeta => ({
     description: incoming.description ?? current?.description,
-    alias: incoming.alias ?? current?.alias,
-    options: { ...current?.options, ...incoming.options },
   }),
 );
 
 /** Opt a procedure into the CLI. Unmarked procedures are not registered. */
-export const cli = cliPlugin;
+export function cli(meta: CliMeta = {}): ReturnType<typeof cliPlugin> {
+  return cliPlugin(meta);
+}
 
 export { getCliMeta };
 
@@ -193,7 +181,7 @@ function toSpec(
   toJsonSchema: CliAdapterOptions["toJsonSchema"],
 ): CliCommandSpec {
   const schema = entry.procedure["~orpc"].inputSchemas?.at(-1);
-  const fields = schema === undefined ? [] : fieldsFor(schema, entry.meta, toJsonSchema);
+  const fields = schema === undefined ? [] : fieldsFor(schema, toJsonSchema);
   return {
     procedure: entry.procedure,
     path: entry.path,
@@ -220,24 +208,15 @@ function assertDistinct(specs: readonly CliCommandSpec[]): void {
   }
 }
 
-function fieldsFor(
-  schema: AnySchema,
-  meta: CliMeta,
-  toJsonSchema: CliAdapterOptions["toJsonSchema"],
-): CliField[] {
+function fieldsFor(schema: AnySchema, toJsonSchema: CliAdapterOptions["toJsonSchema"]): CliField[] {
   const json = toJsonSchema(schema);
   if (json === undefined) return [];
   const unwrapped = unwrap(json);
   if (!isObjectSchema(unwrapped)) return [];
-  return collectFields(unwrapped, "", true, meta);
+  return collectFields(unwrapped, "", true);
 }
 
-function collectFields(
-  schema: CliJsonSchema,
-  prefix: string,
-  parentRequired: boolean,
-  meta: CliMeta,
-): CliField[] {
+function collectFields(schema: CliJsonSchema, prefix: string, parentRequired: boolean): CliField[] {
   const required = schema.required === undefined ? new Set<string>() : new Set(schema.required);
   const fields: CliField[] = [];
   for (const [key, property] of Object.entries(schema.properties ?? {})) {
@@ -245,10 +224,9 @@ function collectFields(
     const child = unwrap(property);
     const fieldRequired = parentRequired && required.has(key);
     if (isObjectSchema(child)) {
-      fields.push(...collectFields(child, path, fieldRequired, meta));
+      fields.push(...collectFields(child, path, fieldRequired));
       continue;
     }
-    const optionMeta = meta.options?.[path];
     const flag = flagName(path);
     if (fields.some((field) => field.flag === flag)) {
       throw new Error(`CLI option "--${flag}" is registered twice`);
@@ -258,9 +236,7 @@ function collectFields(
       flag,
       schema: child,
       required: fieldRequired,
-      description: optionMeta?.description ?? child.description ?? "",
-      alias: optionMeta?.alias,
-      hidden: optionMeta?.hidden,
+      description: child.description ?? "",
       kind: fieldKind(child),
       choices: stringChoices(child),
       integer: schemaTypes(child).includes("integer"),

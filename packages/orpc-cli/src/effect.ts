@@ -15,30 +15,11 @@ import {
   type CliField,
 } from "./metadata";
 
-export interface EffectCliOptions extends CliAdapterOptions {
-  name: string;
-  description?: string;
-  /** Sibling commands. `withSubcommands` replaces, so pass them here. */
-  commands?: ReadonlyArray<Command.Command.Any>;
-}
-
-/** Effect CLI adapter. `--help` is Effect CLI's. Run with `Command.run`. */
-export function createEffectCli(options: EffectCliOptions): Command.Command.Any {
-  const generated = group(readCliCommands(options.router, options.toJsonSchema)).map((node) =>
+/** Effect CLI adapter. Compose the returned commands with `Command.withSubcommands`. */
+export function createEffectCli(options: CliAdapterOptions): ReadonlyArray<Command.Command.Any> {
+  return group(readCliCommands(options.router, options.toJsonSchema)).map((node) =>
     compile(node, options),
   );
-  const extra = options.commands ?? [];
-  for (const command of extra) {
-    if (generated.some((item) => item.name === command.name)) {
-      throw new Error(`CLI command "${command.name}" conflicts with an existing command`);
-    }
-  }
-  const root = Command.make(options.name);
-  const described =
-    options.description === undefined
-      ? root
-      : root.pipe(Command.withDescription(options.description));
-  return described.pipe(Command.withSubcommands([...generated, ...extra]));
 }
 
 interface Node {
@@ -64,13 +45,13 @@ function group(specs: readonly CliCommandSpec[]): readonly Node[] {
   return [...roots.values()];
 }
 
-function compile(node: Node, options: EffectCliOptions): Command.Command.Any {
+function compile(node: Node, options: CliAdapterOptions): Command.Command.Any {
   const children = [...node.children.values()].map((child) => compile(child, options));
   if (node.leaf !== undefined) return leaf(node.leaf, options);
   return Command.make(node.name).pipe(Command.withSubcommands(children));
 }
 
-function leaf(spec: CliCommandSpec, options: EffectCliOptions): Command.Command.Any {
+function leaf(spec: CliCommandSpec, options: CliAdapterOptions): Command.Command.Any {
   const relaxRequired = spec.hasInput && !spec.fields.some((field) => field.flag === "input");
   const config: { [key: string]: Flag.Flag<unknown> } = {};
   for (const field of spec.fields) config[field.key] = fieldFlag(field, relaxRequired);
@@ -87,14 +68,13 @@ function leaf(spec: CliCommandSpec, options: EffectCliOptions): Command.Command.
   if (spec.meta.description !== undefined) {
     command = command.pipe(Command.withDescription(spec.meta.description));
   }
-  if (spec.meta.alias !== undefined) command = command.pipe(Command.withAlias(spec.meta.alias));
   return command;
 }
 
 async function runLeaf(
   spec: CliCommandSpec,
   parsed: Readonly<Record<string, unknown>>,
-  options: EffectCliOptions,
+  options: CliAdapterOptions,
 ): Promise<void> {
   const values = readParsed(parsed);
   const missing = missingRequired(values, spec.fields);
@@ -144,9 +124,7 @@ function unwrap(value: unknown): ReturnType<typeof parseJson> | undefined {
 
 function fieldFlag(field: CliField, relaxRequired: boolean): Flag.Flag<unknown> {
   let flag = baseFlag(field);
-  if (field.alias !== undefined) flag = flag.pipe(Flag.withAlias(field.alias));
   if (field.description !== "") flag = flag.pipe(Flag.withDescription(field.description));
-  if (field.hidden === true) flag = flag.pipe(Flag.withHidden);
   if (!field.required || relaxRequired) flag = flag.pipe(Flag.optional);
   return flag;
 }

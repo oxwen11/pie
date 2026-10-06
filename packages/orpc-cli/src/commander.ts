@@ -14,53 +14,29 @@ import {
   type CliField,
 } from "./metadata";
 
-export interface CommanderCliOptions extends CliAdapterOptions {
-  name?: string;
-  description?: string;
-  version?: string;
-  /** Register onto this program. An existing command with the same path throws. */
-  program?: Command;
-}
-
 /**
  * Commander adapter. Does not parse argv and does not `process.exit`
  * (`exitOverride`). `--help` and usage errors throw `CommanderError`.
  * Add non-oRPC commands on the returned program before `parseAsync`.
  */
-export function createCommanderCli(options: CommanderCliOptions): Command {
-  const program = options.program ?? new Command();
+export function createCommanderCli(options: CliAdapterOptions): Command {
+  const program = new Command();
   program.exitOverride();
   program.showHelpAfterError();
   program.showSuggestionAfterError();
-  if (options.program === undefined) {
-    if (options.name !== undefined) program.name(options.name);
-    if (options.description !== undefined) program.description(options.description);
-    if (options.version !== undefined) program.version(options.version);
-  }
-
   for (const spec of readCliCommands(options.router, options.toJsonSchema)) {
     register(program, spec, options);
   }
   return program;
 }
 
-function register(program: Command, spec: CliCommandSpec, options: CommanderCliOptions): void {
+function register(program: Command, spec: CliCommandSpec, options: CliAdapterOptions): void {
   const leafName = spec.path.at(-1);
   if (leafName === undefined) return;
   const parent = ensureParent(program, spec.path.slice(0, -1));
-  if (
-    parent.commands.some(
-      (command) => command.name() === leafName || command.aliases().includes(leafName),
-    )
-  ) {
-    throw new Error(`CLI command "${spec.path.join(" ")}" conflicts with an existing command`);
-  }
-
   const leaf = parent.command(leafName);
   leaf.showHelpAfterError();
   if (spec.meta.description !== undefined) leaf.description(spec.meta.description);
-  if (spec.meta.alias !== undefined) leaf.alias(spec.meta.alias);
-
   const claimedInput = spec.fields.some((field) => field.flag === "input");
   for (const field of spec.fields) addFieldOption(leaf, field);
   if (spec.hasInput && !claimedInput) {
@@ -130,7 +106,6 @@ function ensureParent(program: Command, names: readonly string[]): Command {
 function addFieldOption(command: Command, field: CliField): void {
   const description = field.required ? appendRequired(field.description) : field.description;
   const option = new FieldOption(optionFlags(field), description, field.key);
-  if (field.hidden === true) option.hideHelp();
   if (field.kind === "array") {
     const items = field.schema.items ?? {};
     option.argParser((value: string, previous: JsonValue[] | undefined) => [
@@ -143,9 +118,7 @@ function addFieldOption(command: Command, field: CliField): void {
   if (field.choices !== undefined) option.choices([...field.choices]);
   command.addOption(option);
   if (field.kind === "boolean") {
-    const negation = new FieldOption(`--no-${field.flag}`, `Negate --${field.flag}`, field.key);
-    if (field.hidden === true) negation.hideHelp();
-    command.addOption(negation);
+    command.addOption(new FieldOption(`--no-${field.flag}`, `Negate --${field.flag}`, field.key));
   }
 }
 
@@ -164,9 +137,7 @@ function optionFlags(field: CliField): string {
           ? " <json>"
           : " <value>";
   const body = `${long}${token}`;
-  if (field.alias === undefined) return body;
-  const short = field.alias.length === 1 ? `-${field.alias}` : `--${field.alias}`;
-  return `${short}, ${body}`;
+  return body;
 }
 
 function coerce(schema: CliField["schema"], value: string): JsonValue {

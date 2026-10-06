@@ -8,7 +8,6 @@ export {
   type CliField,
   type CliJsonSchema,
   type CliMeta,
-  type CliOptionMeta,
 } from "./metadata";
-export { createCommanderCli, type CommanderCliOptions } from "./commander";
-export { createEffectCli, type EffectCliOptions } from "./effect";
+export { createCommanderCli } from "./commander";
+export { createEffectCli } from "./effect";
