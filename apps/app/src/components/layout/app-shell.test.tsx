@@ -14,7 +14,7 @@ import { page } from "vitest/browser";
 import "@/index.css";
 import { PlatformProvider } from "@/platform-provider";
 
-import { AppShellBody, AppShellMain, AppShellSidebar } from "./app-shell";
+import { AppShellBody, AppShellMain, AppShellSessionPanel, AppShellSidebar } from "./app-shell";
 import { ContentPanel } from "./content-panel/model/content-panel";
 import { ContentPanelSessionProvider } from "./content-panel/react/session-provider";
 import type { AnyPanelView } from "./content-panel/react/view";
@@ -112,4 +112,73 @@ it("keeps one bordered inset frame around the sidebar and main when the sidebar 
   await expect
     .poll(() => title.getBoundingClientRect().left)
     .toBe(toggle.element().getBoundingClientRect().right + 8);
+});
+
+it("places the content-panel tab strip in the titlebar above the panel column", async () => {
+  await page.viewport(1280, 800);
+  const contentPanel = new ContentPanel<AnyPanelView>();
+  const sessionRef = {
+    environmentId: "env-1",
+    ref: { projectId: "11111111-1111-4111-8111-111111111111", sessionId: "session-1" },
+  };
+  contentPanel.setPresentation(sessionRef, "docked");
+  const root = createRootRoute({
+    component: () => (
+      <PlatformProvider
+        value={{ os: "macos", windowChrome: { titlebarHeight: 44, toggleInset: 88 } }}
+      >
+        <SidebarProvider className="h-svh overflow-hidden" defaultOpen>
+          <LazyMotion features={domAnimation}>
+            <ContentPanelSessionProvider contentPanel={contentPanel} sessionRef={sessionRef}>
+              <AppShellBody>
+                <AppShellSidebar>
+                  <div>Session list</div>
+                </AppShellSidebar>
+                <AppShellMain>
+                  <main>Main canvas</main>
+                </AppShellMain>
+                <AppShellSessionPanel />
+              </AppShellBody>
+            </ContentPanelSessionProvider>
+          </LazyMotion>
+        </SidebarProvider>
+      </PlatformProvider>
+    ),
+  });
+  const router = createRouter({
+    routeTree: root,
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  await router.load();
+  await render(<RouterProvider router={router} />);
+
+  const maximize = page.getByRole("button", { name: "Maximize panel" });
+  await expect.element(maximize).toBeVisible();
+  const titlebar = maximize.element().closest("header");
+  const column = document.querySelector('[data-slot="content-panel-column"]');
+  const slot = document.querySelector('[data-slot="shell-content-title"]');
+  if (!titlebar || !(column instanceof HTMLElement) || !(slot instanceof HTMLElement)) {
+    throw new Error("Missing titlebar, panel column or content title slot");
+  }
+  expect(column.contains(maximize.element())).toBe(false);
+  await expect
+    .poll(() => slot.getBoundingClientRect().left)
+    .toBe(column.getBoundingClientRect().left);
+  const toggle = page.getByRole("button", { name: "Toggle content panel" }).element();
+  expect(slot.getBoundingClientRect().right).toBe(toggle.getBoundingClientRect().left - 8);
+  const title = document.querySelector('[data-slot="shell-title"]');
+  if (!(title instanceof HTMLElement)) throw new Error("Missing title slot");
+  expect(title.getBoundingClientRect().right).toBeLessThanOrEqual(
+    slot.getBoundingClientRect().left,
+  );
+  const rule = getComputedStyle(slot, "::before");
+  expect(rule.width).toBe("1px");
+  expect(rule.left).toBe("-1px");
+
+  await maximize.click();
+  await expect.poll(() => getComputedStyle(title).display).toBe("none");
+  expect(getComputedStyle(slot, "::before").display).toBe("none");
+  await expect
+    .poll(() => slot.getBoundingClientRect().left)
+    .toBe(column.getBoundingClientRect().left);
 });
