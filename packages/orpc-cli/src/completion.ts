@@ -1,18 +1,13 @@
-import {
-  generate,
-  type CommandDescriptor,
-  type FlagType,
-  type Shell,
-} from "effect/unstable/cli/Completions";
+import { Completions } from "effect/cli";
 
 import type { CliCommandSpec, CliField } from "./metadata";
 
 export function completionScript(
   executableName: string,
   specs: readonly CliCommandSpec[],
-  shell: Shell = "bash",
+  shell: Completions.Shell = "bash",
 ): string {
-  return generate(executableName, shell, {
+  return Completions.generate(executableName, shell, {
     name: executableName,
     description: undefined,
     flags: [],
@@ -24,7 +19,7 @@ export function completionScript(
 function childDescriptors(
   specs: readonly CliCommandSpec[],
   prefix: readonly string[],
-): CommandDescriptor[] {
+): Completions.CommandDescriptor[] {
   const names = [
     ...new Set(
       specs
@@ -44,7 +39,7 @@ function descriptor(
   name: string,
   specs: readonly CliCommandSpec[],
   path: readonly string[],
-): CommandDescriptor {
+): Completions.CommandDescriptor {
   const leaf = specs.find(
     (spec) =>
       spec.path.length === path.length && spec.path.every((part, index) => part === path[index]),
@@ -68,7 +63,7 @@ function descriptor(
   };
 }
 
-function flagDescriptor(field: CliField): CommandDescriptor["flags"][number] {
+function flagDescriptor(field: CliField): Completions.CommandDescriptor["flags"][number] {
   return {
     name: field.flag,
     aliases: field.alias === undefined ? [] : [field.alias],
@@ -77,7 +72,7 @@ function flagDescriptor(field: CliField): CommandDescriptor["flags"][number] {
   };
 }
 
-function flagType(field: CliField): FlagType {
+function flagType(field: CliField): Completions.FlagType {
   if (field.kind === "boolean") return { _tag: "Boolean" };
   if (field.kind === "integer") return { _tag: "Int" };
   if (field.kind === "number") return { _tag: "Finite" };

@@ -2,8 +2,8 @@ import "@orpc/experimental-effect/extensions/input-output";
 import { oc } from "@orpc/contract";
 import { implement } from "@orpc/server";
 import { Effect, FileSystem, Layer, Path, Schema, Stdio, Terminal } from "effect";
-import { Command } from "effect/unstable/cli";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { Command } from "effect/cli";
+import { ChildProcessSpawner } from "effect/process";
 import { describe, expect, it, vi } from "vitest";
 
 import { createEffectCli } from "./effect";
