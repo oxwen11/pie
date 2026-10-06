@@ -91,6 +91,9 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     { resolve: (value: RpcExtensionUIResponse) => void; reject: (error: Error) => void }
   >();
 
+  // Startup bind runs before stdin is read, so no host can answer a dialog yet.
+  let acceptingUiResponses = false;
+
   // Shutdown request flag
   let shutdownRequested = false;
   let shuttingDown = false;
@@ -104,6 +107,8 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     parseResponse: (response: RpcExtensionUIResponse) => T,
   ): Promise<T> {
     if (opts?.signal?.aborted) return Promise.resolve(defaultValue);
+    // Decline instead of waiting on a reply that can never arrive.
+    if (!acceptingUiResponses) return Promise.resolve(defaultValue);
 
     const id = crypto.randomUUID();
     return new Promise((resolve, reject) => {
@@ -871,6 +876,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     const detachJsonl = attachJsonlLineReader(process.stdin, (line) => {
       void handleInputLine(line);
     });
+    acceptingUiResponses = true;
     return () => {
       detachJsonl();
       process.stdin.off("end", onInputEnd);
