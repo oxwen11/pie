@@ -1,4 +1,4 @@
-import { PanelRight } from "lucide-react";
+import { PanelRight, SquarePlus } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { PanelToggleButton } from "@/components/layout/panel-toggle-button";
@@ -17,7 +17,7 @@ export function ContentPanelToggle({ className }: { readonly className?: string 
       label="Toggle content panel"
       onClick={() => session.toggleVisibility()}
       open={presentation !== "hidden"}
-      openIcon={PanelRight}
+      openIcon={SquarePlus}
     />
   );
 }
