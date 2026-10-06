@@ -81,7 +81,7 @@ function TabStrip({
        */}
       <div
         ref={scroller}
-        className="scrollbar-hide flex min-w-0 items-center gap-0.5 overflow-x-auto"
+        className="scrollbar-hide flex min-w-0 items-center gap-1 overflow-x-auto"
       >
         {panels.map((panel) => (
           <Tab key={panel.id} panel={panel} active={panel.id === activeId} session={session} />
@@ -128,10 +128,12 @@ function Tab({
       // `data-active`, as both `tabs` and `sidebar` spell it. Also how the strip
       // finds the tab to scroll into view.
       data-active={active || undefined}
+      // Browser-style tabs: a fixed width that shrinks before the strip scrolls,
+      // and a raised card surface for the current one.
       className={cn(
-        "group flex h-7 max-w-40 shrink-0 items-center gap-1 rounded-md ps-1.5 pe-1",
+        "group/tab flex h-8 w-60 min-w-24 shrink items-center gap-1 rounded-lg ps-2.5 pe-1.5 text-sm",
         active
-          ? "bg-accent text-foreground"
+          ? "bg-card text-foreground ring-border shadow-xs ring-1"
           : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
       )}
       // A middle click closes the tab, the way every tabbed thing does.
@@ -145,20 +147,20 @@ function Tab({
         type="button"
         // Which tab is current must not be carried by the background alone.
         aria-current={active || undefined}
-        className="flex min-w-0 items-center gap-1.5"
+        className="flex min-w-0 flex-1 items-center gap-1.5"
         onClick={() => session.activate(panel.id)}
         title={panel.label}
       >
-        <Icon className="size-3.5 shrink-0" />
+        <Icon className="size-4 shrink-0" />
         <span className="truncate">{panel.label}</span>
       </button>
       <button
         type="button"
-        className="hover:bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded-md opacity-0 group-focus-within/tab:opacity-100 group-hover/tab:opacity-100 focus-visible:opacity-100"
         aria-label={`Close ${panel.label}`}
         onClick={() => session.close(panel.id)}
       >
-        <XIcon className="size-3" />
+        <XIcon className="size-3.5" />
       </button>
     </div>
   );
