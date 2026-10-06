@@ -61,11 +61,11 @@ catalogs:
   # The published beta packages depend on each other with exact versions, so
   # pinning the direct deps here is sufficient — no override needed.
   orpc:
-    "@orpc/client": 2.0.0-beta.35
-    "@orpc/contract": 2.0.0-beta.35
-    "@orpc/experimental-effect": 2.0.0-beta.35
-    "@orpc/server": 2.0.0-beta.35
-    "@orpc/tanstack-query": 2.0.0-beta.35
+    "@orpc/client": 2.0.0-beta.42
+    "@orpc/contract": 2.0.0-beta.42
+    "@orpc/experimental-effect": 2.0.0-beta.42
+    "@orpc/server": 2.0.0-beta.42
+    "@orpc/tanstack-query": 2.0.0-beta.42
   # ProseMirror state is shared through @tiptap/pm — mixed tiptap versions
   # split that singleton, so the family upgrades together.
   tiptap:
