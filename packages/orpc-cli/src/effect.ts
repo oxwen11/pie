@@ -129,8 +129,7 @@ function fieldFlag(field: CliField, relaxRequired: boolean): Flag.Flag<unknown> 
 
 function baseFlag(field: CliField): Flag.Flag<unknown> {
   if (field.kind === "boolean") return Flag.Boolean(field.flag);
-  if (field.kind === "number")
-    return field.integer ? Flag.Int(field.flag) : Flag.Finite(field.flag);
+  if (field.kind === "number") return Flag.Finite(field.flag);
   if (field.choices !== undefined) return Flag.Literals(field.flag, field.choices);
   if (field.kind === "array") return Flag.atLeast(itemFlag(field), 1);
   if (field.kind === "json") return jsonFlag(field.flag);
@@ -138,10 +137,8 @@ function baseFlag(field: CliField): Flag.Flag<unknown> {
 }
 
 function itemFlag(field: CliField): Flag.Flag<unknown> {
-  const items = field.schema.items;
-  if (items?.type === "integer") return Flag.Int(field.flag);
-  if (items?.type === "number") return Flag.Finite(field.flag);
-  if (items?.type === "boolean") return Flag.Boolean(field.flag);
+  if (field.itemKind === "number") return Flag.Finite(field.flag);
+  if (field.itemKind === "boolean") return Flag.Boolean(field.flag);
   return Flag.String(field.flag);
 }
 

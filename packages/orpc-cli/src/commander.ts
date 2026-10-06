@@ -107,13 +107,12 @@ function addFieldOption(command: Command, field: CliField): void {
   const description = field.required ? appendRequired(field.description) : field.description;
   const option = new FieldOption(optionFlags(field), description, field.key);
   if (field.kind === "array") {
-    const items = field.schema.items ?? {};
     option.argParser((value: string, previous: JsonValue[] | undefined) => [
       ...(previous ?? []),
-      coerce(items, value),
+      coerceValue(field.itemKind ?? "string", value),
     ]);
   } else if (field.kind === "number") {
-    option.argParser((value: string) => coerce(field.schema, value));
+    option.argParser((value: string) => coerceValue("number", value));
   } else if (field.kind === "json") {
     option.argParser((value: string) => {
       try {
@@ -148,21 +147,12 @@ function optionFlags(field: CliField): string {
   return body;
 }
 
-function coerce(schema: CliField["schema"], value: string): JsonValue {
-  if (schema.type === "number" || schema.type === "integer") {
-    if (value.trim() === "" || Number.isNaN(Number(value))) {
-      throw new InvalidArgumentError(`expected a number, got "${value}"`);
-    }
-    return Number(value);
+function coerceValue(kind: "string" | "number" | "boolean", value: string): JsonValue {
+  if (kind !== "number") return value;
+  if (value.trim() === "" || Number.isNaN(Number(value))) {
+    throw new InvalidArgumentError(`expected a number, got "${value}"`);
   }
-  if (schema.type === "object" || schema.type === "array") {
-    try {
-      return parseJson(value);
-    } catch (error) {
-      throw new InvalidArgumentError(error instanceof Error ? error.message : "invalid JSON");
-    }
-  }
-  return value;
+  return Number(value);
 }
 
 class FieldOption extends Option {

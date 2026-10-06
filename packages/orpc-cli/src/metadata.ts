@@ -8,20 +8,10 @@ import {
   type Context,
 } from "@orpc/server";
 import { Schema } from "effect";
+import * as SchemaAST from "effect/SchemaAST";
 
 export interface CliMeta {
   description?: string;
-}
-
-export interface CliJsonSchema {
-  type?: string | readonly string[];
-  description?: string;
-  properties?: Readonly<Record<string, CliJsonSchema>>;
-  required?: readonly string[];
-  items?: CliJsonSchema;
-  enum?: readonly (string | number | boolean | null)[];
-  anyOf?: readonly CliJsonSchema[];
-  oneOf?: readonly CliJsonSchema[];
 }
 
 export interface CliAdapterOptions {
@@ -33,12 +23,11 @@ export interface CliAdapterOptions {
 export interface CliField {
   key: string;
   flag: string;
-  schema: CliJsonSchema;
   required: boolean;
   description: string;
   kind: FieldKind;
+  itemKind?: "string" | "number" | "boolean";
   choices?: readonly string[];
-  integer: boolean;
 }
 
 /** One opted-in procedure. Adapters turn this into a command; they do not rediscover the router. */
@@ -205,82 +194,26 @@ function assertDistinct(specs: readonly CliCommandSpec[]): void {
   }
 }
 
-function jsonSchemaOf(schema: AnySchema): CliJsonSchema | undefined {
-  if (!Schema.isSchema(schema)) return undefined;
-  try {
-    return readJsonSchema(
-      Schema.toStandardJSONSchemaV1(schema)["~standard"].jsonSchema.input({ target: "draft-07" }),
-    );
-  } catch {
-    return undefined;
-  }
-}
-
-function readJsonSchema(raw: Record<string, unknown>): CliJsonSchema {
-  const schema: CliJsonSchema = {};
-  if (typeof raw.type === "string") schema.type = raw.type;
-  else if (Array.isArray(raw.type) && raw.type.every((item) => typeof item === "string")) {
-    schema.type = raw.type;
-  }
-  if (typeof raw.description === "string") schema.description = raw.description;
-  if (Array.isArray(raw.required) && raw.required.every((item) => typeof item === "string")) {
-    schema.required = raw.required;
-  }
-  if (isRecord(raw.properties)) {
-    const properties: Record<string, CliJsonSchema> = {};
-    for (const [key, value] of Object.entries(raw.properties)) {
-      if (isRecord(value)) properties[key] = readJsonSchema(value);
-    }
-    schema.properties = properties;
-  }
-  if (isRecord(raw.items)) schema.items = readJsonSchema(raw.items);
-  if (Array.isArray(raw.enum)) schema.enum = raw.enum.filter(isEnumValue);
-  const anyOf = readSchemaArray(raw.anyOf);
-  const oneOf = readSchemaArray(raw.oneOf);
-  if (anyOf !== undefined) schema.anyOf = anyOf;
-  if (oneOf !== undefined) schema.oneOf = oneOf;
-  return schema;
-}
-
-function readSchemaArray(value: unknown): CliJsonSchema[] | undefined {
-  if (!Array.isArray(value)) return undefined;
-  const schemas: CliJsonSchema[] = [];
-  for (const item of value) {
-    if (isRecord(item)) schemas.push(readJsonSchema(item));
-  }
-  return schemas;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function isEnumValue(value: unknown): value is string | number | boolean | null {
-  return (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "boolean"
-  );
-}
-
 function fieldsFor(schema: AnySchema): CliField[] {
-  const json = jsonSchemaOf(schema);
-  if (json === undefined) return [];
-  const unwrapped = unwrap(json);
-  if (!isObjectSchema(unwrapped)) return [];
-  return collectFields(unwrapped, "", true);
+  if (!Schema.isSchema(schema)) return [];
+  const root = stripOptional(schema.ast);
+  if (!isPlainObject(root.ast)) return [];
+  return collectFields(root.ast, "", !root.optional);
 }
 
-function collectFields(schema: CliJsonSchema, prefix: string, parentRequired: boolean): CliField[] {
-  const required = schema.required === undefined ? new Set<string>() : new Set(schema.required);
+function collectFields(
+  ast: SchemaAST.Objects,
+  prefix: string,
+  parentRequired: boolean,
+): CliField[] {
   const fields: CliField[] = [];
-  for (const [key, property] of Object.entries(schema.properties ?? {})) {
-    const path = prefix === "" ? key : `${prefix}.${key}`;
-    const child = unwrap(property);
-    const fieldRequired = parentRequired && required.has(key);
-    if (isObjectSchema(child)) {
-      fields.push(...collectFields(child, path, fieldRequired));
+  for (const property of ast.propertySignatures) {
+    if (typeof property.name !== "string") continue;
+    const child = stripOptional(property.type);
+    const path = prefix === "" ? property.name : `${prefix}.${property.name}`;
+    const required = parentRequired && !child.optional;
+    if (isPlainObject(child.ast)) {
+      fields.push(...collectFields(child.ast, path, required));
       continue;
     }
     const flag = flagName(path);
@@ -290,59 +223,67 @@ function collectFields(schema: CliJsonSchema, prefix: string, parentRequired: bo
     fields.push({
       key: path,
       flag,
-      schema: child,
-      required: fieldRequired,
-      description: child.description ?? "",
-      kind: fieldKind(child),
-      choices: stringChoices(child),
-      integer: schemaTypes(child).includes("integer"),
+      required,
+      description: descriptionOf(child.ast),
+      ...classify(child.ast),
     });
   }
   return fields;
 }
 
-function unwrap(schema: CliJsonSchema): CliJsonSchema {
-  const branches = schema.anyOf ?? schema.oneOf;
-  if (branches === undefined) return schema;
-  const kept = branches.filter((branch) => !isNullSchema(branch));
-  if (kept.length !== 1) return schema;
-  const only = kept[0];
-  if (only === undefined) return schema;
-  return unwrap(only);
+interface StrippedAst {
+  ast: SchemaAST.AST;
+  optional: boolean;
 }
 
-function isNullSchema(schema: CliJsonSchema): boolean {
-  const types = schemaTypes(schema);
-  return types.length === 1 && types[0] === "null";
-}
-
-function isObjectSchema(schema: CliJsonSchema): boolean {
-  return schemaTypes(schema).includes("object") && schema.properties !== undefined;
-}
-
-function fieldKind(schema: CliJsonSchema): FieldKind {
-  const unwrapped = unwrap(schema);
-  if (unwrapped.items !== undefined && schemaTypes(unwrapped).includes("array")) {
-    const itemKind = fieldKind(unwrapped.items);
-    return itemKind === "json" || itemKind === "array" ? "json" : "array";
+function stripOptional(ast: SchemaAST.AST): StrippedAst {
+  if (
+    SchemaAST.isUnion(ast) &&
+    (ast.context?.isOptional === true || ast.types.some(SchemaAST.isUndefined))
+  ) {
+    const kept = ast.types.filter(
+      (type) => !SchemaAST.isUndefined(type) && !SchemaAST.isVoid(type),
+    );
+    const only = kept.length === 1 ? kept[0] : undefined;
+    if (only !== undefined) return { ast: stripOptional(only).ast, optional: true };
   }
-  const types = schemaTypes(unwrapped);
-  if (types.includes("object")) return "json";
-  if (types.length === 1 && types[0] === "boolean") return "boolean";
-  if (types.includes("number") || types.includes("integer")) return "number";
-  if (types.includes("string") || unwrapped.enum !== undefined) return "string";
-  return "json";
+  return { ast, optional: ast.context?.isOptional === true };
 }
 
-function schemaTypes(schema: CliJsonSchema): readonly string[] {
-  if (schema.type === undefined) return [];
-  return typeof schema.type === "string" ? [schema.type] : schema.type;
+function isPlainObject(ast: SchemaAST.AST): ast is SchemaAST.Objects {
+  return SchemaAST.isObjects(ast) && ast.indexSignatures.length === 0;
 }
 
-function stringChoices(schema: CliJsonSchema): string[] | undefined {
-  const values = unwrap(schema).enum;
-  if (values === undefined || values.some((value) => typeof value !== "string")) return undefined;
-  return values.filter((value): value is string => typeof value === "string");
+function classify(ast: SchemaAST.AST): Pick<CliField, "kind" | "choices" | "itemKind"> {
+  const choices = stringChoices(ast);
+  if (choices !== undefined) return { kind: "string", choices };
+  if (SchemaAST.isBoolean(ast)) return { kind: "boolean" };
+  if (SchemaAST.isNumber(ast)) return { kind: "number" };
+  if (SchemaAST.isString(ast) || SchemaAST.isLiteral(ast)) return { kind: "string" };
+  if (SchemaAST.isArrays(ast)) {
+    const itemAst = ast.rest[0] ?? ast.elements[0];
+    if (itemAst === undefined) return { kind: "json" };
+    const item = stripOptional(itemAst).ast;
+    if (SchemaAST.isString(item)) return { kind: "array", itemKind: "string" };
+    if (SchemaAST.isNumber(item)) return { kind: "array", itemKind: "number" };
+    if (SchemaAST.isBoolean(item)) return { kind: "array", itemKind: "boolean" };
+  }
+  return { kind: "json" };
+}
+
+function stringChoices(ast: SchemaAST.AST): readonly string[] | undefined {
+  if (!SchemaAST.isUnion(ast)) return undefined;
+  const values: string[] = [];
+  for (const type of ast.types) {
+    if (!SchemaAST.isLiteral(type) || typeof type.literal !== "string") return undefined;
+    values.push(type.literal);
+  }
+  return values.length > 0 ? values : undefined;
+}
+
+function descriptionOf(ast: SchemaAST.AST): string {
+  const description = ast.annotations?.description;
+  return typeof description === "string" ? description : "";
 }
 
 function isJsonValue(value: unknown): value is JsonValue {
