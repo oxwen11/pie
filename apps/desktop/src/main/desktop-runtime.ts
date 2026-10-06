@@ -9,7 +9,7 @@ import { resolveDevelopmentScope } from "@getpie/core/development-scope";
 import { resolvePieHome, settingsFile } from "@getpie/server/daemon";
 import * as ServerObservability from "@getpie/server/observability";
 import { Effect, Layer, ManagedRuntime, Result } from "effect";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/process";
 import { app, dialog, nativeTheme } from "electron";
 
 import icon from "../../resources/icon.png?asset";

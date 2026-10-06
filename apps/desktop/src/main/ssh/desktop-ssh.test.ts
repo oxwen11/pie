@@ -6,7 +6,7 @@ import * as NodePath from "@effect/platform-node/NodePath";
 import { sshEnvironmentsFile } from "@getpie/server/daemon";
 import { parseSshInput, type SshConnectedEnvironment, type SshTarget } from "@getpie/ssh";
 import { Effect, FileSystem, Layer, Scope } from "effect";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/process";
 import { describe, expect, it } from "vitest";
 
 import { makeDesktopSsh } from "./desktop-ssh";

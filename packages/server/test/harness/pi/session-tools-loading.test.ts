@@ -5,7 +5,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import type { SessionPullRequestLink } from "@getpie/contract/pull-request";
 import { Deferred, Effect, Fiber, FileSystem, Stream } from "effect";
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { afterEach, vi } from "vitest";
 
 import { makePiAgent } from "../../../src/pi/agent";

@@ -4,7 +4,7 @@ import path from "node:path";
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
 import type { PullRequestRef } from "@getpie/contract/pull-request";
 import { ByteSize, Crypto, Deferred, Effect, FileSystem, Schema, type Scope } from "effect";
-import { HttpIncomingMessage, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import { HttpIncomingMessage, HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { PiTransportError } from "../harness/errors";
 import { PiSessionTools, type PiSessionToolsShape } from "../harness/pi-port";
