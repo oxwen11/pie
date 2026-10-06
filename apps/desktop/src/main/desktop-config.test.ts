@@ -19,7 +19,7 @@ describe("buildDesktopConfig", () => {
     });
 
     expect(config.serverEntry).toBe(
-      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/server.mjs",
+      "/Applications/Pie.app/Contents/Resources/app.asar/node_modules/@getpie/server/dist/server.js",
     );
     expect(config.resourcesPath).toBe("/Applications/Pie.app/Contents/Resources");
     expect(config.userDataPath).toBe("/tmp/pie-user-data");
@@ -34,7 +34,7 @@ describe("buildDesktopConfig", () => {
       userDataPath: "/tmp/pie-user-data",
     });
 
-    expect(config.serverEntry).toMatch(/packages\/server\/dist\/server\.mjs$/);
+    expect(config.serverEntry).toMatch(/packages\/server\/dist\/server\.js$/);
     expect(config.resourcesPath).toBe("/unused");
   });
 });

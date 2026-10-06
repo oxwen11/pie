@@ -5,13 +5,13 @@
   "description": "Isolated launch/doctor/drive/cleanup for pie web, CLI, and desktop proofs (bin pie-verify)",
   "bin": {
     "agent-browser": "./bin/agent-browser",
-    "pie-verify": "./bin/pie-verify.mjs"
+    "pie-verify": "./bin/pie-verify.js"
   },
   "type": "module",
   "exports": {
     ".": "./src/cli.ts",
     "./runtime": "./src/runtime/index.ts",
-    "./bootstrap": "./bin/bootstrap.mjs"
+    "./bootstrap": "./bin/bootstrap.js"
   },
   "scripts": {
     "build": "tsdown",

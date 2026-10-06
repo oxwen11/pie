@@ -31,9 +31,7 @@ import { makePullRequestCoordinator } from "../../../src/pull-request/coordinato
 const cli = url.fileURLToPath(
   new URL("../../../node_modules/@earendil-works/pi-coding-agent/dist/cli.js", import.meta.url),
 );
-const provider = url.fileURLToPath(
-  new URL("./fixtures/registration-provider.mjs", import.meta.url),
-);
+const provider = url.fileURLToPath(new URL("./fixtures/registration-provider.js", import.meta.url));
 const pullRequest = { host: "github.com", owner: "owner", repository: "repo", number: 42 };
 const prUrl = "https://github.com/owner/repo/pull/42";
 afterEach(() => vi.unstubAllEnvs());

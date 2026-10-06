@@ -1,5 +1,5 @@
-const fs = require("node:fs");
-const path = require("node:path");
+import fs from "node:fs";
+import path from "node:path";
 
 /**
  * Sibling island next to unpacked pie-pi-process. electron-builder FileSet
@@ -10,7 +10,7 @@ const FFF_ENTRY = ["node_modules", "@ff-labs", "pi-fff", "src", "index.ts"];
 const UNPACKED_SERVER_DIST = ["app.asar.unpacked", "node_modules", "@getpie", "server", "dist"];
 
 function builtFffIsland() {
-  return path.join(__dirname, "..", "..", "..", "packages", "server", "dist", "fff");
+  return path.join(import.meta.dirname, "..", "..", "..", "packages", "server", "dist", "fff");
 }
 
 function fffEntry(root) {
@@ -40,11 +40,11 @@ function packedFffIsland(context) {
   return path.join(packResourcesDir(context), ...UNPACKED_SERVER_DIST, "fff");
 }
 
-function assertBuiltFffIsland() {
+export function assertBuiltFffIsland() {
   assertFffIsland(builtFffIsland(), "packages/server/dist/fff");
 }
 
-function copyFffIslandIntoApp(context, source = builtFffIsland()) {
+export function copyFffIslandIntoApp(context, source = builtFffIsland()) {
   assertFffIsland(source, "packages/server/dist/fff");
   const dest = packedFffIsland(context);
   fs.rmSync(dest, { recursive: true, force: true });
@@ -52,5 +52,3 @@ function copyFffIslandIntoApp(context, source = builtFffIsland()) {
   fs.cpSync(source, dest, { recursive: true });
   assertFffIsland(dest, "packed @getpie/server/dist/fff");
 }
-
-module.exports = { assertBuiltFffIsland, copyFffIslandIntoApp };
