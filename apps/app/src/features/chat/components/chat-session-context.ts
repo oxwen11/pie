@@ -13,6 +13,7 @@ export type ChatSessionValue = {
   prompt: (text: string, delivery?: "steer" | "followUp") => void;
   interrupt: () => Promise<void>;
   replaceQueue: (pending: SessionPendingPrompt) => void;
+  steerFollowUp: (index: number) => void;
   respondToRequest: (requestId: string, response: AgentResponse) => void;
   turnInProgress: boolean;
 };
