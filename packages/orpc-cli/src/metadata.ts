@@ -198,21 +198,30 @@ function fieldsFor(schema: AnySchema): CliField[] {
   if (!Schema.isSchema(schema)) return [];
   const root = stripOptional(schema.ast);
   if (!isPlainObject(root.ast)) return [];
-  return collectFields(root.ast, !root.optional);
+  return collectFields(root.ast, "", !root.optional);
 }
 
-function collectFields(ast: SchemaAST.Objects, parentRequired: boolean): CliField[] {
+function collectFields(
+  ast: SchemaAST.Objects,
+  prefix: string,
+  parentRequired: boolean,
+): CliField[] {
   const fields: CliField[] = [];
   for (const property of ast.propertySignatures) {
     if (typeof property.name !== "string") continue;
     const child = stripOptional(property.type);
+    const path = prefix === "" ? property.name : `${prefix}.${property.name}`;
     const required = parentRequired && !child.optional;
-    const flag = flagName(property.name);
+    if (isPlainObject(child.ast)) {
+      fields.push(...collectFields(child.ast, path, required));
+      continue;
+    }
+    const flag = flagName(path);
     if (fields.some((field) => field.flag === flag)) {
       throw new Error(`CLI option "--${flag}" is registered twice`);
     }
     fields.push({
-      key: property.name,
+      key: path,
       flag,
       required,
       description: descriptionOf(child.ast),
