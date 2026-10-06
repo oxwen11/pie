@@ -46,24 +46,30 @@ NodeRuntime.runMain(
       yield* Effect.die(new Error(`Building pi-process failed: ${piProcessExit}`));
     }
 
-    const workerExit = yield* spawner.exitCode(
-      ChildProcess.make(
-        process.execPath,
-        [
-          "build",
-          path.join(piDir, "dist/utils/image-resize-worker.js"),
-          "--target",
-          "bun",
-          "--define",
-          "PI_BUNDLED_NODE=true",
-          "--outfile",
-          path.join(outDir, "image-resize-worker.js"),
-        ],
-        { stdout: "inherit", stderr: "inherit" },
-      ),
-    );
-    if (workerExit !== 0) {
-      yield* Effect.die(new Error(`Building image-resize-worker failed: ${workerExit}`));
+    // Pi resolves bundled workers beside the bundle (PI_BUNDLED_NODE).
+    for (const [entry, outfile] of [
+      ["dist/utils/image-resize-worker.js", "image-resize-worker.js"],
+      ["dist/extensions/codemode/worker.js", "codemode-worker.js"],
+    ] as const) {
+      const workerExit = yield* spawner.exitCode(
+        ChildProcess.make(
+          process.execPath,
+          [
+            "build",
+            path.join(piDir, entry),
+            "--target",
+            "bun",
+            "--define",
+            "PI_BUNDLED_NODE=true",
+            "--outfile",
+            path.join(outDir, outfile),
+          ],
+          { stdout: "inherit", stderr: "inherit" },
+        ),
+      );
+      if (workerExit !== 0) {
+        yield* Effect.die(new Error(`Building ${outfile} failed: ${workerExit}`));
+      }
     }
 
     // Keep Pi's package layout so getPackageDir(), documentation and HTML export

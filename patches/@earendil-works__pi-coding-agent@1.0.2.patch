@@ -1,3 +1,24 @@
+diff --git a/dist/bun/runtime-setup.js b/dist/bun/runtime-setup.js
+index 282e8d3d54897a7c032616542596be5221937d73..718f7067e5432179faaec935fca6971f9a7dde0a 100644
+--- a/dist/bun/runtime-setup.js
++++ b/dist/bun/runtime-setup.js
+@@ -1,6 +1,7 @@
+ import { bedrockProviderModule } from "@earendil-works/pi-ai/bedrock-provider";
+ import { registerBunOAuthFlows } from "@earendil-works/pi-ai/bun-oauth";
+ import { setBedrockProviderModule } from "@earendil-works/pi-ai/compat";
++import { fileURLToPath } from "node:url";
+ // Bun loads .wasm imports as files: embedded in compiled executables, evaluating to a readable path.
+ import quickjsWasmPath from "quickjs-wasi/quickjs.wasm";
+ import { APP_NAME, setEmbeddedQuickJSWasmPath } from "../config.js";
+@@ -8,5 +9,6 @@ process.title = APP_NAME;
+ process.emitWarning = (() => { });
+ registerBunOAuthFlows();
+ setBedrockProviderModule(bedrockProviderModule);
+-setEmbeddedQuickJSWasmPath(quickjsWasmPath);
++// A non-compiled `bun build --outdir` bundle gets a path relative to the bundle, not the cwd.
++setEmbeddedQuickJSWasmPath(quickjsWasmPath.startsWith(".") ? fileURLToPath(new URL(quickjsWasmPath, import.meta.url)) : quickjsWasmPath);
+ //# sourceMappingURL=runtime-setup.js.map
+\ No newline at end of file
 diff --git a/dist/core/agent-session.js b/dist/core/agent-session.js
 index 33338d518743ba2fd4ee2d710c5496a6ddcd1856..5cafd057a0fae8632caa4fae539917f199005500 100644
 --- a/dist/core/agent-session.js
