@@ -11,13 +11,9 @@ import { Link, useMatch } from "@tanstack/react-router";
 import type { ReactElement, ReactNode } from "react";
 
 import { appNav, type AppNavItem } from "@/components/layout/app-nav";
-import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
-import { usePlatform } from "@/platform-context";
-import { isDesktopHost } from "@/platform-host";
 
-/** Icon column that stays while the session list collapses. Lights live in the shell row above. */
+/** Icon column that stays while the session list collapses. The title row above owns lights, mark, and toggles. */
 export function AppRail(): ReactElement {
-  const desktop = isDesktopHost(usePlatform());
   // Match the sidebar sheet breakpoint (800px), not Tailwind md (768px).
   const mobile = useSidebar().isMobile;
   return (
@@ -30,14 +26,6 @@ export function AppRail(): ReactElement {
         )}
         data-slot="app-rail"
       >
-        {!desktop ? (
-          <Tooltip>
-            <TooltipTrigger render={<ShellSidebarToggle />} />
-            <TooltipPopup side="right" sideOffset={8}>
-              Toggle sidebar
-            </TooltipPopup>
-          </Tooltip>
-        ) : null}
         <RailLink item={appNav.home} />
         {appNav.sections.map((item) => (
           <RailLink item={item} key={item.to} />
