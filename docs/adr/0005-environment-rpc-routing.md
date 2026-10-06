@@ -17,7 +17,7 @@ EnvironmentRpc
 ├── one oRPC DynamicLink
 ├── links: Map<environmentId, WebSocket ClientLink>
 ├── orpc: Map<environmentId, prefixed EnvironmentOrpc>
-└── EnvironmentCatalog workers
+└── EnvironmentListSync workers
     └── Map<environmentId, AbortController>
 ```
 
@@ -38,14 +38,14 @@ There is no mutable current Environment, per-Environment `QueryClient`, per-Envi
 
 The Environment feed is authoritative for connected remotes.
 
-- **Add:** upsert the remote link, create its prefixed oRPC surface lazily, then start catalog hydration and session synchronization.
+- **Add:** upsert the remote link, create its prefixed oRPC surface lazily, then start list hydration and session synchronization.
 - **Rotate URL/token:** replace the link entry. Existing oRPC objects remain stable; subsequent calls resolve the new link.
 - **Remove:** abort the Environment worker and session surfaces, forget its chats/panels, remove the link and prefixed cache, and fail later calls closed.
 - **Race:** `for(environmentId)` may resolve a remote directly from the latest feed snapshot, so React observing the new Environment before the orchestration subscriber is safe.
 
 The daemon UUID—not SSH alias, hostname, project, or session—is the routing and cache identity.
 
-## Proactive catalog synchronization
+## Proactive list synchronization
 
 Each connected Environment owns one worker. It opens the global session stream before fetching the baseline, then:
 
@@ -65,7 +65,7 @@ Non-React consumers use the same registry directly:
 - router loaders: `environmentRpc.for(environmentId)`;
 - ChatManager: Environment-bound session procedures;
 - Terminal: Environment-bound direct calls and streams;
-- catalog/session synchronization: one worker per connected Environment.
+- list synchronization: one worker per connected Environment.
 
 Provider remounting is not a routing mechanism. The global `QueryClient` never changes.
 
