@@ -39,7 +39,7 @@ export function ShellGutter({
       aria-label={label}
       aria-orientation="vertical"
       className={cn(
-        "text-foreground relative z-30 w-1 cursor-col-resize touch-none bg-transparent [-webkit-app-region:no-drag] md:my-1",
+        "text-foreground relative z-30 w-1 cursor-col-resize touch-none bg-transparent [-webkit-app-region:no-drag]",
         disabled && "w-0",
         className,
       )}

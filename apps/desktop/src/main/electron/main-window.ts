@@ -5,6 +5,7 @@ import { Context, Effect, Scope } from "effect";
 import { BrowserWindow, shell, type WebContents } from "electron";
 
 import icon from "../../../resources/icon.png?asset";
+import { MACOS_TRAFFIC_LIGHT } from "../../shared/macos-window-chrome";
 import { startsDesktopInBackground } from "../desktop-config";
 import { APP_ORIGIN } from "./app-protocol";
 
@@ -59,8 +60,7 @@ export function makeMainWindow(
         backgroundColor: options.backgroundColor,
         autoHideMenuBar: true,
         titleBarStyle: "hiddenInset",
-        // y=19 centers the ~14px traffic lights on the 26px titlebar centerline.
-        trafficLightPosition: { x: 22, y: 19 },
+        trafficLightPosition: MACOS_TRAFFIC_LIGHT,
         ...(process.platform === "linux" ? { icon } : undefined),
         webPreferences: {
           preload: path.join(import.meta.dirname, "../preload/index.js"),
