@@ -102,11 +102,11 @@ describe("shell columns", () => {
     expect(drawer?.firstElementChild?.getBoundingClientRect().right).toBeLessThanOrEqual(
       (drawer as HTMLElement).getBoundingClientRect().right + 0.5,
     );
-    expect(getComputedStyle(column as HTMLElement).paddingRight).toBe("4px");
+    expect(getComputedStyle(column as HTMLElement).paddingRight).toBe("0px");
     const seams = [...document.querySelectorAll<HTMLElement>('[role="separator"]')].filter(
       (el) => el.getBoundingClientRect().width > 0,
     );
-    expect(seams.map((el) => el.getBoundingClientRect().width)).toEqual([4, 1]);
+    expect(seams.map((el) => el.getBoundingClientRect().width)).toEqual([1, 1]);
     const seam = seams[0];
     if (seam === undefined) throw new Error("missing seam");
     const box = seam.getBoundingClientRect();
