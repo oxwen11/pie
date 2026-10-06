@@ -84,9 +84,7 @@ export function SessionPullRequestIndicator({
   const { Icon, color, badge, href, description } = view;
   return (
     <SidebarMenuAction
-      // In-flow (static) so the row button shrinks to the badge's real width;
-      // the absolute default forced a fixed pe-24 reservation and early truncation.
-      // after:hidden — the default -inset-2 hit area would escape a static box.
+      // In-flow so the title truncates at the badge's real width; after:hidden keeps the -inset-2 hit area from escaping a static box.
       className="static me-1 aspect-auto h-5 w-auto max-w-24 shrink-0 gap-1 px-1 text-xs after:hidden"
       render={
         <a

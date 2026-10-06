@@ -32,8 +32,7 @@ export function ProjectSessionRow({
 
   return (
     <SidebarMenuItem
-      // The row is one item: hover/active highlight must span the badge too,
-      // so it lives on the item, not the (flex-1) button that ends before the badge.
+      // The item carries the highlight, not the button: the button ends before the badge.
       className="hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent flex items-center gap-1 rounded-lg"
       data-active={active}
       ref={observe}
