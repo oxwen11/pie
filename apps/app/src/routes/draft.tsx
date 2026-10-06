@@ -122,7 +122,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
   const [importOpen, setImportOpen] = useState(false);
 
   // One project.list per connected Environment — same prefixed keys the
-  // sidebar and catalog worker use, so this subscribes to warm caches.
+  // sidebar and Environment list sync use, so this subscribes to warm caches.
   const environments = useConnectedEnvironments();
   const projectLists = useQueries({
     queries: environments.map((environment) =>
