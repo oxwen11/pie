@@ -490,6 +490,39 @@ and latency on Cloudflare's network rather than local `wrangler dev`; Free-plan
 quota behavior under real use. Deployment is a production operation and needs the
 operator's explicit consent; this RFC authorizes none.
 
+### Effect as the host seam
+
+The core is written as Effect programs over a few `Context.Service` seams (store,
+connections, scheduler, configuration) and each host supplies a `Layer`; only the
+Cloudflare layer is built in V1, and a Node layer can be added later without touching
+the core. The prototype ran `Effect.runSync` of a Schema-validated ingest program
+inside `transactionSync` on `effect@4.0.0-rc.115` in workerd: duplicates were
+detected, invalid input produced a Schema failure, and the bundle was 708 KiB
+(140 KiB gzip). `runSync` fails on an asynchronous boundary, so atomic sections are
+enforced rather than conventional.
+
+Ecosystem read on 2026-10-06 (source only, nothing run):
+
+- `danieljvdm/effect-cf` (MIT, very active, young, about 19k lines): the best
+  reference. Worker and Durable Object builders over a `ManagedRuntime`; a
+  `DurableObjectSqlite` layer whose transaction runs on a synchronous scheduler
+  because native timers retain the input gate; `transactionSync` that rolls back on a
+  failed exit; a keepalive that installs `setWebSocketAutoResponse`; a Schema codec for
+  attachments; tests with the Cloudflare Vitest pool and `evictDurableObject` proving
+  keepalive does not wake the object. Borrow patterns; adopting it whole means a large,
+  fast-moving surface.
+- `alchemy-run/alchemy` v2 (Apache-2.0, beta, very active): Effect-native IaC whose
+  Durable Objects are Effects (`Room`, `RpcWebSocket`, alarm storage). Cite and borrow
+  patterns; adopting it forces its deploy model.
+- `crosshatch/liminal` (hibernatable WebSocket actors, no SQL or alarms, Effect beta)
+  and `brandhaug/b2b-saas-starter` (a transactional ledger in the same SQLite
+  transaction as acceptance): cite only. `dmmulroy/effect-cloudflare` is stale; ignore.
+
+Version caveat: effect-cf and Alchemy pin stable `effect@4.0.0`, and a `^4.0.0` peer
+range does not match the prerelease `4.0.0-rc.115` this repository uses, so adoption
+would need an override and an untested rc-to-stable API check. Write the ack-after-
+persist step ourselves; none of them models it.
+
 Node-only and a Worker/DO adapter are not both built: the Worker is the single V1
 host. `packages/hub` therefore uses Web APIs and DO storage, not `node:fs` or
 `@getpie/effect-json-store`.
