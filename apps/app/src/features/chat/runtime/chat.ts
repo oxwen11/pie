@@ -54,6 +54,9 @@ const toUserMessage = (messageId: string, parts: ReadonlyArray<PromptPart>): Pie
   ),
 });
 
+const promptText = (parts: ReadonlyArray<PromptPart>): string =>
+  parts.map((part) => (part.type === "text" ? part.text : "")).join("");
+
 const retryNoticeFrom = (chunk: PieUIMessageChunk): string | undefined => {
   if (chunk.type !== "data-retry") return undefined;
   const { errorMessage, attempt, maxAttempts } = chunk.data;
@@ -70,6 +73,7 @@ const retryNoticeFrom = (chunk: PieUIMessageChunk): string | undefined => {
 // own reducer (readUIMessageStream — the same machinery the server-side
 // history folds use) turns them into evolving UIMessage snapshots.
 type TurnFold = {
+  messageId: string | undefined;
   readonly enqueue: (chunk: PieUIMessageChunk) => void;
   readonly close: () => void;
 };
@@ -119,6 +123,10 @@ export class Chat {
   // queue_update from clear_queue before the remaining lines are rewritten.
   // Ignore those intermediates so the row the user just edited does not flash.
   #queueWritesInFlight = 0;
+  // Steer click shows the user message immediately. The server echo mints a
+  // new id when Pi actually injects it; claim that echo instead of appending
+  // a second bubble.
+  #optimisticSteers: Array<{ id: string; text: string }> = [];
   #cursor = 0;
   #historyLoaded = false;
   // Non-null while the history floor is loading: live events queue here so
@@ -168,7 +176,7 @@ export class Chat {
         if (event.chunk.type === "data-retry") break;
         if (!this.#recoverTurnIds.has(event.turnId)) {
           if (event.chunk.type === "error") this.#erroredTurnIds.add(event.turnId);
-          this.#turnFold(event.turnId).enqueue(event.chunk);
+          this.#foldChunk(event.turnId, event.chunk);
         }
         break;
       // Another client's prompt — or this client's own echoed back, whose
@@ -178,6 +186,11 @@ export class Chat {
         // The sender already cleared its stale error synchronously in prompt().
         // Only a genuinely unseen prompt may clear here: a delayed self-echo
         // must not erase a newer prompt RPC failure.
+        if (this.#claimSteeredEcho(event.messageId, event.parts)) {
+          this.#state.retryNotice = undefined;
+          this.#state.error = undefined;
+          break;
+        }
         if (this.#pushUserMessage(event.messageId, event.parts)) {
           this.#state.retryNotice = undefined;
           this.#state.error = undefined;
@@ -237,6 +250,7 @@ export class Chat {
         // left behind here could never be answered.
         this.#state.clearPendingRequests();
         this.#state.clearPendingPrompt();
+        this.#setOptimisticSteers([]);
         break;
     }
     // Status is copied off the event (the runtime stamps its post-event
@@ -272,6 +286,7 @@ export class Chat {
     this.#state.historyStatus = "settled";
     this.#state.clearPendingRequests();
     this.#state.clearPendingPrompt();
+    this.#setOptimisticSteers([]);
     this.#state.retryNotice = undefined;
     this.#state.error = new Error(
       reason === "session_deleted" ? "Session deleted" : "Session closed",
@@ -314,6 +329,7 @@ export class Chat {
       // floor is still wanted.
       if (history !== null && history.length > 0 && this.#state.messages.length === 0) {
         this.#state.messages = Array.from(history);
+        this.#dropStaleSteers();
       }
       // An empty read is still a floor: the session simply has nothing settled
       // yet. Only the absent capability (null) leaves the transcript unfounded.
@@ -468,7 +484,7 @@ export class Chat {
     for (const chunk of chunks) {
       if (chunk.type === "data-retry") continue;
       if (chunk.type === "error") this.#erroredTurnIds.add(activeTurn.turnId);
-      this.#turnFold(activeTurn.turnId).enqueue(chunk);
+      this.#foldChunk(activeTurn.turnId, chunk);
     }
     if (activeTurn.complete) {
       this.#turnFolds.get(activeTurn.turnId)?.close();
@@ -503,6 +519,39 @@ export class Chat {
   #pushUserMessage(messageId: string, parts: ReadonlyArray<PromptPart>): boolean {
     if (this.#state.messages.some((message) => message.id === messageId)) return false;
     this.#state.pushMessage(toUserMessage(messageId, parts));
+    return true;
+  }
+
+  #setOptimisticSteers(next: Array<{ id: string; text: string }>): void {
+    this.#optimisticSteers = next;
+    this.#state.store.setState({ optimisticSteerTexts: next.map((item) => item.text) });
+  }
+
+  // A reconcile or interrupt can replace the transcript and drop the bubble.
+  // The claim must go with it, or a later echo with the same text is swallowed.
+  #dropStaleSteers(): void {
+    if (this.#optimisticSteers.length === 0) return;
+    const ids = new Set(this.#state.messages.map((message) => message.id));
+    const next = this.#optimisticSteers.filter((item) => ids.has(item.id));
+    if (next.length !== this.#optimisticSteers.length) this.#setOptimisticSteers(next);
+  }
+
+  #claimSteeredEcho(messageId: string, parts: ReadonlyArray<PromptPart>): boolean {
+    this.#dropStaleSteers();
+    const text = promptText(parts);
+    const index = this.#optimisticSteers.findIndex((item) => item.text === text);
+    if (index === -1) return false;
+    const claimed = this.#optimisticSteers[index];
+    if (
+      claimed === undefined ||
+      !this.#state.messages.some((message) => message.id === claimed.id)
+    ) {
+      return false;
+    }
+    this.#setOptimisticSteers(this.#optimisticSteers.filter((item) => item.id !== claimed.id));
+    this.#state.messages = this.#state.messages.map((message) =>
+      message.id === claimed.id ? { ...message, id: messageId } : message,
+    );
     return true;
   }
 
@@ -546,10 +595,26 @@ export class Chat {
       if (this.#state.status === "streaming" || this.#state.status === "submitted") return;
       if (this.#turnFolds.size > 0) return;
       this.#state.messages = Array.from(history);
+      this.#dropStaleSteers();
       this.#needsReconcile = false;
     } catch (reconcileError) {
       console.error("Failed to reconcile session history", reconcileError);
     }
+  }
+
+  // `readUIMessageStream` keeps one message. A steered segment's `start`
+  // only swaps the id, so without a new reader the next text lands on the
+  // previous assistant parts.
+  #foldChunk(turnId: string, chunk: PieUIMessageChunk): void {
+    const started = chunk.type === "start" ? chunk.messageId : undefined;
+    const open = this.#turnFolds.get(turnId);
+    if (open?.messageId !== undefined && started !== undefined && started !== open.messageId) {
+      open.close();
+      this.#turnFolds.delete(turnId);
+    }
+    const fold = this.#turnFold(turnId);
+    if (started !== undefined) fold.messageId = started;
+    fold.enqueue(chunk);
   }
 
   #turnFold(turnId: string): TurnFold {
@@ -577,6 +642,7 @@ export class Chat {
     })();
     let closed = false;
     const fold: TurnFold = {
+      messageId: undefined,
       enqueue: (chunk) => {
         if (!closed) controller?.enqueue(chunk);
       },
@@ -653,6 +719,28 @@ export class Chat {
       console.error("Failed to interrupt session", interruptError);
       this.#state.error =
         interruptError instanceof Error ? interruptError : new Error(String(interruptError));
+    }
+  };
+
+  // Codex-style: the clicked steer is a transcript message now, not a queue
+  // row that waits for Pi to inject it. The server queue still moves so the
+  // model receives it; the echo retargets this bubble instead of adding one.
+  steerFollowUp = async (index: number): Promise<void> => {
+    const pending = this.#state.pendingPrompt;
+    const text = pending.followUp[index];
+    if (text === undefined) return;
+    const messageId = generateId();
+    this.#state.pushMessage(toUserMessage(messageId, [{ type: "text", text }]));
+    this.#setOptimisticSteers([...this.#optimisticSteers, { id: messageId, text }]);
+    try {
+      await this.replaceQueue({
+        steering: [...pending.steering, text],
+        followUp: pending.followUp.filter((_, itemIndex) => itemIndex !== index),
+      });
+    } catch (steerError) {
+      this.#state.messages = this.#state.messages.filter((message) => message.id !== messageId);
+      this.#dropStaleSteers();
+      throw steerError;
     }
   };
 
