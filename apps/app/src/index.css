@@ -125,6 +125,11 @@
 }
 
 /* Image previews float on a translucent black backdrop in either theme. */
+/* Desktop: the modal covers the window-drag strip; keep its controls clickable. */
+.chat-image-preview-dialog {
+  app-region: no-drag;
+}
+
 .chat-image-preview-dialog [data-rmiz-modal-overlay="visible"] {
   background-color: rgb(0 0 0 / 75%);
 }

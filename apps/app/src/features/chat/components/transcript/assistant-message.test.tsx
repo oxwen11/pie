@@ -16,17 +16,24 @@ const imagePart = (src: string) => ({
 afterEach(() => document.documentElement.classList.remove("dark"));
 
 describe("AssistantMessage", () => {
-  it.each(["light", "dark"])(
-    "opens a zoomable preview on a translucent black backdrop in %s mode",
-    async (theme) => {
-      await page.viewport(1280, 800);
+  it.each([
+    { theme: "light", width: 390 },
+    { theme: "dark", width: 390 },
+    { theme: "light", width: 1280 },
+    { theme: "dark", width: 1280 },
+  ])(
+    "opens a zoomable preview on a translucent black backdrop in $theme mode at $width px",
+    async ({ theme, width }) => {
+      await page.viewport(width, 800);
       document.documentElement.classList.toggle("dark", theme === "dark");
       const canvas = document.createElement("canvas");
       canvas.width = 1600;
       canvas.height = 1200;
       const src = canvas.toDataURL("image/png");
       await render(
-        <AssistantMessage parts={[imagePart(src)]} isStreaming={false} showActions={false} />,
+        <div className="mx-auto w-full max-w-4xl p-4">
+          <AssistantMessage parts={[imagePart(src)]} isStreaming={false} showActions={false} />
+        </div>,
       );
 
       const image = page.getByRole("img", { name: "result.png" });
@@ -50,6 +57,11 @@ describe("AssistantMessage", () => {
       if (!(zoomed instanceof HTMLElement)) throw new Error("Zoomed image is missing");
       expect(zoomed.getAttribute("src")).toBe(src);
       expect(getComputedStyle(zoomed).borderRadius).not.toBe("0px");
+      // Never zoom to less than the thumbnail it came from, at any width.
+      const zoomedBox = zoomed.getBoundingClientRect();
+      expect(zoomedBox.width).toBeGreaterThanOrEqual(
+        image.element().getBoundingClientRect().width - 0.5,
+      );
 
       const unzoom = dialog.getByRole("button", { name: "Minimize image" });
       const bounds = unzoom.element().getBoundingClientRect();
