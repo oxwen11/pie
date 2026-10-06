@@ -1,6 +1,6 @@
 import { listenRelay, relayPublicBaseUrl } from "@getpie/server/relay";
 import { Effect } from "effect";
-import { Flag } from "effect/unstable/cli";
+import { Flag } from "effect/cli";
 
 export function takeRelayToken(): string {
   const token = process.env.PIE_RELAY_TOKEN;

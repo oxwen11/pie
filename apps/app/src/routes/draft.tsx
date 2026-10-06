@@ -21,7 +21,7 @@ import {
   type UseQueryResult,
 } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { FolderPlusIcon } from "lucide-react";
+import { FolderPlusIcon, KeyRoundIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -174,7 +174,9 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
       }).queryKey;
 
       void queryClient.invalidateQueries({
-        queryKey: orpcQueryUtils.agent.listModels.key(),
+        queryKey: orpcQueryUtils.agent.listModels.queryOptions({
+          input: { projectId: created.ref.projectId },
+        }).queryKey,
       });
 
       queryClient.setQueryData<ListSessionsOutput>(listKey, (prev) => {
@@ -243,11 +245,24 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
     );
   }
 
+  // The composer stays mounted so typed text survives the model probe and
+  // project switches. Send stays blocked until this Environment confirms a model.
+  const models = modelsQuery.data?.models ?? [];
+  const modelsReady = modelsQuery.isSuccess && models.length > 0;
+  const notice = modelsQuery.isError ? (
+    <DraftModelsError onRetry={() => void modelsQuery.refetch()} />
+  ) : modelsQuery.isSuccess && models.length === 0 ? (
+    <DraftNoModels onRetry={() => void modelsQuery.refetch()} />
+  ) : null;
+
   return (
     <DraftComposer
       draftModel={draftModel}
       groups={groups}
-      models={modelsQuery.data?.models ?? []}
+      models={models}
+      modelsPending={modelsQuery.isPending}
+      modelsReady={modelsReady}
+      notice={notice}
       onModelChange={(provider, modelId) => {
         navigate({
           to: "/draft",
@@ -273,6 +288,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
         });
       }}
       onStart={(text, worktree) => {
+        if (!modelsReady) return;
         startSession.mutate({
           text,
           ...(worktree !== undefined ? { worktree } : undefined),
@@ -282,6 +298,44 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
       selected={selected}
       startPending={startSession.isPending}
     />
+  );
+}
+
+function DraftModelsError({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-3 p-4">
+      <p className="text-muted-foreground text-sm">
+        Couldn&apos;t check available models. Retry before starting a session.
+      </p>
+      <Button onClick={onRetry} size="sm" variant="outline">
+        Retry
+      </Button>
+    </div>
+  );
+}
+
+function DraftNoModels({ onRetry }: { onRetry: () => void }) {
+  return (
+    <Empty className="flex-none py-0">
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <KeyRoundIcon aria-hidden="true" />
+        </EmptyMedia>
+        <EmptyTitle>
+          <h1>No model provider connected</h1>
+        </EmptyTitle>
+        <EmptyDescription>
+          pie needs a model with working credentials before you can start a session. Run{" "}
+          <code>pi</code> in a terminal and use <code>/login</code> to connect a provider via OAuth
+          or an API key, then retry.
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <Button onClick={onRetry} variant="outline">
+          Retry
+        </Button>
+      </EmptyContent>
+    </Empty>
   );
 }
 
