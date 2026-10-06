@@ -291,13 +291,13 @@ overrides:
   '@types/node': ^24.13.4
   react: ^19.3.0
   react-dom: ^19.3.0
-  '@effect/platform-node': 4.0.0-rc.115
-  '@effect/platform-node-shared': 4.0.0-rc.115
-  '@effect/vitest': 4.0.0-rc.115
-  effect: 4.0.0-rc.115
+  '@effect/platform-node': 4.0.1
+  '@effect/platform-node-shared': 4.0.1
+  '@effect/vitest': 4.0.1
+  effect: 4.0.1
   prosemirror-view: 1.42.3
 
-packageExtensionsChecksum: sha256-krQ8w+xxiZ9Mgc7ennDQqwconiHv6V6eTOTbkuDELx4=
+packageExtensionsChecksum: sha256-B80obXszwzH5QqoNQVuKRBi2uSgCxTVk+c19EUAMOW0=
 
 patchedDependencies:
   '@earendil-works/pi-coding-agent@1.0.2': eab4da72ab2caaf074fd07981377bfb8ff912baef828cb4b4c2d29eb91288032
@@ -538,8 +538,8 @@ importers:
   apps/desktop:
     dependencies:
       '@effect/platform-node':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@electron-toolkit/utils':
         specifier: ^4.0.0
         version: 4.0.0(electron@44.3.0(supports-color@10.2.2))
@@ -569,20 +569,20 @@ importers:
         version: 2.0.0-beta.35
       '@orpc/experimental-effect':
         specifier: catalog:orpc
-        version: 2.0.0-beta.35(effect@4.0.0-rc.115)
+        version: 2.0.0-beta.35(effect@4.0.1)
       '@orpc/server':
         specifier: catalog:orpc
         version: 2.0.0-beta.35
       effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
+        specifier: 4.0.1
+        version: 4.0.1
       react-error-boundary:
         specifier: 'catalog:'
         version: 6.1.5(@types/react@19.3.0)(react@19.3.0)
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(vitest@5.0.0)
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(vitest@5.0.0)
       '@electron-toolkit/tsconfig':
         specifier: ^2.0.0
         version: 2.0.0(@types/node@24.13.4)
@@ -661,20 +661,20 @@ importers:
         version: 2.0.0-beta.35
       '@orpc/experimental-effect':
         specifier: catalog:orpc
-        version: 2.0.0-beta.35(effect@4.0.0-rc.115)
+        version: 2.0.0-beta.35(effect@4.0.1)
       ai:
         specifier: 'catalog:'
         version: 7.0.99(zod@4.6.5)
       effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
+        specifier: 4.0.1
+        version: 4.0.1
       zod:
         specifier: 'catalog:'
         version: 4.6.5
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(vitest@5.0.0)
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(vitest@5.0.0)
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
@@ -688,8 +688,8 @@ importers:
   packages/core:
     dependencies:
       effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
+        specifier: 4.0.1
+        version: 4.0.1
     devDependencies:
       '@getpie/typescript':
         specifier: workspace:*
@@ -707,15 +707,15 @@ importers:
   packages/effect-json-store:
     dependencies:
       effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
+        specifier: 4.0.1
+        version: 4.0.1
     devDependencies:
       '@effect/platform-node':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@effect/vitest':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(vitest@5.0.0)
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(vitest@5.0.0)
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
@@ -751,11 +751,11 @@ importers:
         specifier: catalog:pi
         version: 1.0.2(patch_hash=eab4da72ab2caaf074fd07981377bfb8ff912baef828cb4b4c2d29eb91288032)(@aws-sdk/credential-provider-node@3.972.84)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(@smithy/signature-v4@5.7.3)(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@effect/vitest':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(vitest@5.0.0)
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(vitest@5.0.0)
       '@getpie/client':
         specifier: workspace:*
         version: link:../client
@@ -790,8 +790,8 @@ importers:
         specifier: 'catalog:'
         version: 7.0.99(zod@4.6.5)
       effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
+        specifier: 4.0.1
+        version: 4.0.1
       uuid:
         specifier: 'catalog:'
         version: 14.0.2
@@ -811,8 +811,8 @@ importers:
         specifier: catalog:pi
         version: 1.0.2(patch_hash=eab4da72ab2caaf074fd07981377bfb8ff912baef828cb4b4c2d29eb91288032)(@aws-sdk/credential-provider-node@3.972.84)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(@smithy/signature-v4@5.7.3)(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5)
       '@effect/platform-node':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@ff-labs/pi-fff':
         specifier: 0.10.6
         version: 0.10.6(@earendil-works/pi-coding-agent@1.0.2(patch_hash=eab4da72ab2caaf074fd07981377bfb8ff912baef828cb4b4c2d29eb91288032)(@aws-sdk/credential-provider-node@3.972.84)(@modelcontextprotocol/sdk@1.29.0(supports-color@10.2.2)(zod@4.6.5))(@smithy/signature-v4@5.7.3)(supports-color@10.2.2)(ws@8.21.3)(zod@4.6.5))(@earendil-works/pi-tui@1.0.2)(@sinclair/typebox@0.34.52)
@@ -827,7 +827,7 @@ importers:
         version: link:../effect-json-store
       '@orpc/experimental-effect':
         specifier: catalog:orpc
-        version: 2.0.0-beta.35(effect@4.0.0-rc.115)
+        version: 2.0.0-beta.35(effect@4.0.1)
       '@orpc/server':
         specifier: catalog:orpc
         version: 2.0.0-beta.35
@@ -835,8 +835,8 @@ importers:
         specifier: 'catalog:'
         version: 7.0.99(zod@4.6.5)
       effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
+        specifier: 4.0.1
+        version: 4.0.1
       mdast-util-from-markdown:
         specifier: 2.0.2
         version: 2.0.2(supports-color@10.2.2)
@@ -857,8 +857,8 @@ importers:
         version: 4.6.5
     devDependencies:
       '@effect/vitest':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(vitest@5.0.0)
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(vitest@5.0.0)
       '@getpie/client':
         specifier: workspace:*
         version: link:../client
@@ -878,12 +878,12 @@ importers:
         specifier: workspace:*
         version: link:../core
       effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
+        specifier: 4.0.1
+        version: 4.0.1
     devDependencies:
       '@effect/platform-node':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
@@ -903,12 +903,12 @@ importers:
         specifier: workspace:*
         version: link:../core
       effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
+        specifier: 4.0.1
+        version: 4.0.1
     devDependencies:
       '@effect/platform-node':
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))
+        specifier: 4.0.1
+        version: 4.0.1(effect@4.0.1)(redis@6.2.1(@opentelemetry/api@1.9.1))
       '@getpie/typescript':
         specifier: workspace:*
         version: link:../../tools/typescript
@@ -1060,8 +1060,8 @@ importers:
         specifier: workspace:*
         version: link:../../packages/contract
       effect:
-        specifier: 4.0.0-rc.115
-        version: 4.0.0-rc.115
+        specifier: 4.0.1
+        version: 4.0.1
     devDependencies:
       '@getpie/typescript':
         specifier: workspace:*
@@ -1494,23 +1494,23 @@ packages:
     resolution: {integrity: sha512-ElfzjnckohEjzHK5Q5iOpqLpQ1YbM/c/XmjBdPVR5k4uoorQPnny5BtT+rvC0cAjVVCUOHWAWppust7FAaEsOQ==}
     engines: {node: '>=22.19.0'}
 
-  '@effect/platform-node-shared@4.0.0-rc.115':
-    resolution: {integrity: sha512-rcBwhDIfb82akJoTv7Vwh8K5x9vC/XfuePS7JjOr+z+dORXzsmKqI1BUQF27ARCN9fTAbDh7I6YvBlWhLjnqNg==}
+  '@effect/platform-node-shared@4.0.1':
+    resolution: {integrity: sha512-VanaejudEhKJ4mpmqnEzdncVUhN6sGSO9ZDND54mRxAlZxj+4dYAWjDTYAy9o4tJo9aALeP2U8cVcOFzEdSeLg==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: 4.0.0-rc.115
+      effect: 4.0.1
 
-  '@effect/platform-node@4.0.0-rc.115':
-    resolution: {integrity: sha512-mW03Wjq2FiTL5oi9yOkaKpCyUNBaduKgTk7qMHNELvC21Jq2qOAfdsfH+p+s2zmpB9w2RSa+ApODv4WjO9wQfw==}
+  '@effect/platform-node@4.0.1':
+    resolution: {integrity: sha512-FT0Fu5LO0/XP9zBpj0HqrtJNLluK4StNKqf6TSulUsjp8FPBsDVXGJiDuyoN5J2yVMT7tgvhxSwaDcObWVRIaQ==}
     engines: {node: '>=18.0.0'}
     peerDependencies:
-      effect: 4.0.0-rc.115
+      effect: 4.0.1
       redis: '>=5.0.0 <7.0.0'
 
-  '@effect/vitest@4.0.0-rc.115':
-    resolution: {integrity: sha512-DJR0hfdr3HNXAkzW8AzfvUz6VmrNFLrKk9tZGDURi33faMyxkc7ZewxELMMZwGpOTGN4mfqYVbX2CXgI+ZJBeQ==}
+  '@effect/vitest@4.0.1':
+    resolution: {integrity: sha512-DbY9kf/018zBxRIX7rJwBnPVPzSarnUpcshm0vfYPFiDkSa7AFrXTh2BlDNUbrdrmqcIOBhVZ7GkEtxf8WiQrg==}
     peerDependencies:
-      effect: 4.0.0-rc.115
+      effect: 4.0.1
       vitest: 5.0.0
 
   '@electron-internal/extract-zip@1.0.4':
@@ -2365,7 +2365,7 @@ packages:
   '@orpc/experimental-effect@2.0.0-beta.35':
     resolution: {integrity: sha512-TiOy7+NpC/REKmR7FMucvE2RqkVWC3AdcavrTRKGUTYxaimmc4lOZNfz0eKrT7vbjmE0TfWwU8XqEKu4GXN8Ew==}
     peerDependencies:
-      effect: 4.0.0-rc.115
+      effect: 4.0.1
 
   '@orpc/json-schema@2.0.0-beta.35':
     resolution: {integrity: sha512-1d1Jlr3aIQ5NPJOj+6j3Zd7XoZRkFp03SnVU7xs5g3x9bxJyppwjdjdXmkNY5g9UTsinrDJLgkH6FjBdEVwYcw==}
@@ -5897,8 +5897,8 @@ packages:
   ee-first@1.1.1:
     resolution: {integrity: sha512-WMwm9LhRUo+WUaRN+vRuETqG89IgZphVSNkdFgeb6sS/E4OrDIN7t48CAewSHXc6C8lefD8KKfr5vY61brQlow==}
 
-  effect@4.0.0-rc.115:
-    resolution: {integrity: sha512-ogYulZ5ffeOzrJqQrG0XOkDO5lKn2s9KNHhoxJy/6wKUkF0i12dlVXWA9TgsgQ+zV/JzizyG0+XMPepZEQX6vw==}
+  effect@4.0.1:
+    resolution: {integrity: sha512-b1VlQG9g8fwxE5QnIZuPoOP/0MsqHJSRKxUijjoM80E5q95FXrX5yWtY5XI8G+GJsBQAVSDbLS458z9a++uVvw==}
 
   ejs@3.1.10:
     resolution: {integrity: sha512-UeJmFfOrAQS8OJWPZ4qtgHyWExa088/MtK5UEyoJGFH67cDEXkZSviOiKRCZ4Xij0zxI3JECgYs3oKx+AizQBA==}
@@ -8630,6 +8630,10 @@ packages:
     resolution: {integrity: sha512-/y4/bH9YNU5hi9NIrpOuvGXFcxrj3CMrV+/AYpowAYTpHn8gX/XPFjNy766FPoYY0miQhdW977JFWKGNhBdwyQ==}
     engines: {node: '>=22.19.0'}
 
+  undici@8.11.2:
+    resolution: {integrity: sha512-u4UB2/IrKdU6lFxumHmmo1a3fCQO5tzQllRorfoRS63txhrB7xTpSn1PftwC4qEHkOaqP95fCWW4lJzwErwzhQ==}
+    engines: {node: '>=22.19.0'}
+
   unicorn-magic@0.3.0:
     resolution: {integrity: sha512-+QBBXBCvifc56fsbuxZQ6Sic3wqqc3WWaqxs58gvJrcOuN83HGTCwz3oS5phzU9LthRNE9VrJCFCLUgHeeFnfA==}
     engines: {node: '>=18'}
@@ -8952,6 +8956,18 @@ packages:
 
   ws@8.21.3:
     resolution: {integrity: sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      bufferutil: ^4.0.1
+      utf-8-validate: '>=5.0.2'
+    peerDependenciesMeta:
+      bufferutil:
+        optional: true
+      utf-8-validate:
+        optional: true
+
+  ws@8.22.0:
+    resolution: {integrity: sha512-Ydggc987+RO0AnWtZ/7Wq9FtNvcrL1b/RO0ud9mWjUPgDrsAAwQSF51sm2hm1XofbU/4jkpGEsLFsZZxU+1DOg==}
     engines: {node: '>=10.0.0'}
     peerDependencies:
       bufferutil: ^4.0.1
@@ -9885,28 +9901,28 @@ snapshots:
       get-east-asian-width: 1.6.0
       marked: 18.0.11
 
-  '@effect/platform-node-shared@4.0.0-rc.115(effect@4.0.0-rc.115)':
+  '@effect/platform-node-shared@4.0.1(effect@4.0.1)':
     dependencies:
       '@types/ws': 8.18.1
-      effect: 4.0.0-rc.115
-      ws: 8.21.3
+      effect: 4.0.1
+      ws: 8.22.0
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/platform-node@4.0.0-rc.115(effect@4.0.0-rc.115)(redis@6.2.1(@opentelemetry/api@1.9.1))':
+  '@effect/platform-node@4.0.1(effect@4.0.1)(redis@6.2.1(@opentelemetry/api@1.9.1))':
     dependencies:
-      '@effect/platform-node-shared': 4.0.0-rc.115(effect@4.0.0-rc.115)
-      effect: 4.0.0-rc.115
+      '@effect/platform-node-shared': 4.0.1(effect@4.0.1)
+      effect: 4.0.1
       redis: 6.2.1(@opentelemetry/api@1.9.1)
-      undici: 8.10.2
+      undici: 8.11.2
     transitivePeerDependencies:
       - bufferutil
       - utf-8-validate
 
-  '@effect/vitest@4.0.0-rc.115(effect@4.0.0-rc.115)(vitest@5.0.0)':
+  '@effect/vitest@4.0.1(effect@4.0.1)(vitest@5.0.0)':
     dependencies:
-      effect: 4.0.0-rc.115
+      effect: 4.0.1
       vitest: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.0)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
   '@electron-internal/extract-zip@1.0.4': {}
@@ -10611,14 +10627,14 @@ snapshots:
       '@orpc/shared': 2.0.0-beta.35
       '@standard-schema/spec': 1.1.0
 
-  '@orpc/experimental-effect@2.0.0-beta.35(effect@4.0.0-rc.115)':
+  '@orpc/experimental-effect@2.0.0-beta.35(effect@4.0.1)':
     dependencies:
       '@orpc/client': 2.0.0-beta.35
       '@orpc/contract': 2.0.0-beta.35
       '@orpc/json-schema': 2.0.0-beta.35
       '@orpc/server': 2.0.0-beta.35
       '@orpc/shared': 2.0.0-beta.35
-      effect: 4.0.0-rc.115
+      effect: 4.0.1
     transitivePeerDependencies:
       - crossws
       - fastify
@@ -13789,7 +13805,7 @@ snapshots:
   ee-first@1.1.1:
     optional: true
 
-  effect@4.0.0-rc.115: {}
+  effect@4.0.1: {}
 
   ejs@3.1.10:
     dependencies:
@@ -17292,6 +17308,8 @@ snapshots:
 
   undici@8.10.2: {}
 
+  undici@8.11.2: {}
+
   unicorn-magic@0.3.0: {}
 
   unified@11.0.5:
@@ -17648,6 +17666,8 @@ snapshots:
   wrappy@1.0.2: {}
 
   ws@8.21.3: {}
+
+  ws@8.22.0: {}
 
   xml-name-validator@5.0.0:
     optional: true
