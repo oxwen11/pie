@@ -37,6 +37,10 @@
   AbortError —— socket 断开后 Session 列表同步永久停止，只剩轮询兜底。
 - CLI `waitForSession` 先读快照后订阅，turn 在两者之间结束会等到超时；`awaitTurn` 对 `session.closed` 的判断不可达。
 - 见 P7。
+- 客户端断开会中断进行中的 prompt RPC：oRPC 在 WebSocket 关闭或请求取消时 abort 处理器的 signal，Effect 扩展
+  据此中断处理 fiber；`rpc/session.ts` 的 prompt 处理器与 `PiAgentSessionService.prompt` 没有不可中断区段。
+  已用服务层测试确认（在 Pi 收到 prompt 后中断调用）：Pi 已收到 prompt、标题已写入 Session 记录，但
+  `session.prompt.submitted` 与 `session.prompt.rejected` 都没有发布，其他客户端看不到这条 prompt 的提交。
 
 ## 2. 参考
 
@@ -58,7 +62,11 @@
     出现缺口即清空并报错；待推送超过 100 条时把积压替换为一份完整快照（reset）。不做日志补发，历史分页仍是 TODO。
   - 传输层按未写出的字节（`maxPendingBytes`）限制慢客户端，超出即断开。
   - 客户端“never reconnects or replays requests automatically”，重连后只重复已知安全的操作。
+  - 已受理的命令执行到底，与发起它的连接是否断开无关。
   - worker 在有运行中的任务时保持存活，与是否有客户端无关；重启 worker 时 `harness.resume()` 继续中断的工作。
+  - 关闭时先进入 draining：拒绝新的修改类命令（稳定错误码），等已受理的命令结束，再向订阅者发出关闭原因。
+  - 队列项各有 id，可单独取消；流式输出按短时间窗合并后再推送。
+  - 服务端推送的是状态投影的增量（项的增改删），客户端只应用、不自行折叠领域事件。
   - durable `submit` 支持持久的 `requestId` 去重，但实验层当前没有使用；扩展提问路由到哪个客户端尚未设计。
 
   不采用的原因：durable 运行时不支持稳定版 Extension API（扩展改为 durable `Registry` 与 chord facet），MCP、
@@ -120,13 +128,20 @@
 - 携带 `{ epoch, afterSeq }` 从投影按页补齐（Paseo 的做法，带 `hasNewer`）只作为可选优化：仅当尾页快照的体积
   实测成为重连瓶颈时引入，不作为正确性依赖。
 - 取代快照中保留整轮 chunk 的 `ActiveTurnSnapshot.truncated` 恢复方式。
+- 流式文本与工具输出 chunk 在服务端按 50–100 ms 时间窗合并后推送（turn 结束、请求出现等边界立即刷新），
+  降低事件数与慢客户端压力；投影与 seq 语义不变。
+- Pi 内队列（steer / follow-up）改为带 id 的队列项，支持单项取消与编辑，取代整体覆盖、非原子的
+  `replaceQueue`，避免两个客户端同时改队列时互相覆盖。
 
 ### 3.4 冷读与运行时生命周期
 
 - daemon 直接解析 Pi JSONL 会话文件构建历史与投影（复用 `pi/history.ts` 的折叠规则），不经过子进程。
 - 模型、状态、列表读取来自 Pie 记录与投影；只有 prompt、steer、follow-up、compact、回答请求等需要 agent
   的操作才启动运行时。
-- 运行时空闲回收的策略（超时、扩展持有的后台工作）由 #236 决定；本文只保证读路径不再阻碍回收。
+- 运行时回收以“是否有活动”判定，而不是“是否有观看者”（参照 Pi worker）：没有运行中的 turn、没有排队项、
+  没有待答请求、没有扩展持有的后台工作，且超过宽限期后才回收；有订阅者但空闲的 Session 也可回收，
+  有活动但所有客户端都已断开的 Session 不回收。具体超时与扩展后台工作的判定由 #236 决定；本文保证读路径
+  不再阻碍回收。
 - Pi CLI 在同一会话文件上继续产生的内容，在下次打开或冷读时从 JSONL 补齐。
 
 ### 3.5 命令去重
@@ -138,6 +153,9 @@
 - 与 Pi client 相同，`SessionSync` 重连后**不自动重放修改类命令**；只有调用方明确发起的重试才复用原 `commandId`。
   因此内存回执只需覆盖同一 daemon 生命周期内的重试。
 - 整条命令（标题、元数据、交付给 Pi）在同一 Session 内串行，不再拆成独立临界区。
+- **已受理的命令执行到底**：命令一旦开始修改状态或交付给 Pi，其余步骤（含广播 `prompt.submitted` /
+  `rejected`、写回执）不受发起连接断开或请求取消的影响；调用方断开只是收不到响应，结果通过事件流与回执获得。
+  只有尚未开始的命令随取消放弃。
 
 ### 3.6 收尾与失败语义
 
@@ -145,7 +163,8 @@
 - **Pi 子进程崩溃**：发出 `turn.ended(failed)` 与 `session.crashed`（现状保留），并对每个待答请求发出
   `session.request.rejected`；恢复时的 `clearCrash` 发出状态事件，不再静默。
 - **close / archive / delete**：先发布 `turn.ended(canceled)` 与请求失效，再关闭订阅。
-- **daemon 关闭**：向订阅者发出 `closed: server_shutdown`。
+- **daemon 关闭**：先进入 draining，以稳定错误码拒绝新的修改类命令，等待已受理的命令在限时内结束；
+  再对未结束的 turn 收尾，最后向订阅者发出 `closed: server_shutdown`。客户端据此区分“daemon 正在关闭”与网络断开。
 - `stream_replaced`、`internal_error` 要么接入实际路径，要么从契约删除。
 
 ### 3.7 慢客户端
@@ -180,6 +199,9 @@
 5. “上次运行被中断”是否需要写入 Session JSON 记录（属于 host write，按
    [persistence.md](../../.agents/rules/topics/persistence.md) 确认并更新 [持久化清单](../host-persistence.md)）。
 6. Schedule 唤醒意图的记录格式与迁移（同上，属于 host write）。
+7. 实时流推送的内容：继续推送领域事件、由三端各自折叠（现状），还是像 Pi 一样推送投影项的增改删、只在
+   服务端折叠一次、客户端只做副本。后者消除三端折叠逻辑不一致的风险，但事件契约改动更大；倾向后者，
+   须在定义快照契约（第 1 项）时一并确定。
 
 三端与 daemon 同版本发布，ADR 0004 的兼容键要求精确匹配，契约可以直接切换，不保留旧协议。
 
@@ -187,10 +209,12 @@
 
 按顺序以 stack 交付，每片独立可验证：
 
-0. **独立缺陷**：Session 列表断线后重订阅；CLI 先订阅后读快照；close 进行中 turn 时先发布结束事件。
+0. **独立缺陷**：Session 列表断线后重订阅；CLI 先订阅后读快照；close 进行中 turn 时先发布结束事件；
+   prompt 交付给 Pi 后不再因客户端断开而中断（最小修复：交付与广播段不可中断）。
 1. **`SessionSync` + epoch + 收尾**：三端改用共用同步模块；事件与快照带 epoch；补齐 P7、P8 的事件；修正
-   `prompt.submitted` 顺序。
-2. **时间线投影 + 尾页快照 + 历史分页 + 冷读**：读路径不再拉起 Pi 子进程（解锁 #236）。
+   `prompt.submitted` 顺序；所有修改类命令在受理后执行到底；daemon 关闭时 draining 与 `server_shutdown`。
+2. **时间线投影 + 尾页快照 + 历史分页 + 冷读**：读路径不再拉起 Pi 子进程（解锁 #236）；chunk 合并推送；
+   带 id 的队列项取代 `replaceQueue`。
 3. **命令去重 + Session 列表流 + 慢客户端预算**：移除列表与 Schedule 结算轮询。
 4. **跨重启意图**：与 #286 一起交付。
 5. **修订 ADR 0009**，更新持久化清单与 `CONTEXT.md`，删除本文已落地的内容。
@@ -211,6 +235,9 @@
   Session 列表在 socket 断开后恢复；重连不会自动重放修改类命令。
 - 并发：两个客户端同时 prompt、steer、回答同一请求，三端看到的事件顺序与最终状态一致。
 - 崩溃与关闭：杀 Pi 子进程、重启 daemon、在 turn 中关闭 Session，客户端都收到明确的中断与请求失效。
+  以 `fake-e2e-provider` 驱动真实 `pie-pi-process`，在固定注入点（prompt 交付后、turn 中途、待答请求时、
+  daemon draining 中）杀进程或断开客户端，断言事件与最终状态。
+- 断开：发起 prompt 的客户端在 Pi 受理后断开，其他客户端仍收到 `prompt.submitted` 与完整 turn。
 - 慢客户端：限速客户端被断开后能凭游标恢复，其他客户端不受影响。
 - 读路径：打开历史、查看模型、展示列表不启动 Pi 子进程（以进程计数验证）。
 - CLI：`waitForSession` / prompt 等待在 turn 于订阅前结束、以及断线重连时都能正确返回。
@@ -222,5 +249,8 @@
 - 不实现 turn 中途从断点继续；进程丢失即中断并提示重试。
 - 不在本文开放用户 Pi 扩展自动发现（`CONTEXT.md` 现明确禁用）。
 - 不引入 Pi 式的 coordinator（稳定 socket + 可替换 server 进程、worker 跨 daemon 替换存活）与 per-connection
-  `attachmentId`；扩展提问继续广播给所有客户端、先回答者生效。二者留待有具体需求时评估。
+  `attachmentId`；扩展提问继续广播给所有客户端、先回答者生效。二者留待有具体需求时评估，例如需要不中断
+  运行中 Session 的 daemon 热升级。
+- 不对修改类命令做 epoch 防护（携带客户端看到的 epoch，不匹配即拒绝）。当前三端与 daemon 同版本，
+  命令不自动重放，收益不足；若引入自动重试或热升级再评估。
 - 不改变 Pi JSONL 作为对话记录权威的地位，不在 Pie 中复制完整 transcript。
