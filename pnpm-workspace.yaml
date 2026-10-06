@@ -47,14 +47,14 @@ catalog:
 catalogs:
   # Effect v4 ecosystem is versioned in lockstep. Every `effect` / `@effect/*`
   # package must move together or you get two runtimes. Exact pins (no caret)
-  # because a prerelease caret would admit a later RC or the 4.0.0 stable.
+  # so the family moves together.
   # `@effect/platform-node-shared` is transitive-only and is listed so the
   # override below can pin it; no workspace package.json depends on it.
   effect:
-    effect: 4.0.0-rc.115
-    "@effect/platform-node": 4.0.0-rc.115
-    "@effect/platform-node-shared": 4.0.0-rc.115
-    "@effect/vitest": 4.0.0-rc.115
+    effect: 4.0.1
+    "@effect/platform-node": 4.0.1
+    "@effect/platform-node-shared": 4.0.1
+    "@effect/vitest": 4.0.1
   # oRPC must move as one family: exact pins (no caret) because prerelease
   # caret ranges admit the 2.0.0 stable release, and a mixed tree crashes at
   # runtime (stable client imports ORPC_HEADER, absent from the beta contract).
@@ -115,13 +115,7 @@ overrides:
   # @tiptap/pm@3.31.3 depends on prosemirror-view@1.42.3 while sibling
   # prosemirror-* packages still resolve 1.42.1 — split EditorView types fail tsc.
   prosemirror-view: 1.42.3
-# @effect/vitest@4.0.0-rc.112 still peers vitest <5. It only imports
-# TestRunner / expect from `vitest` and runs on 5; drop this when the
-# Effect catalog moves.
 packageExtensions:
-  "@effect/vitest":
-    peerDependencies:
-      vitest: ">=4.1.0"
   "@ff-labs/pi-fff":
     dependencies:
       "@sinclair/typebox": "*"

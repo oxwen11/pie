@@ -2,7 +2,7 @@ import http from "node:http";
 import type { AddressInfo } from "node:net";
 
 import { Context, Effect, Layer, Logger, Scope } from "effect";
-import { HttpServerResponse } from "effect/unstable/http";
+import { HttpServerResponse } from "effect/http";
 import { afterEach, describe, expect, it } from "vitest";
 import { WebSocket } from "ws";
 
