@@ -134,20 +134,27 @@ export function AppShellBody({ children }: AppShellBodyProps) {
   const shellRef = useRef<HTMLDivElement>(null);
   const measure = useCallback((shell: HTMLDivElement) => {
     const left = shell.getBoundingClientRect().left;
+    let leading = 0;
     const toggle = shell.querySelector<HTMLElement>("[aria-label='Toggle Sidebar']");
     if (toggle !== null) {
-      const leading = toggle.getBoundingClientRect().right - left + 8;
+      leading = toggle.getBoundingClientRect().right - left + 8;
       shell.style.setProperty("--shell-leading", `${leading}px`);
     }
-    // The content slot spans the panel column up to the trailing toggle.
+    // The content slot spans the panel column up to the trailing toggle. The
+    // toggle sits after the title's reserve margin, so zero the reserve before
+    // reading: one pass, no feedback loop with the value this writes.
+    shell.style.setProperty("--shell-content-reserve", "0px");
     const column = shell.querySelector<HTMLElement>("[data-slot=content-panel-column]");
     const trailing = shell.querySelector<HTMLElement>("[aria-label='Toggle content panel']");
     const start = column?.getBoundingClientRect().left ?? 0;
+    // The strip never starts inside the leading controls (traffic lights,
+    // brand, sidebar toggle), even when a maximized column does.
+    const stripLeft = Math.max(start - left, leading);
     const width =
       column === null || trailing === null
         ? 0
-        : Math.max(0, trailing.getBoundingClientRect().left - 8 - start);
-    shell.style.setProperty("--shell-content-left", `${start - left}px`);
+        : Math.max(0, trailing.getBoundingClientRect().left - 8 - stripLeft);
+    shell.style.setProperty("--shell-content-left", `${stripLeft}px`);
     shell.style.setProperty("--shell-content-width", `${width}px`);
     shell.style.setProperty("--shell-content-reserve", width > 0 ? `${width + 8}px` : "0px");
   }, []);
