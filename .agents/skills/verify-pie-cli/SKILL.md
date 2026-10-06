@@ -27,10 +27,10 @@ Ready when `GET $address/api/health` returns `ok`. **Read `address` from `$PIE_H
 What launch also does:
 
 - Requires **Node >= 24**. Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
-- Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.mjs` is missing.
+- Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.js` is missing.
 - Sets `PIE_HOME=/tmp/pie-verify-cli/runs/<id>/pie-home`. Daemon state is `$PIE_HOME/daemon`.
-- Invokes source: `cd packages/pie && pnpm exec tsx src/node/cli.ts …`. After a CLI build, `node dist/cli.mjs` is equivalent — do not assume `dist/cli.mjs` exists.
-- Sets `PIE_DAEMON_COMPATIBILITY_KEY` from `@getpie/core/compatibility` `resolveDaemonCompatibilityKey()`. tsdown injects that into `dist/cli.mjs`; **tsx does not**. Daemon start throws without `githash:<8-hex>`. The key is not a secret.
+- Invokes source: `cd packages/pie && pnpm exec tsx src/node/cli.ts …`. After a CLI build, `node dist/cli.js` is equivalent — do not assume `dist/cli.js` exists.
+- Sets `PIE_DAEMON_COMPATIBILITY_KEY` from `@getpie/core/compatibility` `resolveDaemonCompatibilityKey()`. tsdown injects that into `dist/cli.js`; **tsx does not**. Daemon start throws without `githash:<8-hex>`. The key is not a secret.
 - Default mode is **daemon start**. The CLI process exits; the daemon stays. Cleanup is `pie daemon stop` with the **same** `PIE_HOME`, not killing the short-lived CLI pid.
 - `--serve` starts foreground `pie serve` instead (no token). Use that only for the serve-foreground feature.
 

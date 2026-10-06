@@ -1,5 +1,5 @@
-const { execFileSync } = require("node:child_process");
-const path = require("node:path");
+import childProcess from "node:child_process";
+import path from "node:path";
 
 /**
  * Ad-hoc sign the .app after packaging.
@@ -13,12 +13,12 @@ const path = require("node:path");
  * An ad-hoc signature (`--sign -`) satisfies the loader. It grants no trust and
  * is not a substitute for real signing before distribution.
  */
-exports.default = async function adHocSign(context) {
+export default async function adHocSign(context) {
   if (context.electronPlatformName !== "darwin") return;
 
   const appPath = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
 
-  execFileSync("codesign", ["--force", "--deep", "--sign", "-", appPath], {
+  childProcess.execFileSync("codesign", ["--force", "--deep", "--sign", "-", appPath], {
     stdio: "inherit",
   });
-};
+}

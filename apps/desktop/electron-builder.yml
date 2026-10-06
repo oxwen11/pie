@@ -30,7 +30,7 @@ asarUnpack:
   - "**/node_modules/@getpie/server/dist/resources/**"
 # Official Bun binary. beforePack downloads the target arch into vendor/.
 # The Node daemon lives in asar; node-pty and pie-pi-process are unpacked.
-beforePack: scripts/before-pack.cjs
+beforePack: scripts/before-pack.js
 extraResources:
   - vendor
   - from: ../../packages/server/dist/resources
@@ -54,4 +54,4 @@ npmRebuild: false
 publish:
   provider: generic
   url: https://example.com/auto-updates
-afterPack: scripts/after-pack.cjs
+afterPack: scripts/after-pack.js
