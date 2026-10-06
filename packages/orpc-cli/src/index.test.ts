@@ -1,6 +1,6 @@
 import "@orpc/experimental-effect/extensions/input-output";
 import { oc } from "@orpc/contract";
-import { implement } from "@orpc/server";
+import { implement, os } from "@orpc/server";
 import { Command, CommanderError } from "commander";
 import { Schema } from "effect";
 import { describe, expect, it, vi } from "vitest";
@@ -62,7 +62,7 @@ describe("createCommanderCli", () => {
       },
     };
     const base = implement(contract);
-    const program = createCommanderCli({
+    const program = await createCommanderCli({
       router: base.router({
         project: {
           create: base.project.create.handler(({ input }) => {
@@ -104,7 +104,7 @@ describe("createCommanderCli", () => {
       },
     };
     const base = implement(contract);
-    const program = createCommanderCli({
+    const program = await createCommanderCli({
       router: base.router({
         session: {
           show: base.session.show.handler(({ input }) => {
@@ -142,7 +142,7 @@ describe("createCommanderCli", () => {
     const again = implement({
       session: { list: oc.meta(cli({})).input(List) },
     });
-    const negatedProgram = createCommanderCli({
+    const negatedProgram = await createCommanderCli({
       router: again.router({
         session: {
           list: again.session.list.handler(({ input }) => {
@@ -167,7 +167,7 @@ describe("createCommanderCli", () => {
       },
     };
     const base = implement(contract);
-    const program = createCommanderCli({
+    const program = await createCommanderCli({
       router: base.router({
         project: {
           create: base.project.create.handler(({ input }) => {
@@ -205,7 +205,7 @@ describe("createCommanderCli", () => {
       project: { create: oc.meta(cli({})).input(Create) },
     };
     const base = implement(contract);
-    const program = createCommanderCli({
+    const program = await createCommanderCli({
       router: base.router({
         project: {
           create: base.project.create.handler(() => {
@@ -236,7 +236,7 @@ describe("createCommanderCli", () => {
       session: { create: oc.meta(cli({})).input(Worktree) },
     };
     const base = implement(contract);
-    const program = createCommanderCli({
+    const program = await createCommanderCli({
       router: base.router({
         session: {
           create: base.session.create.handler(({ input }) => {
@@ -259,5 +259,30 @@ describe("createCommanderCli", () => {
     const daemon = await run(program, ["daemon", "start"]);
     expect(daemon.exitCode).toBe(0);
     expect(started).toBe(true);
+  });
+
+  it("unlazies nested routers before registering commands", async () => {
+    const create = os.meta(cli()).handler(() => "loaded");
+    const program = await createCommanderCli({
+      router: {
+        project: os.lazy(async () => ({ default: { create } })),
+      },
+    });
+
+    const result = await run(program, ["project", "create"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('"loaded"\n');
+  });
+
+  it("writes each event iterator value as a JSON line", async () => {
+    const events = os.meta(cli()).handler(async function* () {
+      yield { n: 1 };
+      yield { n: 2 };
+    });
+    const program = await createCommanderCli({ router: { events } });
+
+    const result = await run(program, ["events"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('{"n":1}\n{"n":2}\n');
   });
 });

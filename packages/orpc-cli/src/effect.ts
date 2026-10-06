@@ -16,8 +16,11 @@ import {
 } from "./metadata";
 
 /** Effect CLI adapter. Compose the returned commands with `Command.withSubcommands`. */
-export function createEffectCli(options: CliAdapterOptions): ReadonlyArray<Command.Command.Any> {
-  return group(readCliCommands(options.router)).map((node) => compile(node, options));
+export async function createEffectCli(
+  options: CliAdapterOptions,
+): Promise<ReadonlyArray<Command.Command.Any>> {
+  const specs = await readCliCommands(options.router);
+  return group(specs).map((node) => compile(node, options));
 }
 
 interface Node {
@@ -82,7 +85,7 @@ async function runLeaf(
     inputFromValues(values, spec),
     options.context,
   );
-  writeOutput(output);
+  await writeOutput(output);
 }
 
 function readParsed(parsed: Readonly<Record<string, unknown>>) {

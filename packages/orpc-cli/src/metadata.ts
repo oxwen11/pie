@@ -3,6 +3,7 @@ import {
   Lazy,
   Procedure,
   call,
+  unlazyRouter,
   type AnyProcedure,
   type AnyRouter,
   type Context,
@@ -77,8 +78,9 @@ export function cli(meta: CliMeta = {}): ReturnType<typeof cliPlugin> {
 
 export { getCliMeta };
 
-export function readCliCommands(router: AnyRouter): readonly CliCommandSpec[] {
-  const specs = collect(router).map(toSpec);
+export async function readCliCommands(router: AnyRouter): Promise<readonly CliCommandSpec[]> {
+  const ready = await unlazyRouter(router);
+  const specs = collect(ready).map(toSpec);
   assertDistinct(specs);
   return specs;
 }
@@ -121,9 +123,24 @@ export async function callProcedure(
   return call(procedure, input, { context });
 }
 
-export function writeOutput(output: unknown): void {
+export async function writeOutput(output: unknown): Promise<void> {
   if (output === undefined) return;
+  if (isAsyncIterable(output)) {
+    for await (const event of output) {
+      const line = JSON.stringify(event);
+      process.stdout.write(`${line ?? "null"}\n`);
+    }
+    return;
+  }
   process.stdout.write(`${JSON.stringify(output)}\n`);
+}
+
+function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
+  return (
+    (typeof value === "object" || typeof value === "function") &&
+    value !== null &&
+    Symbol.asyncIterator in value
+  );
 }
 
 export function parseJson(text: string): JsonValue {
@@ -145,7 +162,7 @@ function collect(router: AnyRouter): ReadonlyArray<{
   const entries: Array<{ procedure: AnyProcedure; path: readonly string[]; meta: CliMeta }> = [];
   const visit = (node: unknown, path: readonly string[]): void => {
     if (node instanceof Lazy) {
-      throw new TypeError(`Lazy router at "${path.join(".")}". Unlazy it before building a CLI.`);
+      throw new TypeError(`Lazy router at "${path.join(".")}" survived unlazyRouter.`);
     }
     if (node instanceof Procedure) {
       const meta = getCliMeta(node);

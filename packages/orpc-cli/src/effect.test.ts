@@ -67,22 +67,18 @@ describe("createEffectCli", () => {
         started = true;
       }),
     );
-    const command = Command.make("pie").pipe(
-      Command.withSubcommands([
-        ...createEffectCli({
-          router: base.router({
-            project: {
-              create: base.project.create.handler(({ input }) => {
-                created = input;
-                return input;
-              }),
-              list: base.project.list.handler(() => []),
-            },
+    const generated = await createEffectCli({
+      router: base.router({
+        project: {
+          create: base.project.create.handler(({ input }) => {
+            created = input;
+            return input;
           }),
-        }),
-        daemon,
-      ]),
-    );
+          list: base.project.list.handler(() => []),
+        },
+      }),
+    });
+    const command = Command.make("pie").pipe(Command.withSubcommands([...generated, daemon]));
 
     const result = await run(command, ["project", "create", "--path", "/tmp/pie"]);
     expect(created).toEqual({ path: "/tmp/pie" });
@@ -98,7 +94,7 @@ describe("createEffectCli", () => {
     const base = implement(contract);
     const command = Command.make("pie").pipe(
       Command.withSubcommands(
-        createEffectCli({
+        await createEffectCli({
           router: base.router({
             session: {
               show: base.session.show.handler(({ input }) => {

@@ -19,12 +19,12 @@ import {
  * (`exitOverride`). `--help` and usage errors throw `CommanderError`.
  * Add non-oRPC commands on the returned program before `parseAsync`.
  */
-export function createCommanderCli(options: CliAdapterOptions): Command {
+export async function createCommanderCli(options: CliAdapterOptions): Promise<Command> {
   const program = new Command();
   program.exitOverride();
   program.showHelpAfterError();
   program.showSuggestionAfterError();
-  for (const spec of readCliCommands(options.router)) {
+  for (const spec of await readCliCommands(options.router)) {
     register(program, spec, options);
   }
   return program;
@@ -68,7 +68,7 @@ function register(program: Command, spec: CliCommandSpec, options: CliAdapterOpt
         inputFromValues(values, spec),
         options.context,
       );
-      writeOutput(output);
+      await writeOutput(output);
     } catch (error) {
       if (error instanceof CommanderError) throw error;
       if (error instanceof CliUsageError) {
