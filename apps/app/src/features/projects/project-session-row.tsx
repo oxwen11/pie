@@ -31,20 +31,19 @@ export function ProjectSessionRow({
   const observe = usePullRequestRow(session, true);
 
   return (
-    <SidebarMenuItem ref={observe}>
+    <SidebarMenuItem
+      // The item carries the highlight, not the button: the button ends before the badge.
+      className="hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent flex items-center gap-1 rounded-lg"
+      data-active={active}
+      ref={observe}
+    >
       <SessionActionsMenu
         environmentId={environmentId}
         isActive={isActive}
         session={session}
         render={
           <SidebarMenuButton
-            // Hover-only archive must not keep the default pe-8 gap; a PR icon
-            // is a lasting action and still needs that padding.
-            className={
-              pullRequest === undefined
-                ? "md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
-                : "pe-24"
-            }
+            className="group-hover/menu-item:text-sidebar-accent-foreground min-w-0 flex-1 md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
             isActive={active}
             onClick={() => {
               navigate({
