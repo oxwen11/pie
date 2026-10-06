@@ -10,7 +10,9 @@ import {
   memo,
   type ReactNode,
 } from "react";
-import { type Components, Streamdown } from "streamdown";
+import { type CjkPlugin, type Components, Streamdown } from "streamdown";
+
+import { peelCjkAutolinkPunctuation } from "./cjk-autolink";
 
 type ResponseProps = ComponentProps<typeof Streamdown> & {
   className?: string;
@@ -414,8 +416,16 @@ const components: Components = {
 };
 
 // Fenced code and tables stay on Streamdown's built-ins so 2.6 max-height,
-// streaming auto-scroll, and download controls apply.
-const streamdownPlugins = { code };
+// streaming auto-scroll, and download controls apply. CJK autolink peeling
+// runs after remark-gfm, including when a caller replaces remarkPlugins.
+const cjkPlugin = {
+  name: "cjk",
+  type: "cjk",
+  remarkPluginsBefore: [],
+  remarkPluginsAfter: [peelCjkAutolinkPunctuation],
+  remarkPlugins: [peelCjkAutolinkPunctuation],
+} satisfies CjkPlugin;
+const streamdownPlugins = { code, cjk: cjkPlugin };
 
 export const Response = memo(
   (props: ResponseProps) => {
