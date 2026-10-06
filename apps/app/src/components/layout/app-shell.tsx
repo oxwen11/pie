@@ -209,8 +209,10 @@ export function AppShellBody({ children }: AppShellBodyProps) {
             />
             <div
               className={cn(
-                "absolute inset-y-0 flex min-w-0 items-center",
+                // The rule continues the panel's column divider into the titlebar.
+                "before:bg-border absolute inset-y-0 flex min-w-0 items-center before:absolute before:top-1/2 before:-left-px before:h-5 before:w-px before:-translate-y-1/2",
                 !hasVisibleContentPanel && "hidden",
+                isContentPanelMaximized && "before:hidden",
               )}
               data-slot="shell-content-title"
               ref={setContentTitleTarget}

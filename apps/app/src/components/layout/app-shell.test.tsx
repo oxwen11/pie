@@ -171,9 +171,13 @@ it("places the content-panel tab strip in the titlebar above the panel column", 
   expect(title.getBoundingClientRect().right).toBeLessThanOrEqual(
     slot.getBoundingClientRect().left,
   );
+  const rule = getComputedStyle(slot, "::before");
+  expect(rule.width).toBe("1px");
+  expect(rule.left).toBe("-1px");
 
   await maximize.click();
   await expect.poll(() => getComputedStyle(title).display).toBe("none");
+  expect(getComputedStyle(slot, "::before").display).toBe("none");
   await expect
     .poll(() => slot.getBoundingClientRect().left)
     .toBe(column.getBoundingClientRect().left);
