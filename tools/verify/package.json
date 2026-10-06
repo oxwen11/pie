@@ -22,7 +22,6 @@
   },
   "dependencies": {
     "@getpie/contract": "workspace:*",
-    "@getpie/core": "workspace:*",
     "effect": "catalog:effect"
   },
   "devDependencies": {
