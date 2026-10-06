@@ -52,7 +52,7 @@ export function AppSidebar() {
     >
       <div className="bg-card flex h-full min-h-0 w-full flex-col">
         {pageSidebar ? null : (
-          <SidebarHeader className="p-0" data-drag-region="">
+          <SidebarHeader className="p-0">
             {/* Desktop: the title row shows traffic lights, so the list carries
                 the mark. Web hosts it in the title row instead. */}
             {desktop ? (

@@ -1,6 +1,6 @@
 # Session chat
 
-`/session/<sessionId>` is transcript + composer. No extra header bar on the route itself — the shell card heading is the session title. The loader runs `agent.session.prepare` (validates the ref, backfills cwd, does **not** start Pi). A missing session toasts and redirects to `/draft`.
+`/session/<sessionId>` is transcript + composer. No header bar on the route itself — the window titlebar heading is the session title, aligned to the main column (it moves with the sidebar width). The loader runs `agent.session.prepare` (validates the ref, backfills cwd, does **not** start Pi). A missing session toasts and redirects to `/draft`.
 
 ## Sub-features
 
@@ -30,7 +30,7 @@ agent-browser wait --url "**/session/**"
 
 Follow-up prompt (idle session — Pi finished or failed):
 
-1. Snapshot: heading is the first-prompt title; supporting text is the project name; composer at the bottom.
+1. Snapshot: heading is the first-prompt title in the window titlebar; the project is an icon (**Project: \<name\>**), not supporting text; composer at the bottom.
 2. Click the contenteditable. Type a second distinctive line.
 3. Click **Send message** (not Enter).
 4. User bubble appears. **Thinking…** may follow.

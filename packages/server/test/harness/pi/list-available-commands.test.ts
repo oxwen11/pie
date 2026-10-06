@@ -61,7 +61,7 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
       const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-commands-" });
       yield* writeProjectResources(cwd, "explain", "review");
 
-      const commands = yield* Effect.promise(() => listAvailablePiCommands(cwd));
+      const commands = yield* listAvailablePiCommands(cwd);
       const explain = commands.find((command) => command.name === "explain");
       const review = commands.find((command) => command.name === "skill:review");
 
@@ -88,9 +88,7 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
       const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-project-commands-" });
       yield* writeGlobalResources(agentDir, "shared-prompt", "global-skill", "Global");
 
-      const globalCommands = yield* Effect.promise(() =>
-        listAvailablePiCommands(undefined, agentDir),
-      );
+      const globalCommands = yield* listAvailablePiCommands(undefined, agentDir);
       assert.deepEqual(
         globalCommands.find((command) => command.name === "shared-prompt"),
         {
@@ -102,7 +100,7 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
       assert.ok(globalCommands.some((command) => command.name === "skill:global-skill"));
 
       yield* writeProjectResources(cwd, "shared-prompt", "project-skill", "Project");
-      const projectCommands = yield* Effect.promise(() => listAvailablePiCommands(cwd, agentDir));
+      const projectCommands = yield* listAvailablePiCommands(cwd, agentDir);
       assert.deepEqual(
         projectCommands.filter((command) => command.name === "shared-prompt"),
         [
@@ -125,7 +123,7 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
       const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-command-collision-" });
       yield* writeProjectResources(cwd, "skill:review", "review");
 
-      const commands = yield* Effect.promise(() => listAvailablePiCommands(cwd, agentDir));
+      const commands = yield* listAvailablePiCommands(cwd, agentDir);
       assert.deepEqual(
         commands.filter((command) => command.name === "skill:review"),
         [
@@ -153,7 +151,7 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
 `,
       );
 
-      const commands = yield* Effect.promise(() => listAvailablePiCommands(cwd));
+      const commands = yield* listAvailablePiCommands(cwd);
       assert.deepEqual(
         commands.find((command) => command.name === "marker"),
         { name: "marker", description: "Marker command", source: "extension" },
@@ -169,8 +167,8 @@ layer(NodeServices.layer)("listAvailablePiCommands", (it) => {
       yield* writeProjectResources(first, "first-prompt", "first-skill");
       yield* writeProjectResources(second, "second-prompt", "second-skill");
 
-      const firstCommands = yield* Effect.promise(() => listAvailablePiCommands(first));
-      const secondCommands = yield* Effect.promise(() => listAvailablePiCommands(second));
+      const firstCommands = yield* listAvailablePiCommands(first);
+      const secondCommands = yield* listAvailablePiCommands(second);
 
       assert.ok(firstCommands.some((command) => command.name === "first-prompt"));
       assert.ok(firstCommands.some((command) => command.name === "skill:first-skill"));

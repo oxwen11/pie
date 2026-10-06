@@ -27,9 +27,8 @@ jobs:
     if: >-
       github.event_name == 'push' ||
       contains(fromJSON(vars.TRUSTED_PR_AUTHORS || '[]'), github.event.pull_request.user.login)
-    # runner-cursor already has xvfb. rn-pie-02 needs a root bootstrap pass
-    # (xvfb xauth) before this label pin can drop back to [self-hosted, pie].
-    runs-on: [self-hosted, pie, runner-cursor]
+    # Both pie runners have xvfb. Pinning to runner-cursor serializes Code check.
+    runs-on: [self-hosted, pie]
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

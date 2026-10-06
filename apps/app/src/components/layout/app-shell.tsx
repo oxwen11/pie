@@ -1,7 +1,17 @@
 import { SidebarProvider, useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { LazyMotion, domMax } from "motion/react";
-import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
+import {
+  createContext,
+  type ReactNode,
+  use,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 
 import { AppRail } from "@/components/layout/app-rail";
 import { BrandMark } from "@/components/layout/brand-mark";
@@ -26,6 +36,14 @@ interface AppShellContextValue {
 }
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
+
+const ShellTitleContext = createContext<HTMLDivElement | null>(null);
+
+/** Route-owned title, placed in the window titlebar at the main column. */
+export function ShellTitle({ children }: { readonly children: ReactNode }): ReactNode {
+  const target = use(ShellTitleContext);
+  return target === null ? null : createPortal(children, target);
+}
 
 const useAppShell = (): AppShellContextValue => {
   const value = use(AppShellContext);
@@ -73,8 +91,8 @@ export interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   return (
     // The provider is shell-owned: it supplies responsive/sidebar state and is
-    // also the viewport wrapper. Individual titlebar headers own draggable
-    // regions; h-svh keeps long transcripts scrolling inside the shell.
+    // also the viewport wrapper. The shell titlebar is the window drag strip;
+    // h-svh keeps long transcripts scrolling inside the shell.
     <SidebarProvider className="bg-sidebar h-svh overflow-hidden" defaultOpen={readSidebarCookie()}>
       <LazyMotion features={domMax}>{children}</LazyMotion>
     </SidebarProvider>
@@ -107,39 +125,80 @@ export function AppShellBody({ children }: AppShellBodyProps) {
 
   const platform = usePlatform();
   const macos = isDesktopMacosHost(platform);
+  const { isMobile } = useSidebar();
+  const [titleTarget, setTitleTarget] = useState<HTMLDivElement | null>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const measureLeading = useCallback((shell: HTMLDivElement) => {
+    const toggle = shell.querySelector<HTMLElement>("[aria-label='Toggle Sidebar']");
+    if (toggle === null) return;
+    const leading = toggle.getBoundingClientRect().right - shell.getBoundingClientRect().left + 8;
+    shell.style.setProperty("--shell-leading", `${leading}px`);
+  }, []);
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (shell === null) return undefined;
+    const measure = () => measureLeading(shell);
+    measure();
+    shell.style.setProperty("--shell-rail", isMobile ? "0px" : "3.25rem");
+    const observer = new ResizeObserver(measure);
+    observer.observe(shell);
+    return () => observer.disconnect();
+  }, [isMobile, measureLeading]);
   return (
     <AppShellContext value={context}>
-      <div className="flex min-h-0 w-full flex-1 flex-col">
-        {/* Isomorphic title row: the leading slot is the macOS traffic lights
-            or, without them, the product mark. */}
-        <header
-          className={cn("flex shrink-0 items-center gap-2 pe-4", !macos && "h-10 ps-2")}
-          data-drag-region=""
-          style={
-            macos
-              ? {
-                  height: platform.windowChrome.titlebarHeight,
-                  paddingInlineStart: platform.windowChrome.toggleInset,
-                }
-              : undefined
-          }
-        >
-          {macos ? null : <BrandMark />}
-          <ShellSidebarToggle />
-          <ContentPanelToggle className="ms-auto" />
-        </header>
-        <div className={cn("flex min-h-0 w-full flex-1 md:py-1 md:pe-1", macos && "md:pt-0")}>
-          <AppRail />
-          {/* One persistent border encloses the session list, main and content
-              panel. Collapsing a column never moves or removes this frame. */}
-          <div
-            className="bg-card flex min-h-0 min-w-0 flex-1 overflow-hidden md:rounded-xl md:border md:border-black/10 md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)] dark:md:border-white/8"
-            data-slot="shell-panel"
+      <ShellTitleContext value={titleTarget}>
+        <div className="flex min-h-0 w-full flex-1 flex-col" data-slot="shell" ref={shellRef}>
+          {/* One drag strip. Its split tracks the sidebar width, so resizing the
+              list moves the title. Routes portal a title into the main column. */}
+          <header
+            className={cn(
+              "group relative flex shrink-0 items-center gap-2 pe-4",
+              !macos && "h-10 ps-2",
+            )}
+            data-drag-region=""
+            style={
+              macos
+                ? {
+                    height: platform.windowChrome.titlebarHeight,
+                    paddingInlineStart: platform.windowChrome.toggleInset,
+                  }
+                : undefined
+            }
           >
-            {children}
+            {macos ? null : <BrandMark />}
+            <ShellSidebarToggle />
+            <div
+              aria-hidden="true"
+              className="bg-border pointer-events-none absolute top-1/2 hidden h-5 w-px -translate-y-1/2 group-has-[[data-app-shell-titlebar-content]]:block"
+              style={{
+                left: "calc(var(--shell-rail, 0px) + var(--shell-sidebar-width, 0px))",
+                opacity: "var(--shell-sidebar-rule, 0)",
+              }}
+            />
+            <div
+              className="flex h-full min-w-0 flex-1 items-center"
+              data-slot="shell-title"
+              ref={setTitleTarget}
+              style={{
+                marginInlineStart:
+                  "max(0px, calc(var(--shell-rail, 0px) + var(--shell-sidebar-width, 0px) + var(--shell-gutter, 0px) + 8px - var(--shell-leading, 0px)))",
+              }}
+            />
+            <ContentPanelToggle className="ms-auto" />
+          </header>
+          <div className={cn("flex min-h-0 w-full flex-1 md:py-1 md:pe-1", macos && "md:pt-0")}>
+            <AppRail />
+            {/* One persistent border encloses the session list, main and content
+                panel. Collapsing a column never moves or removes this frame. */}
+            <div
+              className="bg-card flex min-h-0 min-w-0 flex-1 overflow-hidden md:rounded-xl md:border md:border-black/10 md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)] dark:md:border-white/8"
+              data-slot="shell-panel"
+            >
+              {children}
+            </div>
           </div>
         </div>
-      </div>
+      </ShellTitleContext>
     </AppShellContext>
   );
 }

@@ -7,7 +7,7 @@ import { resolveDaemonDirectory, statusDaemon, stopDaemon } from "@getpie/server
 import { daemonServeEnvironment, resolveServeConfig, serve, serveFlags } from "@getpie/server/http";
 import { attachRelay, relayPublicBaseUrl } from "@getpie/server/relay";
 import { Effect, Option } from "effect";
-import { Command, Flag } from "effect/unstable/cli";
+import { Command, Flag } from "effect/cli";
 
 import pkg from "../../package.json" with { type: "json" };
 import { resolveCliDaemon } from "./daemon";

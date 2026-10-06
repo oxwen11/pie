@@ -29,6 +29,7 @@ const settle = (last) => { send({ type: "agent_end", messages: [last || assistan
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
+  if (msg.type === "get_available_models") { send({ id: msg.id, type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "xai", id: "grok-4.3", name: "Grok 4.3" }] } }); return; }
   if (msg.type !== "prompt") return;
   send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: true } });
   send({ type: "agent_start" });
