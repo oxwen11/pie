@@ -5,7 +5,7 @@ import { Command, CommanderError } from "commander";
 import { Schema } from "effect";
 import { describe, expect, it, vi } from "vitest";
 
-import { cli, createCommanderCli } from "./index";
+import { cli, completionScript, createCommanderCli, readCliCommands, renderOutput } from "./index";
 
 const Create = Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) });
 const Show = Schema.Struct({
@@ -284,5 +284,67 @@ describe("createCommanderCli", () => {
     const result = await run(program, ["events"]);
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toBe('{"n":1}\n{"n":2}\n');
+  });
+
+  it("parses integers, dates, bigints, records, aliases, and positionals", async () => {
+    let received: unknown;
+    const Input = Schema.Struct({
+      count: Schema.Int,
+      at: Schema.Date,
+      n: Schema.BigInt,
+      labels: Schema.Record(Schema.String, Schema.String),
+      path: Schema.String,
+    });
+    const procedure = os
+      .meta(cli({ alias: "go", positionals: ["path"], options: { labels: { hidden: true } } }))
+      .input(Input)
+      .handler(({ input }) => {
+        received = input;
+        return input;
+      });
+    const program = await createCommanderCli({ router: { run: procedure } });
+    const help = await run(program, ["run", "--help"]);
+    expect(help.help).toContain("go");
+    expect(help.help).not.toContain("labels");
+
+    const result = await run(program, [
+      "go",
+      "/tmp",
+      "--count",
+      "2",
+      "--at",
+      "2020-01-02T00:00:00.000Z",
+      "--n",
+      "12",
+      "--labels",
+      "foo=bar",
+    ]);
+    expect(result.exitCode).toBe(0);
+    expect(received).toMatchObject({
+      count: 2,
+      n: 12n,
+      labels: { foo: "bar" },
+      path: "/tmp",
+    });
+    expect(received).toMatchObject({ at: new Date("2020-01-02T00:00:00.000Z") });
+
+    const bad = await run(program, [
+      "run",
+      "/tmp",
+      "--count",
+      "2.5",
+      "--at",
+      "2020-01-02",
+      "--n",
+      "1",
+    ]);
+    expect(bad.exitCode).not.toBe(0);
+    expect(completionScript("pie", await readCliCommands({ run: procedure }))).toContain("run");
+  });
+
+  it("renders object arrays as a table on a tty", () => {
+    expect(renderOutput([{ name: "ada" }, { name: "bea" }], true)).toContain("ada");
+    expect(renderOutput("hello", true)).toBe("hello\n");
+    expect(renderOutput({ name: "ada" }, false)).toBe('{"name":"ada"}\n');
   });
 });

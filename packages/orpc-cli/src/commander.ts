@@ -4,14 +4,18 @@ import {
   CliUsageError,
   INPUT_KEY,
   callProcedure,
+  coercePrimitive,
   inputFromValues,
   missingRequired,
   parseJson,
+  parseRecordEntry,
+  promptMissing,
   readCliCommands,
   writeOutput,
   type CliAdapterOptions,
   type CliCommandSpec,
   type CliField,
+  type CliValue,
 } from "./metadata";
 
 /**
@@ -37,8 +41,12 @@ function register(program: Command, spec: CliCommandSpec, options: CliAdapterOpt
   const leaf = parent.command(leafName);
   leaf.showHelpAfterError();
   if (spec.meta.description !== undefined) leaf.description(spec.meta.description);
+  if (spec.meta.alias !== undefined) leaf.alias(spec.meta.alias);
   const claimedInput = spec.fields.some((field) => field.flag === "input");
-  for (const field of spec.fields) addFieldOption(leaf, field);
+  for (const field of spec.fields) {
+    if (field.positional === true) addArgument(leaf, field);
+    else addFieldOption(leaf, field);
+  }
   if (spec.hasInput && !claimedInput) {
     const inputOption = new FieldOption("--input <json>", "Procedure input as JSON", INPUT_KEY);
     inputOption.argParser((value: string) => {
@@ -53,7 +61,15 @@ function register(program: Command, spec: CliCommandSpec, options: CliAdapterOpt
   }
 
   leaf.action(async () => {
-    const values = leaf.opts<Record<string, JsonValue | undefined>>();
+    const values = leaf.opts<Record<string, CliValue | undefined>>();
+    let positional = 0;
+    for (const field of spec.fields) {
+      if (!field.positional) continue;
+      const value: unknown = leaf.processedArgs[positional];
+      positional += 1;
+      if (isCliValue(value)) values[field.key] = value;
+    }
+    await promptMissing(spec.fields, values);
     const missing = missingRequired(values, spec.fields);
     if (missing !== undefined) {
       throw new CommanderError(
@@ -80,14 +96,6 @@ function register(program: Command, spec: CliCommandSpec, options: CliAdapterOpt
   });
 }
 
-type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { readonly [key: string]: JsonValue };
-
 function ensureParent(program: Command, names: readonly string[]): Command {
   let current = program;
   for (const name of names) {
@@ -103,29 +111,70 @@ function ensureParent(program: Command, names: readonly string[]): Command {
   return current;
 }
 
+function addArgument(command: Command, field: CliField): void {
+  const name = field.required ? `<${field.flag}>` : `[${field.flag}]`;
+  command.argument(name, field.description, (value: string) => {
+    try {
+      return coercePrimitive(field.kind, value);
+    } catch (error) {
+      throw new InvalidArgumentError(error instanceof Error ? error.message : "invalid value");
+    }
+  });
+}
+
 function addFieldOption(command: Command, field: CliField): void {
   const description = field.required ? appendRequired(field.description) : field.description;
   const option = new FieldOption(optionFlags(field), description, field.key);
-  if (field.kind === "array") {
-    option.argParser((value: string, previous: JsonValue[] | undefined) => [
-      ...(previous ?? []),
-      coerceValue(field.itemKind ?? "string", value),
-    ]);
-  } else if (field.kind === "number") {
-    option.argParser((value: string) => coerceValue("number", value));
-  } else if (field.kind === "json") {
-    option.argParser((value: string) => {
-      try {
-        return parseJson(value);
-      } catch (error) {
-        throw new InvalidArgumentError(error instanceof Error ? error.message : "invalid JSON");
-      }
-    });
+  if (field.hidden === true) option.hideHelp();
+  if (field.kind !== "boolean") {
+    option.argParser((value: string, previous: CliValue | undefined) =>
+      parseOption(field, value, previous),
+    );
   }
   if (field.choices !== undefined) option.choices([...field.choices]);
   command.addOption(option);
   if (field.kind === "boolean") {
     command.addOption(new FieldOption(`--no-${field.flag}`, `Negate --${field.flag}`, field.key));
+  }
+}
+
+function isCliValue(value: unknown): value is CliValue {
+  return value !== undefined;
+}
+
+function isRecordValue(value: CliValue | undefined): value is { [key: string]: CliValue } {
+  return (
+    typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date)
+  );
+}
+
+function parseOption(field: CliField, value: string, previous: CliValue | undefined): CliValue {
+  try {
+    if (field.kind === "array") {
+      const item = coercePrimitive(field.itemKind ?? "string", value);
+      const items: CliValue[] = [];
+      if (Array.isArray(previous)) {
+        for (const entry of previous) {
+          const itemValue: unknown = entry;
+          if (isCliValue(itemValue)) items.push(itemValue);
+        }
+      }
+      items.push(item);
+      return items;
+    }
+    if (field.kind === "record") {
+      const [key, parsed] = parseRecordEntry(value, field.itemKind);
+      const record: { [key: string]: CliValue } = {};
+      if (isRecordValue(previous)) {
+        for (const [entryKey, entryValue] of Object.entries(previous))
+          record[entryKey] = entryValue;
+      }
+      record[key] = parsed;
+      return record;
+    }
+    return coercePrimitive(field.kind, value);
+  } catch (error) {
+    throw new InvalidArgumentError(error instanceof Error ? error.message : "invalid value");
   }
 }
 
@@ -135,24 +184,19 @@ function appendRequired(description: string): string {
 
 function optionFlags(field: CliField): string {
   const long = `--${field.flag}`;
-  const token =
-    field.kind === "boolean"
-      ? ""
-      : field.kind === "number"
-        ? " <number>"
-        : field.kind === "json"
-          ? " <json>"
-          : " <value>";
+  const token = field.kind === "boolean" ? "" : ` <${tokenName(field.kind)}>`;
   const body = `${long}${token}`;
   return body;
 }
 
-function coerceValue(kind: "string" | "number" | "boolean", value: string): JsonValue {
-  if (kind !== "number") return value;
-  if (value.trim() === "" || Number.isNaN(Number(value))) {
-    throw new InvalidArgumentError(`expected a number, got "${value}"`);
-  }
-  return Number(value);
+function tokenName(kind: CliField["kind"]): string {
+  if (kind === "integer") return "integer";
+  if (kind === "number") return "number";
+  if (kind === "date") return "date";
+  if (kind === "bigint") return "bigint";
+  if (kind === "json" || kind === "array") return "json";
+  if (kind === "record") return "key=value";
+  return "value";
 }
 
 class FieldOption extends Option {

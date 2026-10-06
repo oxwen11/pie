@@ -11,8 +11,20 @@ import {
 import { Schema } from "effect";
 import * as SchemaAST from "effect/SchemaAST";
 
+export interface CliOptionMeta {
+  alias?: string;
+  description?: string;
+  hidden?: boolean;
+}
+
 export interface CliMeta {
   description?: string;
+  /** Command alias, not an option alias. */
+  alias?: string;
+  /** Schema paths that are positional arguments, in order. */
+  positionals?: readonly string[];
+  /** Keys are schema paths: `path`, `ref.projectId`. */
+  options?: Readonly<Record<string, CliOptionMeta>>;
 }
 
 export interface CliAdapterOptions {
@@ -27,8 +39,11 @@ export interface CliField {
   required: boolean;
   description: string;
   kind: FieldKind;
-  itemKind?: "string" | "number" | "boolean";
+  itemKind?: "string" | "number" | "integer" | "boolean" | "json";
   choices?: readonly string[];
+  alias?: string;
+  hidden?: boolean;
+  positional?: boolean;
 }
 
 /** One opted-in procedure. Adapters turn this into a command; they do not rediscover the router. */
@@ -48,19 +63,30 @@ export class CliUsageError extends Error {
   }
 }
 
-type JsonValue =
+export type CliValue =
   | string
   | number
   | boolean
   | null
-  | JsonValue[]
-  | { readonly [key: string]: JsonValue };
+  | Date
+  | bigint
+  | readonly CliValue[]
+  | { readonly [key: string]: CliValue };
 
 interface InputObject {
-  [key: string]: JsonValue;
+  [key: string]: CliValue;
 }
 
-type FieldKind = "string" | "number" | "boolean" | "array" | "json";
+type FieldKind =
+  | "string"
+  | "number"
+  | "integer"
+  | "boolean"
+  | "array"
+  | "json"
+  | "date"
+  | "bigint"
+  | "record";
 
 export const INPUT_KEY = "~input";
 
@@ -68,6 +94,9 @@ const [cliPlugin, getCliMeta] = defineMeta(
   "~cli",
   (incoming: CliMeta, current: CliMeta | undefined): CliMeta => ({
     description: incoming.description ?? current?.description,
+    alias: incoming.alias ?? current?.alias,
+    positionals: incoming.positionals ?? current?.positionals,
+    options: { ...current?.options, ...incoming.options },
   }),
 );
 
@@ -86,7 +115,7 @@ export async function readCliCommands(router: AnyRouter): Promise<readonly CliCo
 }
 
 export function missingRequired(
-  values: Readonly<Record<string, JsonValue | undefined>>,
+  values: Readonly<Record<string, CliValue | undefined>>,
   fields: readonly CliField[],
 ): string | undefined {
   if (values[INPUT_KEY] !== undefined) return undefined;
@@ -95,12 +124,12 @@ export function missingRequired(
 }
 
 export function inputFromValues(
-  values: Readonly<Record<string, JsonValue | undefined>>,
+  values: Readonly<Record<string, CliValue | undefined>>,
   spec: Pick<CliCommandSpec, "hasInput" | "fields">,
-): JsonValue | undefined {
+): CliValue | undefined {
   const inputFlag = values[INPUT_KEY];
   const entries = Object.entries(values).filter(
-    (entry): entry is [string, JsonValue] => entry[0] !== INPUT_KEY && entry[1] !== undefined,
+    (entry): entry is [string, CliValue] => entry[0] !== INPUT_KEY && entry[1] !== undefined,
   );
   if (inputFlag !== undefined) {
     if (entries.length > 0) {
@@ -116,7 +145,7 @@ export function inputFromValues(
 
 export async function callProcedure(
   procedure: AnyProcedure,
-  input: JsonValue | undefined,
+  input: CliValue | undefined,
   context: Context | undefined,
 ): Promise<unknown> {
   if (context === undefined) return call(procedure, input);
@@ -127,12 +156,21 @@ export async function writeOutput(output: unknown): Promise<void> {
   if (output === undefined) return;
   if (isAsyncIterable(output)) {
     for await (const event of output) {
-      const line = JSON.stringify(event);
-      process.stdout.write(`${line ?? "null"}\n`);
+      process.stdout.write(`${renderValue(event)}\n`);
     }
     return;
   }
-  process.stdout.write(`${JSON.stringify(output)}\n`);
+  process.stdout.write(renderOutput(output, process.stdout.isTTY));
+}
+
+export function renderOutput(output: unknown, tty: boolean | undefined): string {
+  if (!tty) return `${renderValue(output)}\n`;
+  if (typeof output === "string") return output.endsWith("\n") ? output : `${output}\n`;
+  if (Array.isArray(output) && output.every(isRow)) return renderTable(output);
+  if (typeof output === "number" || typeof output === "boolean" || typeof output === "bigint") {
+    return `${String(output)}\n`;
+  }
+  return `${renderValue(output)}\n`;
 }
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
@@ -143,7 +181,7 @@ function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
   );
 }
 
-export function parseJson(text: string): JsonValue {
+export function parseJson(text: string): CliValue {
   let parsed: unknown;
   try {
     parsed = JSON.parse(text);
@@ -184,7 +222,7 @@ function toSpec(entry: {
   meta: CliMeta;
 }): CliCommandSpec {
   const schema = entry.procedure["~orpc"].inputSchemas?.at(-1);
-  const fields = schema === undefined ? [] : fieldsFor(schema);
+  const fields = schema === undefined ? [] : fieldsFor(schema, entry.meta);
   return {
     procedure: entry.procedure,
     path: entry.path,
@@ -211,9 +249,29 @@ function assertDistinct(specs: readonly CliCommandSpec[]): void {
   }
 }
 
-function fieldsFor(schema: AnySchema): CliField[] {
-  if (!Schema.isSchema(schema)) return [];
-  const root = stripOptional(schema.ast);
+function fieldsFor(schema: AnySchema, meta: CliMeta): CliField[] {
+  const fields = Schema.isSchema(schema) ? fieldsFromAst(schema.ast) : fieldsFromStandard(schema);
+  for (const path of meta.positionals ?? []) {
+    if (!fields.some((field) => field.key === path)) {
+      throw new Error(`unknown positional "${path}"`);
+    }
+  }
+  return fields.map((field) => applyMeta(field, meta));
+}
+
+function applyMeta(field: CliField, meta: CliMeta): CliField {
+  const option = meta.options?.[field.key];
+  return {
+    ...field,
+    description: option?.description ?? field.description,
+    alias: option?.alias,
+    hidden: option?.hidden,
+    positional: meta.positionals?.includes(field.key) === true,
+  };
+}
+
+function fieldsFromAst(ast: SchemaAST.AST): CliField[] {
+  const root = stripOptional(ast);
   if (!isPlainObject(root.ast)) return [];
   return collectFields(root.ast, "", !root.optional);
 }
@@ -274,18 +332,66 @@ function isPlainObject(ast: SchemaAST.AST): ast is SchemaAST.Objects {
 function classify(ast: SchemaAST.AST): Pick<CliField, "kind" | "choices" | "itemKind"> {
   const choices = stringChoices(ast);
   if (choices !== undefined) return { kind: "string", choices };
+  if (SchemaAST.isUnion(ast)) {
+    const members = ast.types.map((type) => classify(stripOptional(type).ast));
+    const first = members[0];
+    if (
+      first !== undefined &&
+      members.every((member) => member.kind === first.kind && member.kind !== "json")
+    ) {
+      return first;
+    }
+    return { kind: "json" };
+  }
   if (SchemaAST.isBoolean(ast)) return { kind: "boolean" };
-  if (SchemaAST.isNumber(ast)) return { kind: "number" };
+  if (SchemaAST.isNumber(ast)) {
+    return { kind: integerNumber(ast) ? "integer" : "number" };
+  }
+  if (SchemaAST.isBigInt(ast)) return { kind: "bigint" };
+  if (isDate(ast)) return { kind: "date" };
   if (SchemaAST.isString(ast) || SchemaAST.isLiteral(ast)) return { kind: "string" };
+  if (
+    SchemaAST.isObjects(ast) &&
+    ast.indexSignatures.length > 0 &&
+    ast.propertySignatures.length === 0
+  ) {
+    const index = ast.indexSignatures[0];
+    const item = index === undefined ? undefined : classify(stripOptional(index.type).ast);
+    if (
+      item?.kind === "string" ||
+      item?.kind === "number" ||
+      item?.kind === "integer" ||
+      item?.kind === "boolean"
+    ) {
+      return { kind: "record", itemKind: item.kind };
+    }
+    return { kind: "json" };
+  }
   if (SchemaAST.isArrays(ast)) {
     const itemAst = ast.rest[0] ?? ast.elements[0];
     if (itemAst === undefined) return { kind: "json" };
-    const item = stripOptional(itemAst).ast;
-    if (SchemaAST.isString(item)) return { kind: "array", itemKind: "string" };
-    if (SchemaAST.isNumber(item)) return { kind: "array", itemKind: "number" };
-    if (SchemaAST.isBoolean(item)) return { kind: "array", itemKind: "boolean" };
+    const item = classify(stripOptional(itemAst).ast);
+    if (
+      item.kind === "string" ||
+      item.kind === "number" ||
+      item.kind === "integer" ||
+      item.kind === "boolean"
+    ) {
+      return { kind: "array", itemKind: item.kind };
+    }
+    return { kind: "array", itemKind: "json" };
   }
   return { kind: "json" };
+}
+
+function integerNumber(ast: SchemaAST.Number): boolean {
+  return ast.checks?.some((check) => check.annotations?.expected === "an integer") === true;
+}
+
+function isDate(ast: SchemaAST.AST): boolean {
+  if (!SchemaAST.isDeclaration(ast)) return false;
+  const representation = ast.annotations?.representation;
+  return isRecord(representation) && representation.id === "effect/schema/Date";
 }
 
 function stringChoices(ast: SchemaAST.AST): readonly string[] | undefined {
@@ -303,7 +409,170 @@ function descriptionOf(ast: SchemaAST.AST): string {
   return typeof description === "string" ? description : "";
 }
 
-function isJsonValue(value: unknown): value is JsonValue {
+function fieldsFromStandard(schema: AnySchema): CliField[] {
+  const raw = standardJson(schema);
+  if (raw === undefined || !isRecord(raw) || raw.type !== "object" || !isRecord(raw.properties)) {
+    return [];
+  }
+  const required = new Set(
+    Array.isArray(raw.required) ? raw.required.filter((item) => typeof item === "string") : [],
+  );
+  return Object.entries(raw.properties).flatMap(([key, value]) => {
+    if (!isRecord(value)) return [];
+    return [
+      {
+        key,
+        flag: flagName(key),
+        required: required.has(key),
+        description: typeof value.description === "string" ? value.description : "",
+        kind: jsonKind(value),
+      } satisfies CliField,
+    ];
+  });
+}
+
+function isJsonInput(value: unknown): value is (options: { readonly target: string }) => unknown {
+  return typeof value === "function";
+}
+
+function standardJson(schema: AnySchema): unknown {
+  const standard = schema["~standard"];
+  if (!isRecord(standard) || !isRecord(standard.jsonSchema)) return undefined;
+  const input = standard.jsonSchema.input;
+  if (!isJsonInput(input)) return undefined;
+  return input({ target: "draft-07" });
+}
+
+function jsonKind(raw: Record<string, unknown>): FieldKind {
+  if (raw.type === "boolean") return "boolean";
+  if (raw.type === "integer") return "integer";
+  if (raw.type === "number") return "number";
+  if (raw.type === "array") return "array";
+  if (raw.type === "object") return "json";
+  return "string";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+export function parseInteger(value: string): number {
+  if (!/^-?\d+$/.test(value)) throw new CliUsageError(`expected an integer, got "${value}"`);
+  return Number(value);
+}
+
+export function parseDate(value: string): Date {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) throw new CliUsageError(`expected a date, got "${value}"`);
+  return date;
+}
+
+export function parseBigint(value: string): bigint {
+  try {
+    return BigInt(value);
+  } catch {
+    throw new CliUsageError(`expected a bigint, got "${value}"`);
+  }
+}
+
+export function parseRecordEntry(
+  value: string,
+  kind: CliField["itemKind"],
+): readonly [string, CliValue] {
+  const eq = value.indexOf("=");
+  if (eq <= 0) throw new CliUsageError(`expected key=value, got "${value}"`);
+  return [value.slice(0, eq), coercePrimitive(kind ?? "string", value.slice(eq + 1))];
+}
+
+export function coercePrimitive(
+  kind: NonNullable<CliField["itemKind"]> | FieldKind,
+  value: string,
+): CliValue {
+  if (kind === "integer") return parseInteger(value);
+  if (kind === "number") {
+    if (value.trim() === "" || Number.isNaN(Number(value))) {
+      throw new CliUsageError(`expected a number, got "${value}"`);
+    }
+    return Number(value);
+  }
+  if (kind === "boolean") return value !== "false";
+  if (kind === "date") return parseDate(value);
+  if (kind === "bigint") return parseBigint(value);
+  if (kind === "json") return parseJson(value);
+  return value;
+}
+
+function renderValue(value: unknown): string {
+  const line = JSON.stringify(value, bigintReplacer);
+  return line ?? "null";
+}
+
+function bigintReplacer(_key: string, nested: unknown): unknown {
+  return typeof nested === "bigint" ? nested.toString() : nested;
+}
+
+function isRow(value: unknown): value is Record<string, unknown> {
+  return (
+    typeof value === "object" && value !== null && !Array.isArray(value) && !(value instanceof Date)
+  );
+}
+
+function renderTable(rows: readonly Record<string, unknown>[]): string {
+  const keys = [...new Set(rows.flatMap((row) => Object.keys(row)))];
+  const cells = rows.map((row) => keys.map((key) => formatCell(row[key])));
+  const widths = keys.map((key, index) =>
+    Math.max(key.length, ...cells.map((row) => row[index]?.length ?? 0)),
+  );
+  const line = (values: readonly string[]) =>
+    values.map((value, index) => value.padEnd(widths[index] ?? 0)).join("  ");
+  return `${[line(keys), line(widths.map((width) => "-".repeat(width))), ...cells.map(line)].join("\n")}\n`;
+}
+
+function formatCell(value: unknown): string {
+  if (value === undefined || value === null) return "";
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+  if (value instanceof Date) return value.toISOString();
+  return renderValue(value);
+}
+
+export async function promptMissing(
+  fields: readonly CliField[],
+  values: Record<string, CliValue | undefined>,
+  ask?: (field: CliField) => Promise<string>,
+): Promise<void> {
+  const read = ask ?? (process.stdin.isTTY && process.stdout.isTTY ? ttyAsk : undefined);
+  if (read === undefined) return;
+  for (const field of fields) {
+    if (!field.required || field.positional || values[field.key] !== undefined) continue;
+    if (
+      field.kind === "boolean" ||
+      field.kind === "array" ||
+      field.kind === "json" ||
+      field.kind === "record"
+    )
+      continue;
+    values[field.key] = coercePrimitive(field.kind, await read(field));
+  }
+}
+
+async function ttyAsk(field: CliField): Promise<string> {
+  const { createInterface } = await import("node:readline/promises");
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    return await rl.question(`--${field.flag}: `);
+  } finally {
+    rl.close();
+  }
+}
+
+function isJsonValue(value: unknown): value is CliValue {
   if (
     value === null ||
     typeof value === "string" ||
@@ -317,7 +586,7 @@ function isJsonValue(value: unknown): value is JsonValue {
   return false;
 }
 
-function assign(target: InputObject, path: string, value: JsonValue): void {
+function assign(target: InputObject, path: string, value: CliValue): void {
   const parts = path.split(".");
   let current = target;
   for (const part of parts.slice(0, -1)) {
@@ -335,7 +604,7 @@ function assign(target: InputObject, path: string, value: JsonValue): void {
   current[leaf] = value;
 }
 
-function isInputObject(value: JsonValue | undefined): value is InputObject {
+function isInputObject(value: CliValue | undefined): value is InputObject {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
