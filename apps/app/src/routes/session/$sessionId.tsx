@@ -1,5 +1,4 @@
 import type { PrepareSessionOutput, SessionRef, WorktreeMissingErrorData } from "@getpie/contract";
-import { useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { ORPCError } from "@orpc/client";
 import { createFileRoute, redirect } from "@tanstack/react-router";
@@ -107,18 +106,12 @@ function Component() {
   const project = useProject(prepared.ref.projectId);
   const title = useProjectSessionTitle(prepared.ref) ?? "New chat";
   const reserveToggle = useContentPanel() !== null;
-  const { isMobile, state } = useSidebar();
   const desktop = isDesktopHost(usePlatform());
-  const collapsedDesktop = desktop && !isMobile && state === "collapsed";
   return (
     <>
-      {/* Desktop: this row is the drag strip, so it also clears the traffic lights. */}
+      {/* Drag strip. Traffic lights sit on the rail, not this column. */}
       <div
-        className={cn(
-          SHELL_TITLEBAR_HEADER_CLASS,
-          "border-b",
-          collapsedDesktop && "ps-(--shell-titlebar-content-left)",
-        )}
+        className={cn(SHELL_TITLEBAR_HEADER_CLASS, "border-b")}
         data-drag-region={desktop ? "" : undefined}
       >
         <div className={SHELL_TITLEBAR_LABEL_CLASS}>
@@ -134,7 +127,9 @@ function Component() {
             </span>
           )}
         </div>
-        {reserveToggle ? <div aria-hidden="true" className="ms-auto size-7 shrink-0" /> : null}
+        {reserveToggle && !desktop ? (
+          <div aria-hidden="true" className="ms-auto size-9 shrink-0" />
+        ) : null}
       </div>
       <Chat
         sessionRef={{

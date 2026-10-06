@@ -24,6 +24,7 @@ const optional = <K extends keyof SchedulesSearch>(
 };
 
 export const Route = createFileRoute("/schedules")({
+  staticData: { pageSidebar: true },
   validateSearch: (search: Record<string, unknown>): SchedulesSearch => ({
     ...optional("environmentId", asText(search.environmentId)),
     ...optional("create", search.create === true || search.create === "true" ? true : undefined),
