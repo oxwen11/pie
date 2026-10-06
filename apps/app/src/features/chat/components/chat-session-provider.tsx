@@ -33,6 +33,14 @@ export function ChatSessionProvider({
     },
     [chat],
   );
+  const steerFollowUp = useCallback(
+    (index: number) => {
+      chat.steerFollowUp(index).catch((error: unknown) => {
+        console.error("Failed to steer queued message", error);
+      });
+    },
+    [chat],
+  );
   const respondToRequest = useCallback<ChatSessionValue["respondToRequest"]>(
     (requestId, response) => {
       chat.respondToAgentRequest(requestId, response).catch((error: unknown) => {
@@ -50,10 +58,20 @@ export function ChatSessionProvider({
       prompt,
       interrupt,
       replaceQueue,
+      steerFollowUp,
       respondToRequest,
       turnInProgress,
     }),
-    [sessionRef, chat, prompt, interrupt, replaceQueue, respondToRequest, turnInProgress],
+    [
+      sessionRef,
+      chat,
+      prompt,
+      interrupt,
+      replaceQueue,
+      steerFollowUp,
+      respondToRequest,
+      turnInProgress,
+    ],
   );
 
   return <ChatSessionContext.Provider value={value}>{children}</ChatSessionContext.Provider>;
