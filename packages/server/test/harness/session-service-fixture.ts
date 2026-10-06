@@ -13,9 +13,6 @@ import {
   type GitWorktreeFailure,
 } from "../../src/git/worktree-service";
 import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
-import { PiAgent, type PiAgentShape } from "../../src/harness/pi/agent";
-import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
-import type { SessionInfoResult } from "../../src/harness/pi/types";
 import type { UserInput } from "../../src/harness/session-io";
 import {
   SessionMetadataLocks,
@@ -37,6 +34,9 @@ import {
   PiAgentSessionService,
   PiAgentSessionServiceCoreLayer,
 } from "../../src/harness/session-service";
+import { PiAgent, type PiAgentShape } from "../../src/pi/agent";
+import type { PiAgentRuntime } from "../../src/pi/runtime";
+import type { SessionInfoResult } from "../../src/pi/types";
 import { ProjectService } from "../../src/project/service";
 
 export type Spy = {

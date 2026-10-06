@@ -8,6 +8,7 @@ import { afterEach, expect, it } from "vitest";
 
 import { makeEventBus } from "../../src/events/event-bus";
 import { makePiAgentSession } from "../../src/harness/session";
+import { readPiSessionFile } from "../../src/pi/session-file";
 
 const homes: string[] = [];
 
@@ -49,11 +50,19 @@ it("idle session reads reuse one SessionManager open", async () => {
     Effect.scoped(
       Effect.gen(function* () {
         const bus = yield* makeEventBus();
-        const session = yield* makePiAgentSession({ projectId: "p", sessionId: "s" }, bus);
+        let reads = 0;
+        const session = yield* makePiAgentSession(
+          { projectId: "p", sessionId: "s" },
+          bus,
+          (agentSessionId, sessionCwd) => {
+            reads += 1;
+            return readPiSessionFile(agentSessionId, sessionCwd);
+          },
+        );
         const first = yield* session.messages("agent-1", cwd);
         const model = yield* session.modelState("agent-1", cwd);
         const second = yield* session.messages("agent-1", cwd);
-        return { first, model, second };
+        return { first, model, second, reads };
       }),
     ),
   );
@@ -64,4 +73,5 @@ it("idle session reads reuse one SessionManager open", async () => {
   ]);
   expect(read.second).toEqual(read.first);
   expect(read.model).toEqual({ provider: "openai", modelId: "gpt-test" });
+  expect(read.reads).toBe(1);
 });

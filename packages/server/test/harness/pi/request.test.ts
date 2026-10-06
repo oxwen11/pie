@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { PiUiRequest } from "../../../src/harness/pi/protocol";
-import { buildUiRequest, declineUiResponse, mapUiResponse } from "../../../src/harness/pi/request";
+import type { PiUiRequest } from "../../../src/pi/protocol";
+import { buildUiRequest, declineUiResponse, mapUiResponse } from "../../../src/pi/request";
 
 const confirm: PiUiRequest = {
   type: "extension_ui_request",

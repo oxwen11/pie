@@ -5,7 +5,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Effect, FileSystem } from "effect";
 
-import { listAvailablePiCommands } from "../../../src/harness/pi/list-available-commands";
+import { listAvailablePiCommands } from "../../../src/pi/list-available-commands";
 
 const writeResources = (
   promptDirectory: string,

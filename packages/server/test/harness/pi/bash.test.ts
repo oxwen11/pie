@@ -6,12 +6,7 @@ import path from "node:path";
 import { killProcessTree } from "@earendil-works/pi-coding-agent";
 import { afterEach, describe, expect, it } from "vitest";
 
-import {
-  bashLogPath,
-  executePieBash,
-  filterPiBashEnv,
-  openBashLog,
-} from "../../../src/harness/pi/bash";
+import { bashLogPath, executePieBash, filterPiBashEnv, openBashLog } from "../../../src/pi/bash";
 
 const HOST_ENV: NodeJS.ProcessEnv = {
   PIE_DAEMON_DIR: "daemon-beta",

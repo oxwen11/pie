@@ -6,8 +6,8 @@ import { layer } from "@effect/vitest";
 import { Effect, Fiber, FileSystem, Schedule } from "effect";
 
 import { PiTransportError } from "../../../src/harness/errors";
-import { listAvailablePiCommands } from "../../../src/harness/pi/list-available-commands";
-import { listAvailablePiModels } from "../../../src/harness/pi/list-available-models";
+import { listAvailablePiCommands } from "../../../src/pi/list-available-commands";
+import { listAvailablePiModels } from "../../../src/pi/list-available-models";
 
 // Publishes the child pid atomically, then never finishes loading.
 const writeStalledExtension = (cwd: string) =>

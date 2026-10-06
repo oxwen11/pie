@@ -12,7 +12,7 @@ import {
   makePiSessionToolsBridge,
   parseSessionPullRequestUrl,
   type PiSessionToolsShape,
-} from "../../../src/harness/pi/session-tools";
+} from "../../../src/pi/session-tools";
 
 const url = "https://github.com/Owner/Repo/pull/42";
 const ref: PullRequestRef = { host: "github.com", owner: "owner", repository: "repo", number: 42 };

@@ -16,8 +16,8 @@ import {
   PiTransportError,
   HarnessSessionNotFound,
   TurnAlreadyRunning,
-} from "../errors";
-import { drainQueue, streamFromQueueOne } from "../queue-stream";
+} from "../harness/errors";
+import { drainQueue, streamFromQueueOne } from "../harness/queue-stream";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
 import { PI_PROJECT_PROCESS_ARGS } from "./project-resource-policy";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";

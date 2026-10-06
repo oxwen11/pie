@@ -18,9 +18,7 @@ import {
   SessionClosed,
   SessionNotResumable,
 } from "./errors";
-import type { PiAgentShape } from "./pi/agent";
-import { PiAgent } from "./pi/agent";
-import type { PiAgentRuntime } from "./pi/runtime";
+import { PiAgent, type PiAgentRuntime, type PiAgentShape } from "./pi-port";
 import {
   type AcquireRuntime,
   type PiAgentSessionShape,

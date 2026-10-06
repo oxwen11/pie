@@ -49,11 +49,7 @@ import {
   SessionNotResumable,
   type TurnAlreadyRunning,
 } from "./errors";
-import { PiAgent } from "./pi/agent";
-import { persistDefaultPiModel } from "./pi/resolve-default-model";
-import type { PiAgentRuntime } from "./pi/runtime";
-import { PiSessionTools } from "./pi/session-tools";
-import type { SessionInfoResult } from "./pi/types";
+import { PiAgent, PiSessionTools, type PiAgentRuntime, type SessionInfoResult } from "./pi-port";
 import { inSession } from "./session-identity";
 import type { PromptReceipt, RuntimePromptReceipt, UserInput } from "./session-io";
 import { SessionMetadataLocks, SessionMetadataLocksLayer } from "./session-locks";
@@ -570,10 +566,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                   ),
                   Effect.tap(() => {
                     const model = input.model;
-                    if (model === undefined) return Effect.void;
-                    return Effect.tryPromise(() =>
-                      persistDefaultPiModel(model.provider, model.modelId),
-                    ).pipe(Effect.ignore);
+                    if (model === undefined || pi.setDefaultModel === undefined) return Effect.void;
+                    return pi.setDefaultModel(model.provider, model.modelId).pipe(Effect.ignore);
                   }),
                   Effect.andThen(bus.publish({ ref, type: "session.created" })),
                   Effect.andThen(
@@ -782,9 +776,9 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
                 })
                 .pipe(
                   Effect.tap(() =>
-                    Effect.tryPromise(() =>
-                      persistDefaultPiModel(model.provider, model.modelId),
-                    ).pipe(Effect.ignore),
+                    pi.setDefaultModel === undefined
+                      ? Effect.void
+                      : pi.setDefaultModel(model.provider, model.modelId).pipe(Effect.ignore),
                   ),
                 );
               if (metadata.agentSessionId === undefined) {

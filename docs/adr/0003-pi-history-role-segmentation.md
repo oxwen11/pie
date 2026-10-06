@@ -43,6 +43,6 @@ all rendered today. This is a known coverage gap, not evidence that those
 entries contain no user-visible information.
 
 Implementation and parity checks live in
-[`history.ts`](../../packages/server/src/harness/pi/history.ts),
-[`transform.ts`](../../packages/server/src/harness/pi/transform.ts), and
-[`test/harness/pi/`](../../packages/server/test/harness/pi/).
+[`history.ts`](../../packages/server/src/pi/history.ts),
+[`transform.ts`](../../packages/server/src/pi/transform.ts), and
+[`test/pi/`](../../packages/server/test/pi/).

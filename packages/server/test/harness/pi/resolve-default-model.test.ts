@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   persistDefaultPiModel,
   resolveDefaultPiModel,
-} from "../../../src/harness/pi/resolve-default-model";
+} from "../../../src/pi/resolve-default-model";
 
 const models: ReadonlyArray<AgentModel> = [
   { provider: "openai", modelId: "gpt-5.4" },

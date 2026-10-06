@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { AgentSessionEvent } from "../../../src/harness/pi/protocol";
-import { createPiTransform } from "../../../src/harness/pi/transform";
+import type { AgentSessionEvent } from "../../../src/pi/protocol";
+import { createPiTransform } from "../../../src/pi/transform";
 
 const e = (event: unknown) => event as AgentSessionEvent;
 const types = (chunks: unknown[]) => chunks.map((c) => (c as { type: string }).type);

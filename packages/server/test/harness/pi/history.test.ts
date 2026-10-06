@@ -2,10 +2,10 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { readUIMessageStream } from "ai";
 import { describe, expect, it } from "vitest";
 
-import { entriesToUIMessages } from "../../../src/harness/pi/history";
-import type { AgentSessionEvent } from "../../../src/harness/pi/protocol";
-import { createPiTransform } from "../../../src/harness/pi/transform";
-import type { PiUIMessage, PiUIMessageChunk } from "../../../src/harness/pi/ui-message";
+import { entriesToUIMessages } from "../../../src/pi/history";
+import type { AgentSessionEvent } from "../../../src/pi/protocol";
+import { createPiTransform } from "../../../src/pi/transform";
+import type { PiUIMessage, PiUIMessageChunk } from "../../../src/pi/ui-message";
 
 const entry = (value: unknown) => value as SessionEntry;
 

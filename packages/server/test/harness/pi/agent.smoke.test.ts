@@ -4,7 +4,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Effect, Stream } from "effect";
 
-import { makePiProcess } from "../../../src/harness/pi/process";
+import { makePiProcess } from "../../../src/pi/process";
 
 layer(NodeServices.layer)("pi live smoke", (it) => {
   it.effect.skipIf(process.env.PI_SMOKE !== "1")(
