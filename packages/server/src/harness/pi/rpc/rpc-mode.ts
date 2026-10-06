@@ -277,30 +277,10 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       return "";
     },
 
-    async editor(title: string, prefill?: string): Promise<string | undefined> {
-      const id = crypto.randomUUID();
-      return new Promise((resolve, reject) => {
-        pendingExtensionRequests.set(id, {
-          resolve: (response: RpcExtensionUIResponse) => {
-            if ("cancelled" in response && response.cancelled) {
-              resolve(undefined);
-            } else if ("value" in response) {
-              resolve(response.value);
-            } else {
-              resolve(undefined);
-            }
-          },
-          reject,
-        });
-        output({
-          type: "extension_ui_request",
-          id,
-          method: "editor",
-          title,
-          prefill,
-        });
-      });
-    },
+    editor: (title: string, prefill?: string): Promise<string | undefined> =>
+      createDialogPromise(undefined, undefined, { method: "editor", title, prefill }, (r) =>
+        "cancelled" in r && r.cancelled ? undefined : "value" in r ? r.value : undefined,
+      ),
 
     addAutocompleteProvider(): void {
       // Autocomplete provider composition is not supported in RPC mode

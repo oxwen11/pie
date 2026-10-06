@@ -11,7 +11,7 @@ import { PI_PROJECT_PROCESS_ARGS } from "../../../src/harness/pi/project-resourc
 import { resolvePiExecutable } from "../../../src/harness/pi/resolve-executable";
 import { makePiTransport } from "../../../src/harness/pi/transport";
 
-// Asks for confirmation at startup and from a command; records each answer.
+// Opens dialogs at startup and from a command; records each answer.
 const writeDialogExtension = (cwd: string) =>
   Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
@@ -32,7 +32,7 @@ export default function dialogs(pi) {
     }],
   });
   pi.on("session_start", async (_event, ctx) => {
-    record("startup=" + (await ctx.ui.confirm("Startup", "allow?")));
+    record("startup=" + (await ctx.ui.confirm("Startup", "allow?")) + " editor=" + (await ctx.ui.editor("Startup", "draft")));
   });
   pi.registerCommand("ask", {
     description: "Ask",
@@ -69,7 +69,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi startup dialogs", (
       const listed = yield* listAvailablePiModels(cwd, agentDir, "20 seconds");
 
       assert.ok(listed.models.some((model) => model.modelId === "dialog-model"));
-      assert.deepEqual(yield* awaitAnswers(cwd, 1), ["startup=false"]);
+      assert.deepEqual(yield* awaitAnswers(cwd, 1), ["startup=false editor=undefined"]);
     }),
   );
 
@@ -85,7 +85,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi startup dialogs", (
       });
 
       yield* transport.command({ type: "get_state" }).pipe(Effect.timeout("20 seconds"));
-      assert.deepEqual(yield* awaitAnswers(cwd, 1), ["startup=false"]);
+      assert.deepEqual(yield* awaitAnswers(cwd, 1), ["startup=false editor=undefined"]);
 
       // The command's prompt response waits for its handler, which waits for the dialog.
       const prompt = yield* Effect.forkChild(
@@ -100,7 +100,10 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi startup dialogs", (
       });
 
       yield* Fiber.join(prompt);
-      assert.deepEqual(yield* awaitAnswers(cwd, 2), ["startup=false", "command=true"]);
+      assert.deepEqual(yield* awaitAnswers(cwd, 2), [
+        "startup=false editor=undefined",
+        "command=true",
+      ]);
     }),
   );
 });
