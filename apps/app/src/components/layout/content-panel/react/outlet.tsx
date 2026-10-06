@@ -10,11 +10,9 @@ import { type ContentPanelSession, useContentPanel, usePanelSnapshot } from "./h
 import type { AnyPanelView } from "./view";
 
 /**
- * Where the active panel renders: its own card beside the chat's, its tab strip,
- * and the empty state. Knows nothing about any particular panel — everything it
- * shows comes off the snapshot.
- *
- * A card beside the chat. Its enclosing shell panel owns width and spacing.
+ * The active content panel, tab strip and empty state. Knows nothing about any
+ * particular panel — everything it shows comes off the snapshot. The shared
+ * shell frame owns the outer border and corners; this column owns its content.
  */
 export type ContentPanelOutletProps = ComponentProps<"aside">;
 
@@ -31,10 +29,7 @@ export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletPr
       data-slot="content-panel"
       data-state={presentation}
       className={cn(
-        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/10 md:rounded-2xl dark:border-white/8",
-        presentation === "docked"
-          ? "md:rounded-s-none md:border-s-0"
-          : "md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)]",
+        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
         className,
       )}
       {...props}
