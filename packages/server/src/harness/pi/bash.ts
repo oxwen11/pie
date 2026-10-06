@@ -558,7 +558,11 @@ export function piBashExtension(cwd: string): ExtensionFactory {
             bashLogPath(ctx.sessionManager.getSessionId() ?? "unknown", String(pid)),
           onBackgroundExit: (message) => {
             try {
-              pi.sendUserMessage(message, { deliverAs: "followUp" });
+              // custom_message is model context. Pie does not render it.
+              pi.sendMessage(
+                { customType: "pie.bash.background", content: message, display: false },
+                { triggerTurn: true, deliverAs: "followUp" },
+              );
             } catch {
               // session already closed
             }
