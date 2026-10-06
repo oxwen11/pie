@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 import { Effect, FileSystem, Layer } from "effect";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/process";
 
 import { applyDesktopRuntime, DesktopConfig } from "../desktop-config";
 import { withTailscaleAllowedHosts } from "../tailscale/allowed-hosts";

@@ -66,6 +66,20 @@ describe("import and draft", () => {
 });
 
 describe("composer and model picker", () => {
+  it("accepts draft text before the model catalog finishes", async () => {
+    await mountApp();
+    await waitForText(sample());
+    await page.getByTitle(`New chat in ${sample()}`).click();
+    const editor = page.getByRole("textbox").first();
+    await expect.element(editor, { timeout: 2_000 }).toBeVisible();
+    await editor.fill("typed before models");
+    const typedNode = await editor.element();
+    expect(typedNode.textContent ?? "").toContain("typed before models");
+    await expect.element(page.getSubmitButton(), { timeout: 20_000 }).toBeEnabled();
+    const keptNode = await editor.element();
+    expect(keptNode.textContent ?? "").toContain("typed before models");
+  });
+
   it("keeps the draft composer usable and opens the picker when models exist", async () => {
     await mountApp();
     await waitForText(sample());

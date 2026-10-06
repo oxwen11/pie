@@ -1,6 +1,6 @@
 import { Data, Effect, Ref, Stream } from "effect";
 import type { PlatformError } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 const COMMAND_TIMEOUT = "30 seconds";
 const FORCE_KILL_AFTER = "2 seconds";

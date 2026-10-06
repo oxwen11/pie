@@ -13,7 +13,7 @@ import {
   type TailscalePeerHost,
 } from "@getpie/tailscale";
 import { Context, Effect, FileSystem, Layer, Ref } from "effect";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/process";
 
 import { LoginShellEnvironment } from "../server/login-shell-environment";
 

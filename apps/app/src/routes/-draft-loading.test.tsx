@@ -256,18 +256,170 @@ it("blocks send from the selected Environment's model list", async () => {
     </QueryClientProvider>,
   );
   try {
-    await expect.element(page.getByRole("textbox", { name: "Message" })).toBeVisible();
+    const editor = page.getByRole("textbox", { name: "Message" });
+    await expect.element(editor).toBeVisible();
+    await editor.fill("kept across the empty catalog");
+    const originalEditor = editor.element();
+    const originalText = originalEditor.textContent ?? "";
     await router.navigate({
       to: "/draft",
       search: { projectId: "remote-project", environmentId: "remote" },
     });
+    await expect.element(editor).toHaveTextContent(originalText);
+    expect(editor.element()).toBe(originalEditor);
     await expect
       .element(page.getByRole("heading", { name: "No model provider connected" }))
       .toBeVisible();
-    expect(document.querySelector('button[type="submit"]')).toBeNull();
+    await expect.element(page.getByRole("button", { name: "Retry" })).toBeVisible();
+    await expect.element(page.getSubmitButton()).toBeDisabled();
     expect(started).toBe(0);
   } finally {
     await view.unmount();
     queryClient.clear();
+  }
+});
+
+async function mountLocalDraft(listModels: () => Promise<unknown>) {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const localProject: Project = {
+    id: "local-project",
+    name: "Local project",
+    path: "/tmp/draft-loading-project",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+  let started = 0;
+  const snapshot = { revision: 0, connecting: [], remotes: [] };
+  const environmentRpc = createEnvironmentRpc({
+    localId: "local",
+    queryClient,
+    resolveRemote: () => {
+      throw new Error("no remote");
+    },
+    createRemoteLink: () => ({ call: async () => undefined }),
+    localLink: {
+      call: async (path) => {
+        switch (path.join(".")) {
+          case "project.list":
+            return [localProject];
+          case "agent.listModels":
+            return listModels();
+          case "agent.commands":
+            return [];
+          case "git.branch":
+            return { kind: "not-repository" };
+          default:
+            throw new Error(`Unexpected RPC: ${path.join(".")}`);
+        }
+      },
+    },
+  });
+  const context = { localEnvironmentId: "local", environmentRpc };
+  const root = createRootRouteWithContext<typeof context>()({
+    component: () => (
+      <PlatformProvider
+        value={{
+          ssh: {
+            client: { available: true },
+            environments: {
+              getSnapshot: () => snapshot,
+              subscribe: () => () => undefined,
+            },
+            discoverHosts: async () => [],
+            connect: async () => {},
+            remove: async () => {},
+          },
+        }}
+      >
+        <ChatManagerContext
+          value={{
+            chatFor: () => {
+              started += 1;
+              throw new Error("This test must not create a Session");
+            },
+          }}
+        >
+          <Outlet />
+        </ChatManagerContext>
+      </PlatformProvider>
+    ),
+  });
+  const draft = createRoute({
+    getParentRoute: () => root,
+    path: "draft",
+    component: DraftRoute.options.component,
+    validateSearch: DraftRoute.options.validateSearch,
+  });
+  const router = createRouter({
+    routeTree: root.addChildren([draft]),
+    context,
+    history: createMemoryHistory({ initialEntries: ["/draft?projectId=local-project"] }),
+  });
+  await router.load();
+  const view = await render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  return {
+    queryClient,
+    started: () => started,
+    unmount: async () => {
+      await view.unmount();
+      queryClient.clear();
+    },
+  };
+}
+
+it("accepts typed text and blocks send while models are still loading", async () => {
+  let resolveModels = (_value: {
+    models: ReadonlyArray<{ provider: string; modelId: string }>;
+  }) => {};
+  const models = new Promise<{ models: ReadonlyArray<{ provider: string; modelId: string }> }>(
+    (resolve) => {
+      resolveModels = resolve;
+    },
+  );
+  const draft = await mountLocalDraft(() => models);
+  try {
+    const editor = page.getByRole("textbox", { name: "Message" });
+    await expect.element(editor).toBeVisible();
+    await editor.fill("typed while models load");
+    const typed = editor.element().textContent ?? "";
+    const submit = page.getSubmitButton();
+    await expect.element(submit).toBeDisabled();
+    expect(submit.element().dataset.loading).toBe("");
+    expect(draft.started()).toBe(0);
+    resolveModels({ models: [{ provider: "e2e", modelId: "fake" }] });
+    await expect.element(submit).toBeEnabled();
+    await expect.element(editor).toHaveTextContent(typed);
+    expect(draft.started()).toBe(0);
+  } finally {
+    resolveModels({ models: [] });
+    await draft.unmount();
+  }
+});
+
+it("keeps the composer and blocks send when the model list fails", async () => {
+  let fail = true;
+  const draft = await mountLocalDraft(async () => {
+    if (fail) throw new Error("catalog unavailable");
+    return { models: [{ provider: "e2e", modelId: "fake" }] };
+  });
+  try {
+    const editor = page.getByRole("textbox", { name: "Message" });
+    await expect.element(editor).toBeVisible();
+    await editor.fill("kept after a catalog error");
+    const typed = editor.element().textContent ?? "";
+    await expect.element(page.getByRole("button", { name: "Retry" })).toBeVisible();
+    await expect.element(page.getByText(/Couldn't check available models/)).toBeVisible();
+    await expect.element(page.getSubmitButton()).toBeDisabled();
+    expect(draft.started()).toBe(0);
+    fail = false;
+    await page.getByRole("button", { name: "Retry" }).click();
+    await expect.element(page.getSubmitButton()).toBeEnabled();
+    await expect.element(editor).toHaveTextContent(typed);
+    expect(draft.started()).toBe(0);
+  } finally {
+    await draft.unmount();
   }
 });

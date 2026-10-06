@@ -1,6 +1,7 @@
 import type { CreateWorktreeInput } from "@getpie/contract";
 import { PromptInputSubmit } from "@getpie/ui/ai-elements/prompt-input";
 import { CardFrameHeader } from "@getpie/ui/components/card";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
@@ -25,6 +26,9 @@ export function DraftComposer({
   draftModel,
   groups,
   models,
+  modelsPending = false,
+  modelsReady,
+  notice,
   onModelChange,
   onProjectChange,
   onStart,
@@ -35,6 +39,11 @@ export function DraftComposer({
   readonly draftModel: { provider: string; modelId: string } | undefined;
   readonly groups: ReadonlyArray<ProjectGroup>;
   readonly models: Parameters<typeof ModelSelectorPicker>[0]["models"];
+  /** Catalog probe in flight. Submit shows a spinner and cannot send. */
+  readonly modelsPending?: boolean;
+  /** Confirmed non-empty catalog. Send stays blocked until this is true. */
+  readonly modelsReady: boolean;
+  readonly notice?: ReactNode;
   readonly onModelChange: (provider: string, modelId: string) => void;
   readonly onProjectChange: (next: ProjectSelection | null) => void;
   readonly onStart: (text: string, worktree?: CreateWorktreeInput) => void;
@@ -51,7 +60,7 @@ export function DraftComposer({
         toast.error("The selected project folder is unavailable.");
         return false;
       }
-      if (startPending) return false;
+      if (startPending || !modelsReady) return false;
       // Linked host: nothing to send against until a Project is picked.
       if (requireProject && selected === null) return false;
       if (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined) {
@@ -66,7 +75,8 @@ export function DraftComposer({
   const selectedId = selected?.project.id ?? null;
 
   return (
-    <div className="flex h-full items-center justify-center p-4">
+    <div className="flex h-full flex-col items-center justify-center gap-4 overflow-y-auto p-4">
+      {notice}
       <ChatComposerFrame
         className="w-full max-w-2xl"
         controller={controller}
@@ -103,10 +113,12 @@ export function DraftComposer({
             disabled={
               (requireProject && selectedId === null) ||
               !hasContent ||
+              !modelsReady ||
               draftWorktree.gitState === "workspace-unavailable" ||
               startPending ||
               (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
             }
+            loading={modelsPending}
           />
         }
         toolbar={
