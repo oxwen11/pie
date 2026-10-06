@@ -70,8 +70,8 @@ gap, not a pass. After the author updates the PR, restart at CI for the new vers
 
 The reviewer runs the checks; the author's evidence cannot replace this step.
 
-- Use a clean reviewer-owned worktree pinned to the recorded head, not the
-  developer's checkout. Install locked dependencies and build affected artifacts
+- Create a dedicated, clean reviewer-owned worktree for each PR, pinned to its
+  recorded head. Install locked dependencies and build affected artifacts
   through Turbo. Confirm builds and running instances belong to this revision;
   reused artifacts or `launch --replace` alone do not prove freshness. Uncommitted
   source changes cannot serve as proof of the PR head.
