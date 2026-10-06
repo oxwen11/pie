@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import {
   bashLogPath,
+  deliverBackgroundExit,
   executePieBash,
   filterPiBashEnv,
   openBashLog,
@@ -74,6 +75,30 @@ describe("openBashLog", () => {
     fs.writeFileSync(existing, "old");
     expect(() => openBashLog(existing, root)).toThrow("refusing bash log path");
     expect(fs.readFileSync(existing, "utf8")).toBe("old");
+  });
+});
+
+describe("deliverBackgroundExit", () => {
+  it("sends a hidden custom message that starts a follow-up turn", () => {
+    const sent: unknown[] = [];
+    deliverBackgroundExit(
+      {
+        sendMessage(message, options) {
+          sent.push({ message, options });
+        },
+      },
+      "Background command 1 finished with exit code 0. Output: /tmp/1.log",
+    );
+    expect(sent).toEqual([
+      {
+        message: {
+          customType: "pie.bash.background",
+          content: "Background command 1 finished with exit code 0. Output: /tmp/1.log",
+          display: false,
+        },
+        options: { triggerTurn: true, deliverAs: "followUp" },
+      },
+    ]);
   });
 });
 

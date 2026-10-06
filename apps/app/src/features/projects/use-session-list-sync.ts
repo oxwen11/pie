@@ -8,8 +8,8 @@ import { applySessionListEvent } from "./session-list-cache";
 
 const RESUBSCRIBE_DELAY_MS = 1000;
 
-// ponytail: second global subscribe beside environment-catalog, so demand can
-// reconnect when the stream drops. Fold into the catalog if the extra stream matters.
+// ponytail: second global subscribe beside environment-list-sync, so demand can
+// reconnect when the stream drops. Fold into that worker if the extra stream matters.
 export function useSessionListSync(
   onSubscribed?: () => void,
   onCollectionEvent?: (type: string) => void,
