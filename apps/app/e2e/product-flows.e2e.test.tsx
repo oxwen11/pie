@@ -88,7 +88,7 @@ describe("sidebar and content panel", () => {
   it("opens New chat and the per-project compose entry", async () => {
     await mountApp();
     await waitForText(sample());
-    await page.getByRole("link", { name: "New chat" }).click();
+    await page.getByTestId("sidebar").getByRole("link", { name: "New chat", exact: true }).click();
     await expect.poll(() => window.location.pathname).toBe("/draft");
     await waitForComposer();
 
@@ -136,7 +136,7 @@ describe("schedules and pull requests", () => {
     await mountApp();
     await page.getByRole("link", { name: "Scheduled" }).click();
     await waitForText("No schedules yet");
-    await page.getByRole("button", { name: "Create" }).click();
+    await page.getByRole("button", { name: "New task" }).click();
     await waitForText("Name");
     await page.getByLabelText("Name").fill("e2e nightly");
     await page.getByLabelText("Prompt").fill("e2e scheduled ping");
@@ -164,7 +164,7 @@ describe("git workspace and review", () => {
     await importFolder(sampleGit());
     await waitForText(sampleGit());
 
-    await page.getByRole("link", { name: "New chat" }).click();
+    await page.getByTestId("sidebar").getByRole("link", { name: "New chat", exact: true }).click();
     await openDraftForProject(sampleGit());
     await waitForText("Current directory", 20_000);
     await page.getByText("Current directory").first().click();
@@ -238,7 +238,10 @@ describe("streaming queue", () => {
     await expect.element(page.getByText("queued while streaming")).toBeVisible();
 
     await page.getByRole("button", { name: "Steer queued message" }).click();
-    await waitForText("Steering", 10_000);
+    await expect
+      .element(page.getByRole("button", { name: "Steer queued message" }))
+      .not.toBeInTheDocument();
+    await expect.element(page.getByText("queued while streaming")).toBeVisible();
 
     // Optimistic UI updates before RPC — prove the server queue moved too.
     const sessionId = window.location.pathname.split("/").at(-1);

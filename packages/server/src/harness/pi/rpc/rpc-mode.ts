@@ -1,5 +1,5 @@
 /**
- * Vendored from @earendil-works/pi-coding-agent v0.99.1
+ * Vendored from @earendil-works/pi-coding-agent v1.0.2
  * (`packages/coding-agent/src/modes/rpc/rpc-mode.ts`).
  *
  * Pie owns this loop so extension bind (`session.bindExtensions`), the RPC
@@ -446,7 +446,12 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
               // already true for a prompt that just started, so it cannot mean
               // "queued". "handled" (an extension command consumed the input)
               // starts no turn, so it is forwarded for the host to tell apart.
-              output(success(id, "prompt", { started: disposition === "started", disposition }));
+              output(
+                success(id, "prompt", {
+                  started: disposition === "started",
+                  disposition,
+                }),
+              );
             },
           })
           .catch((cause: unknown) => {

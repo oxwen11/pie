@@ -5,7 +5,7 @@ Glossary of project-specific terms. pie integrates the Pi coding agent into the 
 ## Session Domain
 
 **Project**:
-A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Registration is the trust boundary for declarative Project-local Pi resources: session children approve prompts, skills, and context from that Project. Automatic Pi extension discovery is disabled for every Pie-owned child because Pie does not yet model inputs that an extension handles without starting a model turn; this intentionally makes discovered global and Project extension commands, tools, hooks, and UI unavailable. The extension request plumbing remains at the Pi protocol seam for compatibility and future explicit extension support. Sessions always resolve their working directory through a Project, never from a caller-supplied path. A session may start without picking an existing Project: `project.allocateChatProjectDir` creates a folder under the **chat-project root**, registers it with `type: "chat"`, then `session.create` uses that id as usual. Chat projects stay off the **Projects** sidebar and picker; their sessions appear under **Recent**.
+A working directory the user has registered with the server, identified by a server-generated UUID. The single source of the projectId → directory mapping; the directory field is `path`. Registration is the trust boundary for Project-local Pi resources: session children approve prompts, skills, and context from that Project. Pie-owned children load and execute Pi's built-in extensions, global extensions, and that Project's extensions. Registering a Project trusts execution of its extension code. The daemon model list (`listAvailablePiModels`) does not load extensions. Sessions always resolve their working directory through a Project, never from a caller-supplied path. A session may start without picking an existing Project: `project.allocateChatProjectDir` creates a folder under the **chat-project root**, registers it with `type: "chat"`, then `session.create` uses that id as usual. That path is local-only. The draft project picker lists every connected Environment's imported projects, split into groups labeled by Environment when more than one has projects. Picking a project addresses that Environment. A linked host still cannot allocate a non-project chat. Chat projects stay off the **Projects** sidebar and picker; their sessions appear under **Recent**.
 _Avoid_: workspace, repo, cwd (for the Project field)
 
 **Chat-project root**:
@@ -28,7 +28,7 @@ _Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat i
 The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), whether the session is archived, and for a worktree session `worktree: { branch }` plus the checkout `cwd`. Distinct from conversation history, which stays in Pi's native storage.
 
 **Schedule**:
-An application-level job stored under `$PIE_HOME/storage/schedules/`. Independent of any live session and of `@getpie/pi-loop`. The server daemon is the clock: on start it marks leftover `running` runs `interrupted`, then sleeps until the next due time (1–60s). When a Schedule is due it snapshots the current prompt, starts or reuses a Session, and settles the run to `succeeded` / `failed`. The session file is an ordinary session record — origin is not stored there. The schedule keeps the session ids it created (`lastSessionId`, `session.sessionId` when bound, `runs[].sessionId`). Specs are `cron` (5-field, optional IANA timezone), `every` (fixed interval), `once` (timezone-aware ISO), or `manual` (run now only). Optional `trigger` (`local` default, `github` or later `hub` when a Hub relationship exists) chooses who may fire the row; Hub must not copy this store. Optional `expiresAt`, `maxRuns` (pauses with `max_runs` after that many fired runs; `firedCount` is the durable counter, `missed`/`skipped` do not count), `session` (`{ policy: "isolated" }` | `{ policy: "owned", sessionId? }` | `{ policy: "existing", sessionId }`), and a failure circuit after three consecutive settle failures. Create may pass `runNow` to fire immediately; it is not stored. Operator signal is structured `event=schedule.*` lines in `$PIE_HOME/logs/pie.log`; the Schedule page keeps the last 20 runs and refreshes while that route is open. There is no EventBus collection event for schedules in v1.
+An application-level job stored under `$PIE_HOME/storage/schedules/`. Independent of any live session and of `@getpie/pi-loop`. The server daemon is the clock: on start it marks leftover `running` runs `interrupted`, then sleeps until the next due time (1–60s). When a Schedule is due it snapshots the current prompt, starts or reuses a Session, and settles the run to `succeeded` / `failed`. The session file is an ordinary session record — origin is not stored there. The schedule keeps the session ids it created (`lastSessionId`, `session.sessionId` when bound, `runs[].sessionId`). Specs are `cron` (5-field, optional IANA timezone), `every` (fixed interval), `once` (timezone-aware ISO), or `manual` (run now only). Hub-triggered runs are proposed in `docs/rfc/pie-hub.md`, not implemented Schedule behavior. Optional `expiresAt`, `maxRuns` (pauses with `max_runs` after that many fired runs; `firedCount` is the durable counter, `missed`/`skipped` do not count), `session` (`{ policy: "isolated" }` | `{ policy: "owned", sessionId? }` | `{ policy: "existing", sessionId }`), and a failure circuit after three consecutive settle failures. Create may pass `runNow` to fire immediately; it is not stored. Operator signal is structured `event=schedule.*` lines in `$PIE_HOME/logs/pie.log`; the Schedule page keeps the last 20 runs and refreshes while that route is open. There is no EventBus collection event for schedules in v1.
 _Avoid_: loop (session-scoped `/loop` in `@getpie/pi-loop`), routine, cron (as the domain noun — it is one spec kind), automation / automations (the old domain name), outputMode / sessionMode / independent / merged / session.type (session policy is `isolated` | `owned` | `existing`), a second schedule store on Hub. The product and code noun is **Schedule** (sidebar: **Scheduled**).
 
 **Workspace path**:
@@ -55,7 +55,7 @@ Effect Context service: availability check, create/resume, and cold reads. Const
 Always Bun: `bun <pi-process.js> --mode rpc …`. `@getpie/server#build` emits the JS with `bun build --target bun`. A pnpm patch keeps extension UI components and `pi-tui` on the package barrel / virtualModules, drops InteractiveMode, inlines builtin theme JSON, and no-ops highlight.js. Unpackaged / CLI look up `bun` on PATH. Packaged desktop ships Bun (`extraResources/vendor/bun`) and prepends that directory to PATH; the entry is the `@getpie/server/pi-process` export, rewritten `app.asar` → `app.asar.unpacked` because Bun cannot read asar. Missing Bun fails availability.
 
 **Daemon**:
-Always Node. Desktop spawns Electron-as-Node (`Pie Helper` + asar `server.mjs`, `ELECTRON_RUN_AS_NODE`). CLI uses `process.execPath`. The live terminal is `node-pty`. Bun is only for pie-pi-process (PATH `bun` plus the package export).
+Always Node. Desktop spawns Electron-as-Node (`Pie Helper` + asar `server.js`, `ELECTRON_RUN_AS_NODE`). CLI uses `process.execPath`. The live terminal is `node-pty`. Bun is only for pie-pi-process (PATH `bun` plus the package export).
 _Avoid_: spawning the shebang `pi` binary under Bun; using a user-installed `pi` as `pie-pi-process`; a Node spawn path for pie-pi-process; a Bun runtime for the daemon or live terminal
 
 **Private modules** (no Context tags, never wired directly):
@@ -107,26 +107,28 @@ _Avoid_: inner tabs, sub-tabs, splits
 Pie-owned user preferences in `$PIE_HOME/settings.json`, namespaced by settings domain (`appearance`, and later domains only when they store a value). Distinct from Pi's agent settings, from `PIE_*` process env, from Desktop host state (window geometry in Electron userData), and from origin-scoped chrome (theme FOUC cache, content-panel, shell layout).
 _Avoid_: `{ version, data }` envelope; `ui.theme`; putting window bounds or `PIE_*` in this file; proxying Pi settings; empty domain objects; treating process owners (`ui` / `desktop` / `server`) as JSON root keys; calling this file `config.json`
 
-## Hub Domain
+## Hub Domain (proposed)
+
+These terms describe the [Hub RFC](docs/rfc/pie-hub.md), not shipped capabilities.
 
 **Hub**:
-A public HTTPS process (`@getpie/hub`, bin `pie-hub` / `npx @getpie/hub`) that receives external events and dispatches work to an enrolled pie daemon. Separate package and CLI from `@getpie/cli` / `pie serve` — no oRPC, no UI, no `Project.path`, no import of `@getpie/server`. V1 GitHub is a Schedule **trigger** (`trigger.kind: "github"`), not an ad-hoc session with no Schedule row. Design: `docs/rfc/pie-hub.md`.
-_Avoid_: treating Hub as a second daemon; `pie hub serve`; exposing the local serve/UI process as the webhook target; a Hub-owned Schedule store; creating Hub sessions that bypass Schedule; `.pie/workflows` / YAML orchestration / multi-step Hub routing (closed — later sources are more Schedule `trigger` kinds); treating `hub.hello` as once-at-connect (Schedule create/update/delete of Hub-facing rows re-sends the full snapshot)
+A public event ingress that asks an enrolled Environment to run an existing Schedule. It is neither another Environment nor a transport for general daemon access.
+_Avoid_: relay, second daemon, Hub-owned Schedule store, workflow engine
 
 **Relationship**:
-The daemon's long-lived Hub identity after `pie hub connect`. The daemon generates and stores the credential; the human CLI login is a different secret used only to mint a one-time enrollment token.
-_Avoid_: reusing the local UI bearer token or WebSocket ticket on the Hub socket
+Revocable authority between a Hub and a specific Environment. Distinct from the Environment's identity and from a client's permission to access that Environment.
+_Avoid_: SSH connection, browser pairing, UI bearer token, using a URL or hostname as the Environment identity
 
 **Hub execution**:
-Hub-minted work identified by `executionId`. The daemon fires the matching Schedule (`ScheduleService.fire`) and maps `executionId → SessionRef`. Idempotent on retry. Offline daemon is `daemon_not_connected` — V1 does not queue.
-_Avoid_: using `executionId` as a SessionRef or wire session identity; calling Hub work a harness job; creating a session that is not a Schedule fire
+One external dispatch, identified by `executionId`, targeting a Schedule in a specific Environment. Its run and optional SessionRef belong to that Environment. A retry is the same execution, not new work; an uncertain outcome is not permission to repeat its effects.
+_Avoid_: executionId as sessionId, bare SessionRef across Environments, exactly-once agent effects
 
-**Session source**:
-Optional floor field on session metadata, `{ kind: "hub", executionId }`, written only when Hub created the session. Absence means a human-created session. The channel (`github`, later others) lives on the create frame's `trigger`, not on `kind`.
-_Avoid_: storing GitHub issue numbers on the session record; overlaying `source` from Pi
+**Schedule trigger**:
+The proposed authority and event source allowed to start a Schedule run. GitHub supplies context; the Schedule still owns its prompt, Project and session policy.
+_Avoid_: a second job definition, treating a new Hub relationship as automatic authorization for old Schedules
 
-## Environments (desktop)
+## Environments
 
 **Environment**:
-A pie daemon the desktop app is talking to. `local` is this computer's daemon and does not need OpenSSH. An SSH environment is a remote daemon reached through a loopback `ssh -L` tunnel, and only exists when this computer has an OpenSSH client on PATH. A Tailscale MagicDNS name is an ordinary SSH host on the tailnet — the renderer still talks only to `127.0.0.1` after the tunnel is up. Opt-in `tailscale serve` can reverse-proxy this computer's loopback daemon at the MagicDNS HTTPS name; CORS trusts that name via `PIE_ALLOWED_HOSTS`. Disconnect closes the local tunnel and leaves the remote daemon running (same resident model as quitting the local desktop app).
-_Avoid_: server (ambiguous with the HTTP process), remote machine, workspace, connection (the token+URL triple is `ServerConnection`)
+A Pie daemon identified by its persistent UUID, independent of the client or access path. The same daemon reached through SSH, LAN, Tailscale or relay remains one Environment. Local is relative to the client; it is not a wire identity. Client operations and caches are scoped by Environment, then by the daemon's Project or SessionRef. Disconnecting a client's access path does not stop the resident daemon.
+_Avoid_: hostname/SSH alias/URL as identity, mutable global current Environment, falling back to local when a remote is unavailable, connection (the token+URL triple is `ServerConnection`)

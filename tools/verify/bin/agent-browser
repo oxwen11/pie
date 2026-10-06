@@ -1,4 +1,4 @@
 #!/usr/bin/env node
-import { bootstrapAgentBrowser } from "./bootstrap.mjs";
+import { bootstrapAgentBrowser } from "./bootstrap.js";
 
 bootstrapAgentBrowser();

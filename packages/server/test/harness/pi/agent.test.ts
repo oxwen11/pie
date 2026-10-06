@@ -94,7 +94,22 @@ rl.on("line", (line) => {
   if (msg.type !== "prompt") return;
   const text = msg.message;
   if (text === "fail") { send({ id: msg.id, type: "response", command: "prompt", success: false, error: "cannot prompt" }); return; }
-  if (text === "/cmd") { send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "handled" } }); return; }
+  if (text === "queue-idle") {
+    send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "queued" } });
+    send({ type: "agent_start" });
+    send({ type: "message_start", message: assistant() });
+    upd({ type: "start" });
+    upd({ type: "text_start", contentIndex: 0 });
+    upd({ type: "text_delta", contentIndex: 0, delta: "queued" });
+    upd({ type: "text_end", contentIndex: 0, content: "queued" });
+    send({ type: "message_end", message: assistant() });
+    settle();
+    return;
+  }
+  if (text === "handled") {
+    send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: false, disposition: "handled" } });
+    return;
+  }
   if (holding && !msg.streamingBehavior) {
     send({ id: msg.id, type: "response", command: "prompt", success: false, error: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." });
     return;
@@ -189,6 +204,45 @@ layer(NodeServices.layer)("PiAgent", (it) => {
           "finish",
         ],
       );
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("streams a prompt Pi queued while the server has no turn", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const prompt = yield* agent.session.prompt({ sessionId, text: "queue-idle" });
+      assert.equal(prompt.started, true);
+      const chunks = yield* Stream.runCollect(prompt.output);
+      assert.deepEqual(
+        Array.from(chunks, (chunk) => chunk.type),
+        [
+          "start",
+          "message-metadata",
+          "text-start",
+          "text-delta",
+          "text-end",
+          "message-metadata",
+          "finish",
+        ],
+      );
+      yield* agent.session.abort(sessionId);
+    }),
+  );
+
+  it.effect("accepts a handled prompt without opening a turn", () =>
+    Effect.gen(function* () {
+      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
+      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
+      const prompt = yield* agent.session.prompt({ sessionId, text: "handled" });
+      assert.equal(prompt.started, false);
+      const chunks = yield* Stream.runCollect(prompt.output);
+      assert.equal(Array.from(chunks).length, 0);
+
+      const next = yield* agent.session.prompt({ sessionId, text: "ping" });
+      assert.equal(next.started, true);
+      assert.equal(Array.from(yield* Stream.runCollect(next.output)).at(-1)?.type, "finish");
       yield* agent.session.abort(sessionId);
     }),
   );
@@ -515,22 +569,6 @@ layer(NodeServices.layer)("PiAgent", (it) => {
     }),
   );
 
-  it.effect("an extension command handled without a turn leaves the session promptable", () =>
-    Effect.gen(function* () {
-      const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
-      const { sessionId } = yield* agent.session.create({ cwd: "/tmp" });
-      const handled = yield* agent.session.prompt({ sessionId, text: "/cmd" });
-      assert.equal(handled.started, false);
-      assert.equal(Array.from(yield* Stream.runCollect(handled.output)).length, 0);
-
-      const prompt = yield* agent.session.prompt({ sessionId, text: "ping" });
-      assert.equal(prompt.started, true);
-      const chunks = yield* Stream.runCollect(prompt.output);
-      assert.equal(Array.from(chunks).at(-1)?.type, "finish");
-      yield* agent.session.abort(sessionId);
-    }),
-  );
-
   it.effect("a child crash evicts only that session and surfaces an error chunk", () =>
     Effect.gen(function* () {
       const agent = yield* makePiProcess({ executable: { command: makeFake(), prefixArgs: [] } });
@@ -664,7 +702,7 @@ layer(NodeServices.layer)("PiAgent", (it) => {
 const sidIndex = process.argv.indexOf("--session-id");
 const isResume = process.argv[sidIndex + 1] === "existing";
 const hasModel = process.argv.includes("--provider") && process.argv.includes("p") && process.argv.includes("--model") && process.argv.includes("m");
-if (!process.argv.includes("--approve") || !process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
+if (!process.argv.includes("--approve") || process.argv.includes("--no-extensions") || (!isResume && !hasModel)) process.exit(9);
 const readline = require("node:readline");
 const rl = readline.createInterface({ input: process.stdin });
 rl.on("line", (line) => {

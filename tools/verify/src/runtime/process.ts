@@ -1,6 +1,7 @@
 import childProcess from "node:child_process";
 import type { ChildProcess, SpawnOptions } from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import timers from "node:timers/promises";
 
@@ -248,6 +249,27 @@ export function spawnLogged(
   });
   child.unref();
   return child;
+}
+
+/** Verification uses the operator's Pi config. Isolation is `PIE_HOME` only. */
+export function assertOperatorPiConfig(env: NodeJS.ProcessEnv = process.env): void {
+  if (env.HOME !== os.homedir()) {
+    throw new Error("verify keeps the operator HOME; do not override HOME");
+  }
+  const agentDir = env.PI_CODING_AGENT_DIR;
+  if (agentDir === undefined) return;
+  const trimmed = agentDir.trim();
+  let occupied = false;
+  try {
+    occupied = trimmed !== "" && fs.readdirSync(trimmed).length > 0;
+  } catch {
+    occupied = false;
+  }
+  if (!occupied) {
+    throw new Error(
+      "do not point PI_CODING_AGENT_DIR at an empty directory; leave it unset to use the operator Pi configuration",
+    );
+  }
 }
 
 export function isSharedPieHome(pieHome: string): boolean {

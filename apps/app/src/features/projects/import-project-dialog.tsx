@@ -24,12 +24,15 @@ import {
   Laptop,
   Server,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { EnvironmentOrpcProvider, useCatalogOrpc } from "@/lib/environment-orpc";
 
 import {
+  folderBrowserDrillPath,
+  folderBrowserInputValue,
+  folderBrowserLeafFilter,
   isProjectDirectoryEntryVisible,
   type ProjectDirectoryEntry,
   projectDirectoryEntryMatches,
@@ -219,23 +222,8 @@ function ImportFolderDialog({
     }),
   });
   const current = listing.data;
-  const currentPath = current?.path;
-  const inputValue = query ?? currentPath ?? "";
-
-  const leafFilter = useMemo(() => {
-    if (currentPath === undefined) return "";
-    if (
-      inputValue === currentPath ||
-      inputValue === `${currentPath}/` ||
-      inputValue === `${currentPath}\\`
-    ) {
-      return "";
-    }
-    if (inputValue.startsWith(currentPath)) {
-      return inputValue.slice(currentPath.length).replace(/^[\\/]+/, "");
-    }
-    return inputValue;
-  }, [currentPath, inputValue]);
+  const inputValue = folderBrowserInputValue(query, current?.path);
+  const leafFilter = folderBrowserLeafFilter(current?.path, inputValue);
   const entries = useMemo(
     () =>
       current?.entries.filter(
@@ -262,28 +250,37 @@ function ImportFolderDialog({
   });
 
   const canImport = current !== undefined && !listing.isPlaceholderData && !importProject.isPending;
+  const fieldRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (query !== null) return;
+    const input = fieldRef.current?.querySelector("input");
+    if (!(input instanceof HTMLInputElement) || input.value.length === 0) return;
+    const end = input.value.length;
+    input.setSelectionRange(end, end);
+    input.scrollLeft = input.scrollWidth;
+  }, [inputValue, query]);
 
   return (
     <CommandDialog open onOpenChange={(open) => !open && onClose()}>
-      <CommandDialogPopup>
+      <CommandDialogPopup className="max-h-[min(26.25rem,calc(100dvh-6rem))] overflow-hidden before:-z-1">
         <Command
           autoHighlight={false}
-          filter={() => true}
           items={entries}
-          key={current?.path ?? "loading"}
+          mode="none"
           onValueChange={(next) => {
             setQuery(next);
-            // Exact path typed with trailing separator → navigate.
-            if (next !== current?.path && (next.endsWith("/") || next.endsWith("\\"))) {
-              setQuery(null);
-              setPath(next);
-            }
+            const drill = folderBrowserDrillPath(current?.path, next);
+            if (drill !== null) setPath(drill);
           }}
           value={inputValue}
         >
-          <div className="relative **:data-[slot=autocomplete-input]:pe-28!">
+          <div
+            className="relative min-w-0 shrink-0 **:data-[slot=autocomplete-input]:pe-28!"
+            ref={fieldRef}
+          >
             <CommandInput
               placeholder="Enter path (e.g. ~/projects/my-app)"
+              title={inputValue}
               startAddon={
                 onBack !== undefined ? (
                   <button
@@ -317,13 +314,13 @@ function ImportFolderDialog({
               </KbdGroup>
             </Button>
           </div>
-          <CommandPanel>
+          <CommandPanel className="**:data-[slot=scroll-area-viewport]:max-h-[min(16rem,calc(100dvh-16rem))]">
             <CommandEmpty>{listing.isPending ? "Loading..." : "No folders found."}</CommandEmpty>
             <div className="text-muted-foreground px-2 py-1.5 text-xs font-medium">Directories</div>
             <CommandList>
               {(item: ProjectDirectoryEntry) => (
                 <CommandItem
-                  className="gap-2"
+                  className="min-w-0 gap-2"
                   key={item.value}
                   onClick={() => {
                     setQuery(null);
@@ -339,7 +336,7 @@ function ImportFolderDialog({
                   ) : (
                     <FolderIcon className="text-muted-foreground size-4" />
                   )}
-                  <span className="truncate">{item.label}</span>
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
                 </CommandItem>
               )}
             </CommandList>

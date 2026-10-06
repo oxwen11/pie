@@ -50,8 +50,11 @@
   Use the relevant existing harness rather than treating one as proof of the other.
 - Conversation/sync E2E runs real `pie-pi-process` with a seeded provider under
   isolated `$PIE_HOME/agent` (`PI_CODING_AGENT_DIR`); see
-  `tools/testing/fake-e2e-provider.ts`. Connection/daemon/MessagePort cases do not
-  use that provider. `fake-pi.mjs` remains for unit/RPC executable-replacement tests.
+  `@getpie/test` (`tools/test/fake-e2e-provider.ts`). That override is only for this seeded
+  fake provider. `pie-verify` keeps `HOME` and the operator's Pi configuration;
+  do not point `PI_CODING_AGENT_DIR` at an empty directory. Connection, daemon,
+  and MessagePort cases do not use that provider. `fake-pi.js` remains for
+  unit/RPC executable-replacement tests.
 - Read the package's Vitest config before adding tests: include patterns and
   environment/typecheck settings differ, and an unmatched test can be silently skipped.
   Artifact tests require a build first. Server tests disable file parallelism because

@@ -28,7 +28,9 @@ export function PackageDetail({
 }): ReactElement {
   const configured =
     isConfigured(items, detail.name) || items.some((item) => item.source === detail.source);
-  const activeSource = configuredSource(items, detail.name) ?? detail.source;
+  const activeSource = items.some((item) => item.source === detail.source)
+    ? detail.source
+    : (configuredSource(items, detail.name) ?? detail.source);
   const downloads = formatDownloads(detail.downloadsMonthly);
   const adding = addingSource === detail.source;
   const removing = removingSource === activeSource;

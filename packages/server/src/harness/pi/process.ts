@@ -559,16 +559,17 @@ export const makePiProcessWithDependencies = <R>(
                         output: Stream.empty,
                       };
                     }
-                    // An extension command (e.g. `/mcp`) consumed the input
-                    // without starting a turn.
+                    // Extension command already ran. No model turn follows.
                     if (admission?.disposition === "handled") {
-                      return { turnId: uuid(), started: false, output: Stream.empty };
+                      return {
+                        turnId: uuid(),
+                        started: false,
+                        output: Stream.empty,
+                      };
                     }
-                    return yield* new AgentOperationError({
-                      sessionId: input.sessionId,
-                      operation: "prompt-admission-state",
-                      cause: new Error("Pi queued a prompt without an active server turn"),
-                    });
+                    // Pi queued this prompt while we have no turn (its run
+                    // outlived the finish we already consumed). Attach and
+                    // stream that run instead of failing the RPC.
                   }
 
                   const previous = yield* Ref.get(session.turnState);
