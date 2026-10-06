@@ -78,6 +78,22 @@ it("keeps one bordered inset frame around the sidebar and main when the sidebar 
   expect(toggleBounds.top + toggleBounds.height / 2).toBe(
     (titlebar.getBoundingClientRect().top + before.top) / 2,
   );
+  const title = document.querySelector('[data-slot="shell-title"]');
+  const drawer = document.querySelector('[data-slot="sidebar-drawer"]');
+  if (!(title instanceof HTMLElement) || !(drawer instanceof HTMLElement)) {
+    throw new Error("Missing title slot or sidebar");
+  }
+  expect(title.getBoundingClientRect().left).toBe(
+    52 + drawer.getBoundingClientRect().width + 1 + 8,
+  );
+  const marker = document.createElement("span");
+  marker.textContent = "Chat";
+  marker.dataset.appShellTitlebarContent = "";
+  title.append(marker);
+  const rule = titlebar.querySelector(".bg-border");
+  if (!(rule instanceof HTMLElement)) throw new Error("Missing titlebar rule");
+  expect(getComputedStyle(rule).display).not.toBe("none");
+  expect(rule.getBoundingClientRect().left).toBe(52 + drawer.getBoundingClientRect().width);
 
   await toggle.click();
   await expect
@@ -93,4 +109,7 @@ it("keeps one bordered inset frame around the sidebar and main when the sidebar 
     before.height,
   ]);
   expect(getComputedStyle(frame).borderTopWidth).toBe("1px");
+  await expect
+    .poll(() => title.getBoundingClientRect().left)
+    .toBe(toggle.element().getBoundingClientRect().right + 8);
 });
