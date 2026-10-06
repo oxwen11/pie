@@ -9,7 +9,7 @@ import {
 } from "@getpie/server/daemon";
 import { resolveServeConfig } from "@getpie/server/http";
 import { type Config, Effect, Option } from "effect";
-import { Flag } from "effect/unstable/cli";
+import { Flag } from "effect/cli";
 
 import { resolveCliDaemon } from "./daemon";
 
