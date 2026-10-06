@@ -1,0 +1,28 @@
+{
+  "name": "@getpie/orpc-cli",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Opt-in Commander CLI over an implemented oRPC router",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "git clean -xdf node_modules dist .turbo"
+  },
+  "dependencies": {
+    "@orpc/contract": "catalog:orpc",
+    "@orpc/server": "catalog:orpc",
+    "commander": "^14.0.3"
+  },
+  "devDependencies": {
+    "@getpie/typescript": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "zod": "catalog:"
+  }
+}

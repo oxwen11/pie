@@ -723,6 +723,34 @@ importers:
         specifier: 5.0.0
         version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.0)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
 
+  packages/orpc-cli:
+    dependencies:
+      '@orpc/contract':
+        specifier: catalog:orpc
+        version: 2.0.0-beta.35
+      '@orpc/server':
+        specifier: catalog:orpc
+        version: 2.0.0-beta.35
+      commander:
+        specifier: ^14.0.3
+        version: 14.0.3
+    devDependencies:
+      '@getpie/typescript':
+        specifier: workspace:*
+        version: link:../../tools/typescript
+      '@types/node':
+        specifier: ^24.13.4
+        version: 24.13.4
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 5.0.0
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@24.13.4)(@vitest/browser-playwright@5.0.0)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.0)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.0(@types/node@24.13.4)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.13)(yaml@2.9.0))
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
+
   packages/pi-loop:
     devDependencies:
       '@earendil-works/pi-coding-agent':
