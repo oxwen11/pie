@@ -49,15 +49,29 @@
 - **[t3code](https://github.com/pingdotgg/t3code)**（`cf3e714b0`，作为上限参照）：同样以 `pi --mode rpc` 接入 Pi 并保留用户扩展，
   但自建 SQLite 事件日志、command receipts 与 effect outbox，重启后可逐条重放事件、跨重启去重。代价是事件格式
   必须永久可解码、需要迁移机制。本方案暂不走到这一步，触发条件见第 6 节。
-- **Pi `pi-durable` / `chord`**：替换 coding-agent 运行时与 Extension API，Pie 依赖后者，且二者在 Pi 1.0.2
-  均为 experimental。等 Pi 稳定版把 coding-agent 迁到 durable 并保留扩展后再评估。
+- **Pi 实验性 client/server**（`earendil-works/pi@76f6c06d`，`pi-server` / `pi-client` / `pi-protocol` / `chord` /
+  `pi-durable`）：coordinator 持有稳定 socket 并把连接转给可替换的 server 进程，每个 Session 一个 worker 进程运行
+  durable Harness。要点：
+  - 每个连接一个服务端生成的 `attachmentId`，请求携带 `{serverId, sessionId, attachmentId}`，过期路由以
+    `session_not_attached` 拒绝；断开时等已受理的操作结束再释放。
+  - 状态以 chord replicated state 同步：**每次（重新）订阅都发完整快照**，之后按每订阅递增的 seq 发增量，
+    出现缺口即清空并报错；待推送超过 100 条时把积压替换为一份完整快照（reset）。不做日志补发，历史分页仍是 TODO。
+  - 传输层按未写出的字节（`maxPendingBytes`）限制慢客户端，超出即断开。
+  - 客户端“never reconnects or replays requests automatically”，重连后只重复已知安全的操作。
+  - worker 在有运行中的任务时保持存活，与是否有客户端无关；重启 worker 时 `harness.resume()` 继续中断的工作。
+  - durable `submit` 支持持久的 `requestId` 去重，但实验层当前没有使用；扩展提问路由到哪个客户端尚未设计。
+
+  不采用的原因：durable 运行时不支持稳定版 Extension API（扩展改为 durable `Registry` 与 chord facet），MCP、
+  codemode、图片、会话树导航、`!` bash、导出、提示词模板均缺失；存储为 SQLite，不兼容 Pi JSONL 会话；
+  server/client 不在 npm 包与二进制中发布（需 `PI_EXPERIMENTAL=1` 从源码运行），durable API
+  “changes without notice”。本方案借鉴其协议与生命周期规则；等 Pi 稳定版在 durable 上保留扩展能力后再评估迁移。
 
 ## 3. 目标架构
 
 ```text
  CLI ─┐
  Web ─┼─ @getpie/client · SessionSync（三端共用）
- Desktop┘   订阅 → 快照 → 按 {epoch, seq} 应用 → 缺口分页补齐 → 新鲜度状态
+ Desktop┘   订阅 → 尾页快照 → 按 {epoch, seq} 应用增量 → 异常即重订阅 → 新鲜度状态
                       │  oRPC / WebSocket
 ──────────────────────┼─────────────────────────── daemon（每个 $PIE_HOME 一个）
                       ▼
@@ -101,8 +115,10 @@
   每个投影项记录覆盖的 `seqStart`/`seqEnd`。
 - 流式中间态不进入投影；当前 turn 以合并后的完整消息形式更新。工具输出进入投影与实时流前统一截断到 64 KiB，
   完整内容仍在 Pi JSONL 中。
-- 订阅可携带 `{ epoch, afterSeq }`：同 epoch 且缺口在投影范围内时，返回 `afterSeq` 之后的投影页，带
-  `hasNewer`，客户端连续请求直到补齐；否则返回最新尾页快照。更早的历史向前分页。
+- 默认采用 Pi 的做法：**每次（重新）订阅都返回投影尾页快照**（携带 `{epoch, seq}` 与 `hasOlder`），之后按 seq
+  推送增量；同一订阅内出现缺口即视为错误并重新订阅。更早的历史向前分页。
+- 携带 `{ epoch, afterSeq }` 从投影按页补齐（Paseo 的做法，带 `hasNewer`）只作为可选优化：仅当尾页快照的体积
+  实测成为重连瓶颈时引入，不作为正确性依赖。
 - 取代快照中保留整轮 chunk 的 `ActiveTurnSnapshot.truncated` 恢复方式。
 
 ### 3.4 冷读与运行时生命周期
@@ -118,7 +134,9 @@
 - 所有修改类 RPC 接受客户端生成的 `commandId`（prompt 可沿用 `messageId`）。服务端在内存按 Session 记录回执
   （结果与对应 seq），保留一段时间后清除；重复的 `commandId` 返回首次结果，不再次执行。
 - Pie 内部发起的命令（Schedule、Loop 唤醒）使用确定性 id。
-- 回执不跨 daemon 重启：重启时进行中的 turn 已被收尾为中断，客户端看到 epoch 变化后重新对齐，不自动重发修改。
+- 回执不跨 daemon 重启：重启时进行中的 turn 已被收尾为中断，客户端看到 epoch 变化后重新对齐。
+- 与 Pi client 相同，`SessionSync` 重连后**不自动重放修改类命令**；只有调用方明确发起的重试才复用原 `commandId`。
+  因此内存回执只需覆盖同一 daemon 生命周期内的重试。
 - 整条命令（标题、元数据、交付给 Pi）在同一 Session 内串行，不再拆成独立临界区。
 
 ### 3.6 收尾与失败语义
@@ -133,7 +151,8 @@
 ### 3.7 慢客户端
 
 - 预算按订阅计算，计入已交给传输层但客户端尚未消费的数据（WebSocket `bufferedAmount` 或 oRPC 流的确认）。
-- 超出时以 `closed: slow_consumer` 结束该订阅，客户端带 `{ epoch, afterSeq }` 重新接入；不阻塞生产者与其他订阅者。
+- 待推送积压超过阈值时，与 chord 相同，把积压替换为一份当前完整快照（reset）继续推送；超出传输层字节上限时以
+  `closed: slow_consumer` 结束该订阅，客户端重新订阅取快照。不阻塞生产者与其他订阅者。
 - `global` 订阅只承载 collection 事件与 Session 摘要，不再承载所有 Session 的 chunk；daemon 内部订阅者
   （如 `PullRequestCoordinator`）被关闭时自动重订阅。
 
@@ -154,7 +173,7 @@
 
 实施切片 2 前须在本文补充并经 Developer 确认：
 
-1. 订阅输入与快照、分页结果的契约形状（`epoch`、`afterSeq`、`seqStart/seqEnd`、`hasNewer`、`hasOlder`）。
+1. 订阅输入与快照、reset、历史分页结果的契约形状（`epoch`、`seq`、`seqStart/seqEnd`、`hasOlder`）。
 2. 投影页大小与内存上限、空闲 Session 投影的释放时机。
 3. `commandId` 回执保留时长与上限。
 4. 慢客户端预算数值及“未消费数据”的取得方式（oRPC 是否提供流确认）。
@@ -171,7 +190,7 @@
 0. **独立缺陷**：Session 列表断线后重订阅；CLI 先订阅后读快照；close 进行中 turn 时先发布结束事件。
 1. **`SessionSync` + epoch + 收尾**：三端改用共用同步模块；事件与快照带 epoch；补齐 P7、P8 的事件；修正
    `prompt.submitted` 顺序。
-2. **时间线投影 + 分页补齐 + 冷读**：读路径不再拉起 Pi 子进程（解锁 #236）。
+2. **时间线投影 + 尾页快照 + 历史分页 + 冷读**：读路径不再拉起 Pi 子进程（解锁 #236）。
 3. **命令去重 + Session 列表流 + 慢客户端预算**：移除列表与 Schedule 结算轮询。
 4. **跨重启意图**：与 #286 一起交付。
 5. **修订 ADR 0009**，更新持久化清单与 `CONTEXT.md`，删除本文已落地的内容。
@@ -188,7 +207,8 @@
 ## 7. 验收
 
 - 重复提交：同一 `commandId` 重试只产生一次 Pi turn，返回相同结果。
-- 重连：缺口在投影内时逐页补齐且不重复、不遗漏；epoch 变化时整段对齐；Session 列表在 socket 断开后恢复。
+- 重连：重新订阅得到当前尾页快照，此后增量不重复、不遗漏；epoch 变化时整段对齐；积压时收到 reset 而非断开；
+  Session 列表在 socket 断开后恢复；重连不会自动重放修改类命令。
 - 并发：两个客户端同时 prompt、steer、回答同一请求，三端看到的事件顺序与最终状态一致。
 - 崩溃与关闭：杀 Pi 子进程、重启 daemon、在 turn 中关闭 Session，客户端都收到明确的中断与请求失效。
 - 慢客户端：限速客户端被断开后能凭游标恢复，其他客户端不受影响。
@@ -201,4 +221,6 @@
 - 不引入 SQLite、通用 outbox、`pi-durable` 或 `chord`，不替换 Pi 运行时。
 - 不实现 turn 中途从断点继续；进程丢失即中断并提示重试。
 - 不在本文开放用户 Pi 扩展自动发现（`CONTEXT.md` 现明确禁用）。
+- 不引入 Pi 式的 coordinator（稳定 socket + 可替换 server 进程、worker 跨 daemon 替换存活）与 per-connection
+  `attachmentId`；扩展提问继续广播给所有客户端、先回答者生效。二者留待有具体需求时评估。
 - 不改变 Pi JSONL 作为对话记录权威的地位，不在 Pie 中复制完整 transcript。
