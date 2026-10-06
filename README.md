@@ -44,7 +44,7 @@ launch a separately installed `pi` binary.
   See [ADR 0002](docs/adr/0002-session-info-storage-floor-harness-overlay.md).
 - A registered Project is trusted for Pi prompts, skills, and context, and for executing that
   Project's extension code. Pie-owned children load Pi's built-in, global, and Project extensions.
-  The daemon model list does not load extensions. See [CONTEXT.md](CONTEXT.md).
+  The model list comes from a short-lived child, so extension providers appear. See [CONTEXT.md](CONTEXT.md).
 
 ## Concepts
 
