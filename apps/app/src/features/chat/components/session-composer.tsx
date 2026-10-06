@@ -13,7 +13,7 @@ import type { EnvironmentSessionRef } from "@/lib/session-ref";
 
 import { ChatComposerFrame } from "./chat-composer-frame";
 import { ChatInputQueue } from "./chat-input-queue";
-import { omitEchoedFollowUps, promoteQueuedFollowUp } from "./chat-input-queue-model";
+import { omitEchoedFollowUps } from "./chat-input-queue-model";
 import { useChatSession } from "./chat-session-context";
 import { useChatComposerController } from "./input/use-chat-composer-controller";
 import { useChatInputHasContent } from "./input/use-chat-input-has-content";
@@ -41,12 +41,20 @@ export function SessionComposer({
     branch.data?.kind === "repository" ? (branch.data.current ?? undefined) : undefined;
   const workspaceUnavailable = branch.data?.kind === "workspace-unavailable";
   const chat = useChatHandle(sessionRef);
-  const { interrupt, replaceQueue, store } = useChatSession();
+  const { interrupt, replaceQueue, steerFollowUp, store } = useChatSession();
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
+  const optimisticSteerTexts = useStore(store, (s) => s.optimisticSteerTexts);
   const canInterrupt = status === "streaming";
   const turnInProgress = status === "submitted" || status === "streaming";
-  const hasQueued = pendingPrompt.steering.length > 0 || pendingPrompt.followUp.length > 0;
+  // Hide only the bubble this client just inserted, not every earlier user line
+  // with the same text.
+  const hiddenSteers = new Set(optimisticSteerTexts);
+  const visiblePending = {
+    steering: pendingPrompt.steering.filter((text) => !hiddenSteers.has(text)),
+    followUp: pendingPrompt.followUp,
+  };
+  const hasQueued = visiblePending.steering.length > 0 || visiblePending.followUp.length > 0;
   const workspaceUnavailableRef = useLatestRef(workspaceUnavailable);
   const turnInProgressRef = useLatestRef(turnInProgress);
   const pendingRef = useLatestRef(pendingPrompt);
@@ -68,8 +76,8 @@ export function SessionComposer({
     }
     if (!steerOnEcho.current) return;
     steerOnEcho.current = false;
-    replaceQueue(promoteQueuedFollowUp(pendingPrompt, 0));
-  }, [turnInProgress, pendingPrompt, replaceQueue]);
+    steerFollowUp(0);
+  }, [turnInProgress, pendingPrompt, steerFollowUp]);
 
   const controller = useChatComposerController({
     initialContent: chat.composerDraft,
@@ -100,7 +108,7 @@ export function SessionComposer({
       const pending = pendingRef.current;
       if (pending.followUp.length > 0) {
         steerOnEcho.current = false;
-        replaceQueue(promoteQueuedFollowUp(pending, 0));
+        steerFollowUp(0);
         return;
       }
       inflightFollowUps.current = omitEchoedFollowUps(inflightFollowUps.current, pending);
@@ -129,7 +137,11 @@ export function SessionComposer({
       header={
         hasQueued ? (
           <CardFrameHeader className="min-w-0 grid-rows-none gap-1 px-3 py-2">
-            <ChatInputQueue onReplace={replaceQueue} pending={pendingPrompt} />
+            <ChatInputQueue
+              onReplace={replaceQueue}
+              onSteer={steerFollowUp}
+              pending={visiblePending}
+            />
           </CardFrameHeader>
         ) : undefined
       }
