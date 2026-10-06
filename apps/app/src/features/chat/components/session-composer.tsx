@@ -45,8 +45,11 @@ export function SessionComposer({
   const status = useStore(store, (s) => s.status);
   const pendingPrompt = useStore(store, (s) => s.pendingPrompt);
   const optimisticSteerTexts = useStore(store, (s) => s.optimisticSteerTexts);
-  const canInterrupt = status === "streaming";
   const turnInProgress = status === "submitted" || status === "streaming";
+  // Stop as soon as the turn is in flight, including the optimistic submitted
+  // window before the first server phase. Otherwise a slow spawn leaves
+  // Thinking… with a disabled Send and no way to cancel.
+  const canInterrupt = turnInProgress;
   // Hide only the bubble this client just inserted, not every earlier user line
   // with the same text.
   const hiddenSteers = new Set(optimisticSteerTexts);
@@ -171,8 +174,8 @@ function ChatComposerActions({
   interrupt: () => Promise<void>;
   workspaceUnavailable: boolean;
 }) {
-  // Exactly one primary action: Stop while streaming with an empty draft,
-  // otherwise Send (disabled when empty / workspace missing).
+  // Exactly one primary action: Stop while a turn is in flight and the draft
+  // is empty, otherwise Send (disabled when empty / workspace missing).
   if (canInterrupt && !hasContent) {
     return (
       <PromptInputButton
