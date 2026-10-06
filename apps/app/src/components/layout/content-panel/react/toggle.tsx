@@ -1,4 +1,4 @@
-import { PanelRightClose, PanelRightOpen } from "lucide-react";
+import { PanelRight } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { PanelToggleButton } from "@/components/layout/panel-toggle-button";
@@ -13,11 +13,11 @@ export function ContentPanelToggle({ className }: { readonly className?: string 
   return (
     <PanelToggleButton
       className={className}
-      closeIcon={PanelRightClose}
+      closeIcon={PanelRight}
       label="Toggle content panel"
       onClick={() => session.toggleVisibility()}
       open={presentation !== "hidden"}
-      openIcon={PanelRightOpen}
+      openIcon={PanelRight}
     />
   );
 }
