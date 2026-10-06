@@ -35,9 +35,6 @@
   "peerDependenciesMeta": {
     "commander": {
       "optional": true
-    },
-    "effect": {
-      "optional": true
     }
   }
 }

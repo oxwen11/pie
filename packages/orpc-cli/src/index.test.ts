@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createCommanderCli } from "./commander";
 import { cli, completionScript, readCliCommands, renderOutput } from "./index";
+import { coercePrimitive } from "./metadata";
 
 const Create = Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) });
 const Show = Schema.Struct({
@@ -364,5 +365,13 @@ describe("createCommanderCli", () => {
     expect(renderOutput([{ name: "ada" }, { name: "bea" }], true)).toContain("ada");
     expect(renderOutput("hello", true)).toBe("hello\n");
     expect(renderOutput({ name: "ada" }, false)).toBe('{"name":"ada"}\n');
+  });
+
+  it("rejects blank numbers and false-like booleans", () => {
+    expect(() => coercePrimitive("number", "")).toThrow(/number/);
+    expect(() => coercePrimitive("number", "  ")).toThrow(/number/);
+    expect(coercePrimitive("boolean", "no")).toBe(false);
+    expect(coercePrimitive("boolean", "0")).toBe(false);
+    expect(coercePrimitive("boolean", "false")).toBe(false);
   });
 });

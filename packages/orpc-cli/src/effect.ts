@@ -82,7 +82,7 @@ async function runLeaf(
   options: CliAdapterOptions,
 ): Promise<void> {
   const values = readParsed(parsed);
-  await promptMissing(spec.fields, values);
+  await promptMissing(spec.fields, values, options.prompt);
   const missing = missingRequired(values, spec.fields);
   if (missing !== undefined) throw new CliUsageError(`required option '${missing}' not specified`);
   const output = await callProcedure(
@@ -90,7 +90,7 @@ async function runLeaf(
     inputFromValues(values, spec),
     options.context,
   );
-  await writeOutput(output);
+  await writeOutput(output, options.tables);
 }
 
 function readParsed(parsed: Readonly<Record<string, unknown>>) {

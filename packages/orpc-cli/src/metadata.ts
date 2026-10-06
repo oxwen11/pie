@@ -31,6 +31,10 @@ export interface CliAdapterOptions {
   router: AnyRouter;
   /** Passed to `call`. This package does not authenticate or authorize. */
   context?: Context;
+  /** Ask for missing required fields on a TTY. Off: missing fields fail. */
+  prompt?: boolean;
+  /** Render object arrays as a table when stdout is a TTY. Off: JSON. */
+  tables?: boolean;
 }
 
 export interface CliField {
@@ -152,7 +156,7 @@ export async function callProcedure(
   return call(procedure, input, { context });
 }
 
-export async function writeOutput(output: unknown): Promise<void> {
+export async function writeOutput(output: unknown, tables = false): Promise<void> {
   if (output === undefined) return;
   if (isAsyncIterable(output)) {
     for await (const event of output) {
@@ -160,7 +164,7 @@ export async function writeOutput(output: unknown): Promise<void> {
     }
     return;
   }
-  process.stdout.write(renderOutput(output, process.stdout.isTTY));
+  process.stdout.write(renderOutput(output, tables && process.stdout.isTTY));
 }
 
 export function renderOutput(output: unknown, tty: boolean | undefined): string {
@@ -467,6 +471,15 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+function parseBoolean(value: string): boolean {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "yes" || normalized === "1") return true;
+  if (normalized === "false" || normalized === "no" || normalized === "0" || normalized === "off") {
+    return false;
+  }
+  throw new CliUsageError(`expected a boolean, got "${value}"`);
+}
+
 export function parseInteger(value: string): number {
   if (!/^-?\d+$/.test(value)) throw new CliUsageError(`expected an integer, got "${value}"`);
   return Number(value);
@@ -501,11 +514,12 @@ export function coercePrimitive(
 ): CliValue {
   if (kind === "integer") return parseInteger(value);
   if (kind === "number") {
+    if (value.trim() === "") throw new CliUsageError(`expected a number, got "${value}"`);
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) throw new CliUsageError(`expected a number, got "${value}"`);
     return parsed;
   }
-  if (kind === "boolean") return value !== "false";
+  if (kind === "boolean") return parseBoolean(value);
   if (kind === "date") return parseDate(value);
   if (kind === "bigint") return parseBigint(value);
   if (kind === "json") return parseJson(value);
@@ -555,9 +569,10 @@ function formatCell(value: unknown): string {
 export async function promptMissing(
   fields: readonly CliField[],
   values: Record<string, CliValue | undefined>,
+  prompt = false,
   ask?: (field: CliField) => Promise<string>,
 ): Promise<void> {
-  const read = ask ?? (process.stdin.isTTY && process.stdout.isTTY ? ttyAsk : undefined);
+  const read = ask ?? (prompt && process.stdin.isTTY && process.stdout.isTTY ? ttyAsk : undefined);
   if (read === undefined) return;
   for (const field of fields) {
     if (!field.required || field.positional || values[field.key] !== undefined) continue;

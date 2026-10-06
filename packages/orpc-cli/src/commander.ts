@@ -69,7 +69,7 @@ function register(program: Command, spec: CliCommandSpec, options: CliAdapterOpt
       positional += 1;
       if (isCliValue(value)) values[field.key] = value;
     }
-    await promptMissing(spec.fields, values);
+    await promptMissing(spec.fields, values, options.prompt);
     const missing = missingRequired(values, spec.fields);
     if (missing !== undefined) {
       throw new CommanderError(
@@ -84,7 +84,7 @@ function register(program: Command, spec: CliCommandSpec, options: CliAdapterOpt
         inputFromValues(values, spec),
         options.context,
       );
-      await writeOutput(output);
+      await writeOutput(output, options.tables);
     } catch (error) {
       if (error instanceof CommanderError) throw error;
       if (error instanceof CliUsageError) {
