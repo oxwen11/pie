@@ -31,14 +31,20 @@ export function ProjectSessionRow({
   const observe = usePullRequestRow(session, true);
 
   return (
-    <SidebarMenuItem className="flex items-center gap-1" ref={observe}>
+    <SidebarMenuItem
+      // The row is one item: hover/active highlight must span the badge too,
+      // so it lives on the item, not the (flex-1) button that ends before the badge.
+      className="hover:bg-sidebar-accent data-[active=true]:bg-sidebar-accent flex items-center gap-1 rounded-lg"
+      data-active={active}
+      ref={observe}
+    >
       <SessionActionsMenu
         environmentId={environmentId}
         isActive={isActive}
         session={session}
         render={
           <SidebarMenuButton
-            className="min-w-0 flex-1 md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
+            className="group-hover/menu-item:text-sidebar-accent-foreground min-w-0 flex-1 md:group-has-data-[sidebar=menu-action]/menu-item:pe-2"
             isActive={active}
             onClick={() => {
               navigate({
