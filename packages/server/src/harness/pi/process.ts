@@ -535,7 +535,7 @@ export const makePiProcessWithDependencies = <R>(
                   if (before._tag === "Idle") yield* drainQueue(session.chunks);
 
                   // Stock Pi before 0.99 omits `data`. 0.99 returns `{ disposition }`.
-                  // pie-pi-process still returns `{ started }`.
+                  // pie-pi-process returns `{ started, disposition }`.
                   const admission = yield* restore(
                     session.transport.command<
                       { readonly started?: boolean; readonly disposition?: string } | undefined

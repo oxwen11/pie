@@ -76,6 +76,28 @@ Hub's product-domain dependency is the contract leaf. Effect/platform,
 Node-only V1 is proposed; no speculative Bun host, pull-transport interface,
 Worker/DO adapter, Hub clock, Slack union, or remote-control frame.
 
+### Compared with t3code, not copied
+
+Checked t3code `main` at `9d029a1df` (2026-10-05). Execution stays in the
+Environment; SSH, LAN, Tailscale, and T3 Connect are routes, not another
+executor. The shipped relay brokers links and tunnels and does not proxy
+application traffic after bootstrap. Main has no webhook ingress.
+
+The unmerged stack `t3code/webhooks-mailbox` at `7ed32788e` is the relevant
+ingress, not a shipped API. A scheduled task can use trigger `webhook`. The
+public URL is that Environment's HTTP route, or the relay forwards
+`/v1/hooks/...` into its managed tunnel. The token is in the path. The task
+prompt is a `{{body}}` / `{{headers}}` template and becomes the whole agent
+input. Offline fails closed unless the operator opts into relay hold, which
+stores request bodies off the machine for up to 24 hours. HTTP returns before
+the run. Run now is hidden because there is no request to render.
+
+Keep Pie's divergences. Do not publish GitHub on daemon HTTP or the existing
+relay; the daemon dials Hub, and a relay token stays an access credential.
+Do not add a template language or a second job store. Do not hold raw webhook
+bodies on Hub. Keep explicit local Run now, because the Schedule prompt is
+already complete. V1 still has no offline queue.
+
 ## 3. Identities, authority, and Environment lifecycle
 
 These identities must remain distinct:

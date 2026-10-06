@@ -1,11 +1,25 @@
 import { useSidebar } from "@getpie/ui/components/sidebar";
-import { animate, useMotionValue, useReducedMotion } from "motion/react";
+import { animate, useMotionValue, useMotionValueEvent, useReducedMotion } from "motion/react";
 import * as m from "motion/react-m";
-import { type PointerEvent as ReactPointerEvent, type ReactNode, useEffect, useRef } from "react";
+import {
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+} from "react";
 import { useStore } from "zustand";
 
 import { ShellGutter } from "@/components/layout/shell-gutter";
 import { shellLayout } from "@/components/layout/shell-layout";
+
+function publishSidebarWidth(width: number): void {
+  const shell = document.querySelector("[data-slot=shell]");
+  if (!(shell instanceof HTMLElement)) return;
+  shell.style.setProperty("--shell-sidebar-width", `${width}px`);
+  shell.style.setProperty("--shell-gutter", width > 0 ? "1px" : "0px");
+  shell.style.setProperty("--shell-sidebar-rule", width > 0 ? "1" : "0");
+}
 
 export function ShellSidebarPanel({
   children,
@@ -20,6 +34,12 @@ export function ShellSidebarPanel({
   const expandedRef = useRef(expanded);
   const columnWidth = useMotionValue(open ? expanded : 0);
   const drag = useRef<{ startX: number; startWidth: number } | null>(null);
+
+  useMotionValueEvent(columnWidth, "change", publishSidebarWidth);
+  useLayoutEffect(() => {
+    publishSidebarWidth(columnWidth.get());
+    return () => publishSidebarWidth(0);
+  }, [columnWidth]);
 
   useEffect(() => {
     const target = open ? expanded : 0;

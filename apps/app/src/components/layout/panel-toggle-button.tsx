@@ -1,5 +1,4 @@
 import { Button } from "@getpie/ui/components/button";
-import { cn } from "@getpie/ui/lib/utils";
 import type { LucideIcon } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
 
@@ -24,10 +23,10 @@ export function PanelToggleButton({
       {...props}
       aria-label={label}
       aria-pressed={open}
-      className={cn("size-9", className)}
+      className={className}
       data-pressed={open ? "" : undefined}
       onClick={onClick}
-      size="icon"
+      size="icon-sm"
       variant="ghost"
     >
       <Icon />

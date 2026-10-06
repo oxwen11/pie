@@ -239,6 +239,10 @@ layer(NodeServices.layer)("PiAgent", (it) => {
       assert.equal(prompt.started, false);
       const chunks = yield* Stream.runCollect(prompt.output);
       assert.equal(Array.from(chunks).length, 0);
+
+      const next = yield* agent.session.prompt({ sessionId, text: "ping" });
+      assert.equal(next.started, true);
+      assert.equal(Array.from(yield* Stream.runCollect(next.output)).at(-1)?.type, "finish");
       yield* agent.session.abort(sessionId);
     }),
   );
