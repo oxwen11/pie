@@ -14,7 +14,7 @@ import type {
 } from "@getpie/contract/pull-request";
 import { Clock, Data, Effect, Ref, Result, Stream } from "effect";
 import type { PlatformError } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import {
   PullRequestActionOutcomeUnknown,

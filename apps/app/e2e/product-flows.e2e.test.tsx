@@ -100,7 +100,10 @@ describe("sidebar and content panel", () => {
   it("renames the session from the row menu", async () => {
     await mountApp();
     await waitForText(FIRST_PROMPT);
-    await page.getByText(FIRST_PROMPT, { exact: true }).first().click({ button: "right" });
+    await page
+      .getByTestId("sidebar")
+      .getByRole("button", { name: FIRST_PROMPT })
+      .click({ button: "right" });
     await page.getByRole("menuitem", { name: "Rename" }).click();
     await waitForText("Rename session");
     await page.getByLabelText("Title").fill(RENAMED);
@@ -203,7 +206,10 @@ describe("session archive", () => {
     const projectId = new URL(window.location.href).searchParams.get("projectId");
     expect(projectId).toBeTruthy();
 
-    await page.getByText("e2e archive me", { exact: true }).first().click({ button: "right" });
+    await page
+      .getByTestId("sidebar")
+      .getByRole("button", { name: "e2e archive me" })
+      .click({ button: "right" });
     await page.getByRole("menuitem", { name: "Archive" }).click();
 
     await expect.poll(() => window.location.pathname, { timeout: 15_000 }).toBe("/draft");

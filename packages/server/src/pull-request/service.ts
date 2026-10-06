@@ -8,7 +8,7 @@ import type {
   PullRequestSnapshot,
 } from "@getpie/contract/pull-request";
 import { Context, Effect, Layer } from "effect";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/process";
 
 import { PullRequestStaleContext } from "./errors";
 import {

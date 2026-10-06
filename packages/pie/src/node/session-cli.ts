@@ -11,7 +11,7 @@ import {
   type SubscribeStreamEvent,
 } from "@getpie/contract";
 import { Effect, Option, Runtime, Schema } from "effect";
-import { Argument, Command, Flag } from "effect/unstable/cli";
+import { Argument, Command, Flag } from "effect/cli";
 
 import {
   type PieEndpoint,
