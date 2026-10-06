@@ -611,6 +611,15 @@ Daemon cold transcript open, above, is the approved dependence on Pi's session
 file. Any further design that depends on Pi's physical files rather than its
 public runtime behavior requires a new Developer-approved persistence decision.
 
+Background bash logs are OS temp, not a `$PIE_HOME` store:
+`os.tmpdir()/pie/<sessionId>/bash/<pid>.log`. Directories are `0700` and the
+file is `0600`. Creation `lstat`s the `pie` root and each component below it,
+refuses a symlink or a directory owned by another user, and creates the file
+with `O_CREAT|O_EXCL|O_NOFOLLOW`. A mismatch fails closed. A foreground
+command deletes its log when the tool result already contains the output. A
+background log stays until the OS cleans temp. Session deletion does not
+remove it. Aborting the turn backgrounds the command instead of killing it.
+
 ## Current retention and migration gaps
 
 These are current architecture facts, not implicit approval to preserve them in
