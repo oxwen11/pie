@@ -151,16 +151,7 @@ export const makePiAgentSessionManager = (
 ): Effect.Effect<PiAgentSessionManagerShape, never, Scope.Scope> =>
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
-    // Test adapters supply a cold read. Production sessions open SessionManager themselves.
-    const coldRead: SessionColdRead | undefined =
-      pi.getMessages || pi.getModelState
-        ? (agentSessionId, cwd) =>
-            Effect.gen(function* () {
-              const messages = pi.getMessages ? yield* pi.getMessages(agentSessionId, cwd) : [];
-              const model = pi.getModelState ? yield* pi.getModelState(agentSessionId, cwd) : {};
-              return { messages, model };
-            })
-        : undefined;
+    const coldRead: SessionColdRead | undefined = pi.readSession;
     // Complete SessionRef → the session that owns its observable state.
     const sessions = yield* Ref.make<ReadonlyMap<string, SessionEntry>>(new Map());
     const sessionKey = (ref: SessionRef) => `${ref.projectId}\0${ref.sessionId}`;

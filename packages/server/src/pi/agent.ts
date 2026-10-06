@@ -9,8 +9,6 @@ import type { PiExecutable } from "./resolve-executable";
 import { createPiAgentRuntime, resumePiAgentRuntime } from "./runtime";
 import { readPiSessionFile } from "./session-file";
 
-export { PiAgent, type PiAgentShape } from "../harness/pi-port";
-
 export const makePiAgent = (
   piProcess: PiProcess,
   options: { readonly executable?: PiExecutable } = {},
@@ -39,13 +37,7 @@ export const makePiAgent = (
             resumePiAgentRuntime(piProcess, input, sessionTools),
           ),
         ),
-      getMessages: (agentSessionId, cwd) =>
-        readPiSessionFile(agentSessionId, cwd ?? "").pipe(Effect.map((value) => value.messages)),
-      getModelState: (agentSessionId, cwd) =>
-        readPiSessionFile(agentSessionId, cwd ?? "").pipe(
-          Effect.map((value) => value.model),
-          Effect.catchTag("SessionNotResumable", () => Effect.succeed({})),
-        ),
+      readSession: (agentSessionId, cwd) => readPiSessionFile(agentSessionId, cwd),
       setDefaultModel: (provider, modelId) =>
         Effect.tryPromise({
           try: () => persistDefaultPiModel(provider, modelId),

@@ -94,14 +94,13 @@ export type PiAgentShape = {
     SessionNotResumable | AgentUnavailable | ExecutableNotFound | AgentOpenError,
     Scope.Scope
   >;
-  readonly getMessages?: (
+  readonly readSession?: (
     agentSessionId: string,
-    cwd?: string,
-  ) => Effect.Effect<ReadonlyArray<PieUIMessage>, AgentOperationError | SessionNotResumable>;
-  readonly getModelState?: (
-    agentSessionId: string,
-    cwd?: string,
-  ) => Effect.Effect<AgentModelState, AgentOperationError>;
+    cwd: string,
+  ) => Effect.Effect<
+    { readonly messages: ReadonlyArray<PieUIMessage>; readonly model: AgentModelState },
+    AgentOperationError | SessionNotResumable
+  >;
   readonly setDefaultModel?: (provider: string, modelId: string) => Effect.Effect<void, unknown>;
   readonly getSessionInfo: (
     agentSessionId: string,

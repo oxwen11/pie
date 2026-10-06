@@ -64,7 +64,7 @@ create: Effect.fn("PiAgentSessionService.create")(function* (input) { ... })
 
 - `packages/server/src/http/serve.ts:19–33,133,137`：`PIE_AUTH_TOKEN`（读完还 `delete process.env.PIE_AUTH_TOKEN`）、`PIE_PORT`、`NODE_ENV`、`PIE_DAEMON_COMPATIBILITY_KEY`、`npm_package_version`。
 - `packages/server/src/observability/logging.ts:73,85`：手动解析 `PIE_LOG_LEVEL`、`PIE_PRINT_LOGS`。
-- `packages/server/src/harness/pi/resolve-executable.ts:34–41`：`PIE_E2E`、`PIE_PI_EXECUTABLE`。
+- `packages/server/src/pi/resolve-executable.ts:34–41`：`PIE_E2E`、`PIE_PI_EXECUTABLE`。
 - `apps/desktop/src/main/desktop-runtime.ts:52,57,106`、`main-window.ts:40`、`login-shell-environment.ts:108–109`、`local-server-live.ts:19`。
 
 **问题**：违反 `.agents/rules/topics/runtime.md` "side effects go through Effect's platform services"。测试只能靠改真实环境变量注入；token 不 redact；缺少类型化的默认值和错误报告。
@@ -85,7 +85,7 @@ create: Effect.fn("PiAgentSessionService.create")(function* (input) { ... })
 - `packages/server/src/schedule/fire.ts:214`：`settleAfterPrompt` fire-and-forget。
 - `apps/desktop/src/main/electron/main-window.ts:118`：`loadURL` 失败后 `catchCause` + `forkDetach`。
 
-**问题**：`forkDetach` 的 fiber 不属于任何 Scope，父 Scope 关闭时不会被中断，defect 无人观察，进程退出时这些 fiber 只是消失。项目其他地方（`harness/pi/process.ts`、`harness/pi/runtime.ts`、`harness/session.ts`）都正确用了 `forkIn(scope)`，这三处是漏网的。
+**问题**：`forkDetach` 的 fiber 不属于任何 Scope，父 Scope 关闭时不会被中断，defect 无人观察，进程退出时这些 fiber 只是消失。项目其他地方（`pi/process.ts`、`pi/runtime.ts`、`harness/session.ts`）都正确用了 `forkIn(scope)`，这三处是漏网的。
 
 **方案**：改为 `Effect.forkIn(ownerScope)` 或 `Effect.forkScoped`；确实需要跨请求存活的，用 `FiberSet.run` 挂到服务级 scope，保证 shutdown 时能中断、defect 能被记录。`main-window.ts` 的那处应挂到 window 的 Scope 上（同一文件 105 行已经有 `addFinalizer`）。
 
@@ -102,7 +102,7 @@ Effect.catch((error) =>
 **问题**：
 
 - `Effect.log*` 支持直接传 error 作为参数（`08_observability/10_logging.ts`），logger 会渲染完整 Cause；`String(error)` 对 `TaggedError` 只剩 message。
-- `Effect.catch` 只捕获 typed failure。`tick()` 内若出现 defect（例如 `schedule/tick.ts` 对 `schedule.nextRunAt!` 的非空断言炸掉），`Effect.forever` 直接终止，schedule daemon 静默死亡。而 `ScheduleDaemonLayer`（`rpc/runtime.ts:88`）是 `Layer.effectDiscard(... forkScoped)`，无人察觉。
+- `Effect.catch` 只捕获 typed failure。`tick()` 内若出现 defect（例如 `schedule/tick.ts` 对 `schedule.nextRunAt!` 的非空断言炸掉），`Effect.forever` 直接终止，schedule daemon 静默死亡。而 `ScheduleDaemonLayer`（`runtime.ts:88`）是 `Layer.effectDiscard(... forkScoped)`，无人察觉。
 - 同类：`schedule/runtime.ts` 对 `PlatformError` 直接 `Effect.die`。
 
 **方案**：永活循环用 `Effect.catchCause` 兜底并 `Effect.logWarning("schedule tick failed", cause)`；或把循环体包成 `Effect.retry(Schedule.spaced(...))`。`Effect.sleep(\`${ms} millis\`)`改为`Effect.sleep(Duration.millis(ms))`。
@@ -119,7 +119,7 @@ Effect.catch((error) =>
 
 #### 7. Layer 挂在类外而不是 `static layer`
 
-**现状**：23 个 `export const XxxLayer`，0 个 `static readonly layer`。`rpc/runtime.ts:24` 为此专门造了一个 `PiProcessTag` 类与 `PiProcess` 类型分家。
+**现状**：23 个 `export const XxxLayer`，0 个 `static readonly layer`。`runtime.ts:24` 为此专门造了一个 `PiProcessTag` 类与 `PiProcess` 类型分家。
 
 **问题**：文档模式是 `layer` / `layerNoDeps` 作为 service 类的静态成员（`20_layer-composition.ts`），import 一个符号同时拿到 tag 和实现。
 
@@ -134,9 +134,9 @@ export class GitService extends Context.Service<GitService, GitServiceShape>()("
 
 旧的 `XxxLayer` 导出可先保留为别名，逐步删除。
 
-#### 8. `rpc/runtime.ts` 组合根冗长
+#### 8. `runtime.ts` 组合根冗长
 
-**现状**：79 处 `Layer.provide` vs 3 处 `Layer.provideMerge`。`packages/server/src/rpc/runtime.ts` 每个 `XxxProvided` 都重复 `Layer.provide(PlatformLayer)`、`Layer.provide(PathsLayer)`。30 行 `const piExecutable = resolvePiExecutable()` 在模块顶层同步执行。
+**现状**：79 处 `Layer.provide` vs 3 处 `Layer.provideMerge`。`packages/server/src/runtime.ts` 每个 `XxxProvided` 都重复 `Layer.provide(PlatformLayer)`、`Layer.provide(PathsLayer)`。30 行 `const piExecutable = resolvePiExecutable()` 在模块顶层同步执行。
 
 **问题**：Layer 按引用 memoize，功能没问题，但可读性差、容易漏；模块顶层副作用在 import 时执行，测试无法替换。
 
@@ -155,7 +155,7 @@ export const AgentRuntimeLayer = Layer.mergeAll(Harness, ScheduleDaemonLayer, No
 
 #### 9. `PiAgentShape` 泄漏 `R` 且可变
 
-**现状**：`packages/server/src/harness/pi/agent.ts:20–33` shape 方法的 `R` 含 `FileSystem.FileSystem`；78–80 行 `cachePiAgentAvailability` 通过 `(pi as MutableAvailability).availability = ...` 就地改写服务对象。
+**现状**：`packages/server/src/pi/agent.ts:20–33` shape 方法的 `R` 含 `FileSystem.FileSystem`；78–80 行 `cachePiAgentAvailability` 通过 `(pi as MutableAvailability).availability = ...` 就地改写服务对象。
 
 **问题**：违反 `runtime.md` "R-free service shapes"；服务对象事后 mutate 不符合 Effect 的不可变约定。
 
@@ -193,7 +193,7 @@ return stream.pipe(Stream.ensuring(Scope.close(subscriptionScope, Exit.void)));
 
 #### 12. 手写类型守卫，`Predicate` 模块零使用
 
-**现状**：`harness/pi/transport.ts:54`、`harness/pi/process.ts:456`、`harness/errors.ts:7`、`harness/pi/transform.ts:46–49`、`harness/session-fold.ts:47–49`、`observability/logging.ts` 的 `plain` 函数，都是 `typeof x === "object" && x !== null && "_tag" in x` 一类。
+**现状**：`pi/transport.ts:54`、`pi/process.ts:456`、`harness/errors.ts:7`、`pi/transform.ts:46–49`、`harness/session-fold.ts:47–49`、`observability/logging.ts` 的 `plain` 函数，都是 `typeof x === "object" && x !== null && "_tag" in x` 一类。
 
 **问题**：`10_predicate/index.md` 原文 "**NEVER** write your own helper functions like `isRecord` or `isString`, instead use the helpers from the `Predicate` module."
 
@@ -204,7 +204,7 @@ return stream.pipe(Stream.ensuring(Scope.close(subscriptionScope, Exit.void)));
 **现状**：
 
 - `events/event-bus.ts:70,104`：包在 `SynchronizedRef.modifyEffect` 外，把 Queue 操作失败和 modify 本身失败一起吞掉。
-- `harness/pi/process.ts:382,475,643`、`harness/pi/runtime.ts:167,169`：abort/shutdown 路径。
+- `pi/process.ts:382,475,643`、`pi/runtime.ts:167,169`：abort/shutdown 路径。
 - `git/service.ts:171,303`：git 命令失败变成 `""`。
 - `fs/service.ts:153,156,198,227`、`rpc/fs.ts:71`、`harness/executable.ts:52`。
 - `apps/desktop/src/main/server/login-shell-environment.ts:54`：probe 失败变 `undefined`。
@@ -284,7 +284,7 @@ Layer.sync(ScheduleRuntime, () => ({
 
 #### 19. 随机源绕过 `Crypto` 服务
 
-**现状**：`harness/pi/process.ts:10` `import { v7 as uuid } from "uuid"`（501、518 行调用）；`effect-json-store/src/atomic.ts:24` `crypto.randomUUID()`。而 `schedule/service.ts:62` 已经正确地 `yield* Crypto.Crypto`。
+**现状**：`pi/process.ts:10` `import { v7 as uuid } from "uuid"`（501、518 行调用）；`effect-json-store/src/atomic.ts:24` `crypto.randomUUID()`。而 `schedule/service.ts:62` 已经正确地 `yield* Crypto.Crypto`。
 
 **方案**：统一 `yield* Crypto.Crypto` 后调用 `crypto.randomUUID`；若必须 UUID v7（时间有序），在 `Crypto` 之上封一个 `pie/IdGenerator` 服务，测试可确定性注入。
 
@@ -308,7 +308,7 @@ Layer.sync(ScheduleRuntime, () => ({
 
 **方案**：合并为单个 `SynchronizedRef.modifyEffect`，去掉 `Ref` + `Semaphore` 双结构。
 
-#### 23. `harness/pi/transport.ts:164–171` 在 `Effect.gen` 里 `try/catch` `JSON.parse`
+#### 23. `pi/transport.ts:164–171` 在 `Effect.gen` 里 `try/catch` `JSON.parse`
 
 **说明**：注释已说明 stdout 有非 JSON 行需要跳过，属于有意为之。
 
@@ -353,7 +353,7 @@ Layer.sync(ScheduleRuntime, () => ({
 3. 第 3 条：`Config` 接管 `serve.ts` / `logging.ts` / `resolve-executable.ts`；`Context.Reference` 承载有默认值的开关。
 4. 第 2、13 条：错误统一到 `Schema.TaggedError` + `Schema.Defect()`，同时清理 `mapError` 丢 cause 的点。顺序：`packages/server/src/errors.ts` → 各子域 → `packages/contract` 复用。
 5. 第 6、7、10 条：service id 加 `pie/` 前缀、`static layer`、`ScheduleService` 去掉 `provide` 强转。
-6. 第 8 条：`rpc/runtime.ts` 组合根用 `provideMerge` 重排。
+6. 第 8 条：`runtime.ts` 组合根用 `provideMerge` 重排。
 7. 第 9、11、12、14、18–25 条：逐文件小 PR。
 8. 第 27、28 条：测试整理。
 9. 第 16、17 条：`EventBus` → `PubSub`、`createServer` → `Layer`，单独开设计讨论。

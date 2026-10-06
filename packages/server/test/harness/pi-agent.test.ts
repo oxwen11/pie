@@ -3,12 +3,14 @@ import os from "node:os";
 import path from "node:path";
 
 import { SessionManager } from "@earendil-works/pi-coding-agent";
+import * as NodeServices from "@effect/platform-node/NodeServices";
 import { Effect } from "effect";
 import { afterEach, expect, it } from "vitest";
 
 import { makeEventBus } from "../../src/events/event-bus";
-import { makePiAgentSession } from "../../src/harness/session";
-import { readPiSessionFile } from "../../src/pi/session-file";
+import { makePiAgentSessionManager } from "../../src/harness/session-manager";
+import { makePiAgent } from "../../src/pi/agent";
+import { makePiProcess } from "../../src/pi/process";
 
 const homes: string[] = [];
 
@@ -46,32 +48,37 @@ it("idle session reads reuse one SessionManager open", async () => {
   });
   manager.appendModelChange("openai", "gpt-test");
 
-  const read = await Effect.runPromise(
-    Effect.scoped(
-      Effect.gen(function* () {
-        const bus = yield* makeEventBus();
-        let reads = 0;
-        const session = yield* makePiAgentSession(
-          { projectId: "p", sessionId: "s" },
-          bus,
-          (agentSessionId, sessionCwd) => {
-            reads += 1;
-            return readPiSessionFile(agentSessionId, sessionCwd);
-          },
-        );
-        const first = yield* session.messages("agent-1", cwd);
-        const model = yield* session.modelState("agent-1", cwd);
-        const second = yield* session.messages("agent-1", cwd);
-        return { first, model, second, reads };
-      }),
-    ),
-  );
-  expect(read.first.map((message) => message.parts)).toEqual([
-    [{ type: "text", text: "keep" }],
-    [{ type: "text", text: "stay" }],
-    [{ type: "text", text: "ok", state: "done" }],
-  ]);
-  expect(read.second).toEqual(read.first);
-  expect(read.model).toEqual({ provider: "openai", modelId: "gpt-test" });
-  expect(read.reads).toBe(1);
+  const open = SessionManager.open.bind(SessionManager);
+  let opens = 0;
+  SessionManager.open = (...args: Parameters<typeof SessionManager.open>) => {
+    opens += 1;
+    return open(...args);
+  };
+  try {
+    const read = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function* () {
+          const process = yield* makePiProcess();
+          const pi = yield* makePiAgent(process);
+          const bus = yield* makeEventBus();
+          const sessions = yield* makePiAgentSessionManager(pi, bus);
+          const ref = { projectId: "p", sessionId: "s" };
+          const first = yield* sessions.messages(ref, "agent-1", cwd);
+          const model = yield* sessions.modelState(ref, "agent-1", cwd);
+          const second = yield* sessions.messages(ref, "agent-1", cwd);
+          return { first, model, second };
+        }).pipe(Effect.provide(NodeServices.layer)),
+      ),
+    );
+    expect(read.first.map((message) => message.parts)).toEqual([
+      [{ type: "text", text: "keep" }],
+      [{ type: "text", text: "stay" }],
+      [{ type: "text", text: "ok", state: "done" }],
+    ]);
+    expect(read.second).toEqual(read.first);
+    expect(read.model).toEqual({ provider: "openai", modelId: "gpt-test" });
+    expect(opens).toBe(1);
+  } finally {
+    SessionManager.open = open;
+  }
 });

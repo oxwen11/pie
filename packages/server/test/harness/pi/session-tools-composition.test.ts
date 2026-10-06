@@ -9,6 +9,7 @@ import { afterEach, vi } from "vitest";
 import { EventBus, makeEventBus } from "../../../src/events/event-bus";
 import { GitService } from "../../../src/git/service";
 import { WorktreeService } from "../../../src/git/worktree-service";
+import { PiAgent } from "../../../src/harness/pi-port";
 import { SessionMetadataLocksLayer } from "../../../src/harness/session-locks";
 import {
   makePiAgentSessionManager,
@@ -23,7 +24,7 @@ import {
   PiAgentSessionService,
   PiAgentSessionServiceCoreLayer,
 } from "../../../src/harness/session-service";
-import { makePiAgent, PiAgent } from "../../../src/pi/agent";
+import { makePiAgent } from "../../../src/pi/agent";
 import { makePiProcess } from "../../../src/pi/process";
 import { ProjectService } from "../../../src/project/service";
 import { makePullRequestCoordinator } from "../../../src/pull-request/coordinator";

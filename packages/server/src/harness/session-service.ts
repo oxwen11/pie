@@ -920,7 +920,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
 
 /**
  * Production face. Provides metadata, per-ref locks, and the session
- * repository. `rpc/runtime.ts` still supplies manager, Pi, EventBus,
+ * repository. `runtime.ts` still supplies manager, Pi, EventBus,
  * ProjectService, Paths, WorktreeService, GitService, and platform Crypto/FS.
  */
 export const PiAgentSessionServiceLayer: Layer.Layer<

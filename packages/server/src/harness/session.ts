@@ -438,7 +438,6 @@ export const makePiAgentSession = (
       ),
     );
 
-    // Process owns the file while it is held or still starting. Otherwise one SessionManager.
     const route = <A, E, E2>(
       fromRuntime: (runtime: PiAgentRuntime) => Effect.Effect<A, E>,
       fromFile: Effect.Effect<A, E2>,
@@ -458,9 +457,25 @@ export const makePiAgentSession = (
         }),
       );
 
+    const pieSessionError = <A>(
+      effect: Effect.Effect<A, AgentOperationError | SessionNotResumable>,
+    ) =>
+      effect.pipe(
+        Effect.mapError((error) => {
+          if (error.sessionId === ref.sessionId) return error;
+          return error._tag === "AgentOperationError"
+            ? new AgentOperationError({
+                sessionId: ref.sessionId,
+                operation: error.operation,
+                cause: error.cause,
+              })
+            : new SessionNotResumable({ sessionId: ref.sessionId });
+        }),
+      );
+
     const fileMessages = (agentSessionId: string, cwd: string) => {
       if (readCold) {
-        return readCold(agentSessionId, cwd).pipe(
+        return pieSessionError(readCold(agentSessionId, cwd)).pipe(
           Effect.tap((value) =>
             Effect.sync(() => {
               cold = value;
@@ -475,7 +490,7 @@ export const makePiAgentSession = (
     const fileModel = (agentSessionId: string, cwd: string) => {
       if (readCold) {
         if (cold) return Effect.succeed<AgentModelState | undefined>(cold.model);
-        return readCold(agentSessionId, cwd).pipe(
+        return pieSessionError(readCold(agentSessionId, cwd)).pipe(
           Effect.tap((value) =>
             Effect.sync(() => {
               cold = value;

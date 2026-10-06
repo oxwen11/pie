@@ -8,12 +8,10 @@ import type * as Cause from "effect/Cause";
 import { makeEventBus } from "../../src/events/event-bus";
 import { AgentOperationError } from "../../src/harness/errors";
 import type { SessionEnvelopeDraft } from "../../src/harness/events/framework";
+import type { PiAgentRuntime, PiAgentShape, SessionInfoResult } from "../../src/harness/pi-port";
 import { streamFromQueueOne } from "../../src/harness/queue-stream";
 import type { UserInput } from "../../src/harness/session-io";
 import { makePiAgentSessionManager } from "../../src/harness/session-manager";
-import type { PiAgentShape } from "../../src/pi/agent";
-import type { PiAgentRuntime } from "../../src/pi/runtime";
-import type { SessionInfoResult } from "../../src/pi/types";
 import { NodePlatformLayer } from "../platform";
 
 const refFor = (sessionId: string): SessionRef => ({
