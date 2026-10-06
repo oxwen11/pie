@@ -1,15 +1,10 @@
 import type { Schedule } from "@getpie/contract";
-import type { ReactNode } from "react";
-import { Group } from "react-resizable-panels";
-
-import { PanelSeparator } from "@/components/layout/panel-separator";
-import { ResizablePanel } from "@/components/layout/resizable-panel";
+import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@getpie/ui/components/empty";
 
 import { useSchedule } from "./schedule-context";
 import { ScheduleDeleteDialog } from "./schedule-delete-dialog";
 import { ScheduleDetailPanel } from "./schedule-detail-panel";
 import { ScheduleEditorPanel } from "./schedule-editor-panel";
-import { SchedulePageList } from "./schedule-page-list";
 
 export function SchedulePageFrame() {
   const { actions, meta } = useSchedule();
@@ -20,8 +15,15 @@ export function SchedulePageFrame() {
       <ScheduleDetailPanel />
     );
   return (
-    <div className="flex min-h-0 flex-1 overflow-hidden">
-      <SchedulePageSplit list={<SchedulePageList />} sidePanel={sidePanel} />
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      {sidePanel ?? (
+        <Empty>
+          <EmptyHeader>
+            <EmptyTitle>Schedule a task</EmptyTitle>
+            <EmptyDescription>Start a session in a project on a cadence.</EmptyDescription>
+          </EmptyHeader>
+        </Empty>
+      )}
       <SchedulePageDeleteDialog
         deleting={meta.deleting}
         onCancel={() => actions.cancelDelete()}
@@ -29,32 +31,6 @@ export function SchedulePageFrame() {
         pending={meta.removing}
       />
     </div>
-  );
-}
-
-function SchedulePageSplit({ list, sidePanel }: { list: ReactNode; sidePanel: ReactNode }) {
-  if (sidePanel === null) {
-    return <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{list}</div>;
-  }
-  return (
-    <Group
-      className="flex min-h-0 flex-1"
-      orientation="horizontal"
-      resizeTargetMinimumSize={{ coarse: 44, fine: 12 }}
-    >
-      <ResizablePanel className="flex min-w-0 flex-col" minSize="16rem">
-        {list}
-      </ResizablePanel>
-      <PanelSeparator label="Resize schedule panel" />
-      <ResizablePanel
-        className="flex min-w-0 flex-col"
-        defaultSize="28rem"
-        maxSize="50%"
-        minSize="18rem"
-      >
-        {sidePanel}
-      </ResizablePanel>
-    </Group>
   );
 }
 

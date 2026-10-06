@@ -1,16 +1,28 @@
 import type { PackageItem } from "@getpie/contract/packages";
 import { Button } from "@getpie/ui/components/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@getpie/ui/components/empty";
-import { cn } from "@getpie/ui/lib/utils";
+import {
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@getpie/ui/components/sidebar";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowLeft, ChevronRight, Plus } from "lucide-react";
-import { useState, type ReactElement } from "react";
+import { ArrowLeft, BookOpen, ChevronRight, Package, Plus } from "lucide-react";
+import { useState, type ReactElement, type ReactNode } from "react";
 
+import { PageSidebar } from "@/components/layout/page-sidebar";
 import Loader from "@/components/loader";
 import { useLocalOrpc } from "@/lib/environment-orpc";
 
 import { PackageDetail } from "./package-detail";
-import type { PackageDetail as PackageDetailModel } from "./package-model";
+import {
+  detailFromInstalled,
+  packageLabel,
+  type PackageDetail as PackageDetailModel,
+} from "./package-model";
 import { AddSourceForm, PackagesBrowse } from "./packages-browse";
 import { usePackageMutations } from "./packages-mutations";
 import { SkillsPanel } from "./skills-panel";
@@ -21,6 +33,7 @@ const tabs = [
 ] as const;
 
 export function PackagesPage(): ReactElement {
+  const { setOpenMobile } = useSidebar();
   const [tab, setTab] = useState<(typeof tabs)[number][0]>("packages");
   const [addingSourceOpen, setAddingSourceOpen] = useState(false);
   const [detail, setDetail] = useState<PackageDetailModel | null>(null);
@@ -33,38 +46,76 @@ export function PackagesPage(): ReactElement {
   const items = list.data ?? [];
   const addingSource = add.isPending ? add.variables : undefined;
   const removingSource = remove.isPending ? remove.variables : undefined;
+  const addSourceButton = (
+    <Button
+      className="shrink-0 rounded-full"
+      onClick={() => {
+        setTab("packages");
+        setAddingSourceOpen((open) => !open);
+      }}
+      size="sm"
+      type="button"
+      variant={addingSourceOpen ? "secondary" : "default"}
+    >
+      <Plus />
+      Add
+    </Button>
+  );
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex h-12 shrink-0 items-center justify-between px-3">
-        {detail === null ? (
-          <div
-            aria-label="Browse packages or skills"
-            className="flex items-center gap-0.5"
-            role="tablist"
-          >
+      <PageSidebar>
+        <div className="flex h-10 shrink-0 items-center px-4">
+          <h2 className="text-sm font-semibold">Customize</h2>
+        </div>
+        <SidebarGroup className="pt-0">
+          <SidebarMenu>
             {tabs.map(([value, label]) => (
-              <button
-                aria-selected={tab === value}
-                className={cn(
-                  "rounded-lg px-3 py-1.5 text-sm font-medium",
-                  tab === value
-                    ? "bg-muted text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
-                )}
-                key={value}
-                onClick={() => {
-                  setTab(value);
-                  if (value !== "packages") setAddingSourceOpen(false);
-                }}
-                role="tab"
-                type="button"
-              >
-                {label}
-              </button>
+              <SidebarMenuItem key={value}>
+                <SidebarMenuButton
+                  aria-pressed={tab === value && detail === null}
+                  isActive={tab === value && detail === null}
+                  onClick={() => {
+                    setTab(value);
+                    setDetail(null);
+                    if (value !== "packages") setAddingSourceOpen(false);
+                    setOpenMobile(false);
+                  }}
+                >
+                  {value === "packages" ? <Package /> : <BookOpen />}
+                  <span>{label}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
             ))}
-          </div>
-        ) : (
+          </SidebarMenu>
+        </SidebarGroup>
+        <SidebarGroup className="min-h-0 flex-1 overflow-y-auto">
+          <SidebarGroupLabel>Installed</SidebarGroupLabel>
+          <SidebarMenu>
+            {items.map((item) => (
+              <SidebarMenuItem key={item.source}>
+                <SidebarMenuButton
+                  aria-pressed={detail?.source === item.source}
+                  isActive={detail?.source === item.source}
+                  onClick={() => {
+                    setTab("packages");
+                    // ponytail: source-only details; reuse catalog metadata if richer sidebar details are needed.
+                    setDetail(detailFromInstalled(item, []));
+                    setAddingSourceOpen(false);
+                    setOpenMobile(false);
+                  }}
+                  title={item.source}
+                >
+                  <Package />
+                  <span>{packageLabel(item.source)}</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+      </PageSidebar>
+      {detail === null ? null : (
+        <div className="flex h-12 shrink-0 items-center px-3">
           <div className="flex min-w-0 items-center gap-1 text-sm">
             <Button
               aria-label="Back to packages"
@@ -85,26 +136,11 @@ export function PackagesPage(): ReactElement {
             <ChevronRight className="text-muted-foreground size-3.5" />
             <span className="truncate px-1.5 font-medium">{detail.name}</span>
           </div>
-        )}
-        {detail === null ? (
-          <Button
-            className="rounded-full"
-            onClick={() => {
-              setTab("packages");
-              setAddingSourceOpen((open) => !open);
-            }}
-            size="sm"
-            type="button"
-            variant={addingSourceOpen ? "secondary" : "default"}
-          >
-            <Plus />
-            Add
-          </Button>
-        ) : null}
-      </div>
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto">
         {tab === "skills" ? (
-          <SkillsPanel />
+          <SkillsPanel>{addSourceButton}</SkillsPanel>
         ) : (
           <PackagesBody
             addingSource={addingSource}
@@ -121,7 +157,9 @@ export function PackagesPage(): ReactElement {
             onRemove={(source) => remove.mutate(source)}
             pending={add.isPending}
             removingSource={removingSource}
-          />
+          >
+            {addSourceButton}
+          </PackagesBody>
         )}
       </div>
     </div>
@@ -129,6 +167,7 @@ export function PackagesPage(): ReactElement {
 }
 
 function PackagesBody({
+  children,
   addingSource,
   addingSourceOpen,
   detail,
@@ -141,6 +180,7 @@ function PackagesBody({
   pending,
   removingSource,
 }: {
+  children: ReactNode;
   addingSource: string | undefined;
   addingSourceOpen: boolean;
   detail: PackageDetailModel | null;
@@ -180,7 +220,9 @@ function PackagesBody({
           onDetailChange={onDetailChange}
           onRemove={onRemove}
           removingSource={removingSource}
-        />
+        >
+          {children}
+        </PackagesBrowse>
       </div>
       {detail === null ? null : (
         <PackageDetail
