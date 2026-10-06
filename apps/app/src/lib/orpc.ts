@@ -97,6 +97,13 @@ export function createEnvironmentOrpc(
   queryClient.setQueryDefaults(orpc.agent.session.list.key(), {
     staleTime: 30_000,
   });
+  // App default refetches on focus, which would spawn a Pi process each time.
+  queryClient.setQueryDefaults(orpc.agent.listModels.key(), {
+    refetchOnWindowFocus: false,
+  });
+  queryClient.setQueryDefaults(orpc.agent.commands.key(), {
+    refetchOnWindowFocus: false,
+  });
   const pullRequestDefaults = {
     staleTime: 15_000,
     retry: false,

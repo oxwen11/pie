@@ -54,7 +54,7 @@ it.each(["resolve", "reject"])(
             case "project.list":
               return [localProject];
             case "agent.listModels":
-              return { models: [] };
+              return { models: [{ provider: "e2e", modelId: "fake", name: "Fake" }] };
             case "agent.commands":
               return [];
             case "git.branch":
@@ -147,3 +147,127 @@ it.each(["resolve", "reject"])(
     }
   },
 );
+
+it("blocks send from the selected Environment's model list", async () => {
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const localProject: Project = {
+    id: "local-project",
+    name: "Local project",
+    path: "/tmp/draft-loading-project",
+    createdAt: "2026-01-01T00:00:00.000Z",
+  };
+  const remoteProject: Project = {
+    id: "remote-project",
+    name: "Remote project",
+    path: "/tmp/remote-project",
+    createdAt: "2026-01-02T00:00:00.000Z",
+  };
+  const connection = {
+    httpBaseUrl: "http://127.0.0.1:1",
+    wsBaseUrl: "ws://127.0.0.1:1",
+    token: "test-only",
+  };
+  const snapshot = {
+    revision: 1,
+    connecting: [],
+    remotes: [
+      { id: "remote", environmentId: "remote", alias: "remote", label: "Remote", connection },
+    ],
+  };
+  let started = 0;
+  const environmentRpc = createEnvironmentRpc({
+    localId: "local",
+    queryClient,
+    resolveRemote: () => connection,
+    createRemoteLink: () => ({
+      call: async (path) => {
+        switch (path.join(".")) {
+          case "project.list":
+            return [remoteProject];
+          case "agent.listModels":
+            return { models: [] };
+          default:
+            throw new Error(`Unexpected remote RPC: ${path.join(".")}`);
+        }
+      },
+    }),
+    localLink: {
+      call: async (path) => {
+        switch (path.join(".")) {
+          case "project.list":
+            return [localProject];
+          case "agent.listModels":
+            return { models: [{ provider: "e2e", modelId: "fake", name: "Fake" }] };
+          case "agent.commands":
+            return [];
+          case "git.branch":
+            return { kind: "not-repository" };
+          default:
+            throw new Error(`Unexpected RPC: ${path.join(".")}`);
+        }
+      },
+    },
+  });
+  const context = { localEnvironmentId: "local", environmentRpc };
+  const root = createRootRouteWithContext<typeof context>()({
+    component: () => (
+      <PlatformProvider
+        value={{
+          ssh: {
+            client: { available: true },
+            environments: {
+              getSnapshot: () => snapshot,
+              subscribe: () => () => undefined,
+            },
+            discoverHosts: async () => [],
+            connect: async () => {},
+            remove: async () => {},
+          },
+        }}
+      >
+        <ChatManagerContext
+          value={{
+            chatFor: () => {
+              started += 1;
+              throw new Error("This test must not create a Session");
+            },
+          }}
+        >
+          <Outlet />
+        </ChatManagerContext>
+      </PlatformProvider>
+    ),
+  });
+  const draft = createRoute({
+    getParentRoute: () => root,
+    path: "draft",
+    component: DraftRoute.options.component,
+    validateSearch: DraftRoute.options.validateSearch,
+  });
+  const router = createRouter({
+    routeTree: root.addChildren([draft]),
+    context,
+    history: createMemoryHistory({ initialEntries: ["/draft?projectId=local-project"] }),
+  });
+  await router.load();
+  const view = await render(
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+  try {
+    await expect.element(page.getByRole("textbox", { name: "Message" })).toBeVisible();
+    await router.navigate({
+      to: "/draft",
+      search: { projectId: "remote-project", environmentId: "remote" },
+    });
+    await expect
+      .element(page.getByRole("heading", { name: "No model provider connected" }))
+      .toBeVisible();
+    expect(document.querySelector('button[type="submit"]')).toBeNull();
+    expect(started).toBe(0);
+  } finally {
+    await view.unmount();
+    queryClient.clear();
+  }
+});

@@ -82,6 +82,22 @@ rl.on("line", (line) => {
     return;
   }
 
+  if (msg.type === "get_available_models") {
+    send({
+      id: msg.id,
+      type: "response",
+      command: "get_available_models",
+      success: true,
+      data: {
+        models: [
+          { provider: "xai", id: "grok-4.3", name: "Grok 4.3" },
+          { provider: "cliproxyapi", id: "gpt-5.6-sol", name: "GPT-5.6 Sol" },
+        ],
+      },
+    });
+    return;
+  }
+
   // Persist entries so history reload after a live turn can decode Markdown
   // images. An empty tree is still a finished read on first attach.
   if (msg.type === "get_entries") {
