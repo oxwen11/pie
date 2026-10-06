@@ -4,6 +4,7 @@ import {
   decodeDaemonCompatibilityKey,
   embeddedDaemonCompatibilityKey,
   makeGitHashDaemonCompatibilityKey,
+  parseDaemonDiscoveryRecord,
 } from "./compatibility";
 
 describe("daemon compatibility key", () => {
@@ -26,4 +27,22 @@ describe("daemon compatibility key", () => {
       expect(decodeDaemonCompatibilityKey(value)).toBeUndefined();
     },
   );
+
+  it("parses a discovery record and drops a bad compatibility key", () => {
+    expect(
+      parseDaemonDiscoveryRecord({
+        pid: 1,
+        address: "http://127.0.0.1:9",
+        token: "tok",
+        startedAt: 1,
+        compatibilityKey: "not-a-key",
+      }),
+    ).toEqual({
+      pid: 1,
+      address: "http://127.0.0.1:9",
+      token: "tok",
+      startedAt: 1,
+    });
+    expect(parseDaemonDiscoveryRecord({ pid: 1 })).toBeUndefined();
+  });
 });

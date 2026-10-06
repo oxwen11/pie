@@ -122,7 +122,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
   const [importOpen, setImportOpen] = useState(false);
 
   // One project.list per connected Environment — same prefixed keys the
-  // sidebar and catalog worker use, so this subscribes to warm caches.
+  // sidebar and Environment list sync use, so this subscribes to warm caches.
   const environments = useConnectedEnvironments();
   const projectLists = useQueries({
     queries: environments.map((environment) =>
@@ -245,21 +245,24 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
     );
   }
 
-  // Do not expose the composer until Pi confirms at least one usable model.
-  // On an unconfigured machine the first prompt would fail after creating a session.
-  if (modelsQuery.isPending) return <Loader />;
-  if (modelsQuery.isError) {
-    return <DraftModelsError onRetry={() => void modelsQuery.refetch()} />;
-  }
-  if (modelsQuery.data.models.length === 0) {
-    return <DraftNoModels onRetry={() => void modelsQuery.refetch()} />;
-  }
+  // The composer stays mounted so typed text survives the model probe and
+  // project switches. Send stays blocked until this Environment confirms a model.
+  const models = modelsQuery.data?.models ?? [];
+  const modelsReady = modelsQuery.isSuccess && models.length > 0;
+  const notice = modelsQuery.isError ? (
+    <DraftModelsError onRetry={() => void modelsQuery.refetch()} />
+  ) : modelsQuery.isSuccess && models.length === 0 ? (
+    <DraftNoModels onRetry={() => void modelsQuery.refetch()} />
+  ) : null;
 
   return (
     <DraftComposer
       draftModel={draftModel}
       groups={groups}
-      models={modelsQuery.data?.models ?? []}
+      models={models}
+      modelsPending={modelsQuery.isPending}
+      modelsReady={modelsReady}
+      notice={notice}
       onModelChange={(provider, modelId) => {
         navigate({
           to: "/draft",
@@ -285,6 +288,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
         });
       }}
       onStart={(text, worktree) => {
+        if (!modelsReady) return;
         startSession.mutate({
           text,
           ...(worktree !== undefined ? { worktree } : undefined),
@@ -312,7 +316,7 @@ function DraftModelsError({ onRetry }: { onRetry: () => void }) {
 
 function DraftNoModels({ onRetry }: { onRetry: () => void }) {
   return (
-    <Empty>
+    <Empty className="flex-none py-0">
       <EmptyHeader>
         <EmptyMedia variant="icon">
           <KeyRoundIcon aria-hidden="true" />

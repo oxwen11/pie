@@ -17,8 +17,6 @@ export type DaemonRecord = {
   pid: number;
   address: string;
   token: string;
-  startedAt?: string;
-  compatibilityKey?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,15 +44,7 @@ export function readDaemonRecord(filePath: string): DaemonRecord {
   ) {
     throw new TypeError(`invalid daemon.pid at ${filePath}`);
   }
-  return {
-    pid: data.pid,
-    address: data.address,
-    token: data.token,
-    ...(typeof data.startedAt === "string" ? { startedAt: data.startedAt } : undefined),
-    ...(typeof data.compatibilityKey === "string"
-      ? { compatibilityKey: data.compatibilityKey }
-      : undefined),
-  };
+  return { pid: data.pid, address: data.address, token: data.token };
 }
 
 export function redactDaemonRecord(src: string, dest: string): void {
