@@ -1,81 +1,27 @@
-import { oc, type AnySchema } from "@orpc/contract";
+import "@orpc/experimental-effect/extensions/input-output";
+import { oc } from "@orpc/contract";
 import { implement } from "@orpc/server";
 import { Command, CommanderError } from "commander";
+import { Schema } from "effect";
 import { describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 
-import { cli, createCommanderCli, type CliJsonSchema } from "./index";
+import { cli, createCommanderCli } from "./index";
 
-const Create = z.object({ path: z.string().min(1) });
-const Show = z.object({
-  ref: z.object({ projectId: z.string(), sessionId: z.string() }),
+const Create = Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) });
+const Show = Schema.Struct({
+  ref: Schema.Struct({ projectId: Schema.String, sessionId: Schema.String }),
 });
-const List = z.object({
-  count: z.number().int(),
-  tag: z.array(z.string()).optional(),
-  archived: z.boolean(),
-  mode: z.enum(["all", "open"]).optional(),
+const List = Schema.Struct({
+  count: Schema.Int,
+  tag: Schema.optional(Schema.Array(Schema.String)),
+  archived: Schema.Boolean,
+  mode: Schema.optional(Schema.Literals(["all", "open"])),
 });
-const Name = z.string().min(3);
-const Worktree = z.object({
-  branch: z.string(),
-  spec: z.object({ base: z.string() }),
+const Name = Schema.String.check(Schema.isMinLength(3));
+const Worktree = Schema.Struct({
+  branch: Schema.String,
+  spec: Schema.Unknown,
 });
-
-const schemas = new Map<AnySchema, CliJsonSchema>([
-  [
-    Create,
-    {
-      type: "object",
-      properties: { path: { type: "string", description: "folder" } },
-      required: ["path"],
-    },
-  ],
-  [
-    Show,
-    {
-      type: "object",
-      properties: {
-        ref: {
-          type: "object",
-          properties: {
-            projectId: { type: "string" },
-            sessionId: { type: "string" },
-          },
-          required: ["projectId", "sessionId"],
-        },
-      },
-      required: ["ref"],
-    },
-  ],
-  [
-    List,
-    {
-      type: "object",
-      properties: {
-        count: { type: "integer" },
-        tag: { type: "array", items: { type: "string" } },
-        archived: { type: "boolean" },
-        mode: { enum: ["all", "open"] },
-      },
-      required: ["count"],
-    },
-  ],
-  [Name, { type: "string" }],
-  [
-    Worktree,
-    {
-      type: "object",
-      properties: {
-        branch: { type: "string" },
-        spec: { type: "object" },
-      },
-      required: ["branch"],
-    },
-  ],
-]);
-
-const toJsonSchema = (schema: AnySchema): CliJsonSchema | undefined => schemas.get(schema);
 
 async function run(program: Command, argv: readonly string[]) {
   const help: string[] = [];
@@ -112,7 +58,7 @@ describe("createCommanderCli", () => {
     const contract = {
       project: {
         create: oc.meta(cli({ description: "Register a project" })).input(Create),
-        list: oc.input(z.object({ archived: z.boolean().optional() })),
+        list: oc.input(Schema.Struct({ archived: Schema.optional(Schema.Boolean) })),
       },
     };
     const base = implement(contract);
@@ -129,7 +75,6 @@ describe("createCommanderCli", () => {
           }),
         },
       }),
-      toJsonSchema,
     });
 
     const help = await run(program, ["project", "--help"]);
@@ -172,7 +117,6 @@ describe("createCommanderCli", () => {
           }),
         },
       }),
-      toJsonSchema,
     });
 
     await run(program, ["session", "show", "--ref.project-id", "p1", "--ref.session-id", "s1"]);
@@ -207,7 +151,6 @@ describe("createCommanderCli", () => {
           }),
         },
       }),
-      toJsonSchema,
     });
     await run(negatedProgram, ["session", "list", "--count", "1", "--no-archived"]);
     expect(negated).toEqual({ count: 1, archived: false });
@@ -238,7 +181,6 @@ describe("createCommanderCli", () => {
           }),
         },
       }),
-      toJsonSchema,
     });
 
     await run(program, ["project", "create", "--input", '{"path":"from-json"}']);
@@ -272,7 +214,6 @@ describe("createCommanderCli", () => {
           }),
         },
       }),
-      toJsonSchema,
     });
 
     const missing = await run(program, ["project", "create"]);
@@ -304,7 +245,6 @@ describe("createCommanderCli", () => {
           }),
         },
       }),
-      toJsonSchema,
     });
     program
       .command("daemon")

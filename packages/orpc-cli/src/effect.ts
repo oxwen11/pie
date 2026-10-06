@@ -17,9 +17,7 @@ import {
 
 /** Effect CLI adapter. Compose the returned commands with `Command.withSubcommands`. */
 export function createEffectCli(options: CliAdapterOptions): ReadonlyArray<Command.Command.Any> {
-  return group(readCliCommands(options.router, options.toJsonSchema)).map((node) =>
-    compile(node, options),
-  );
+  return group(readCliCommands(options.router)).map((node) => compile(node, options));
 }
 
 interface Node {

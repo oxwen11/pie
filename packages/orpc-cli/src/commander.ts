@@ -24,7 +24,7 @@ export function createCommanderCli(options: CliAdapterOptions): Command {
   program.exitOverride();
   program.showHelpAfterError();
   program.showSuggestionAfterError();
-  for (const spec of readCliCommands(options.router, options.toJsonSchema)) {
+  for (const spec of readCliCommands(options.router)) {
     register(program, spec, options);
   }
   return program;
@@ -112,8 +112,16 @@ function addFieldOption(command: Command, field: CliField): void {
       ...(previous ?? []),
       coerce(items, value),
     ]);
-  } else if (field.kind === "number" || field.kind === "json") {
+  } else if (field.kind === "number") {
     option.argParser((value: string) => coerce(field.schema, value));
+  } else if (field.kind === "json") {
+    option.argParser((value: string) => {
+      try {
+        return parseJson(value);
+      } catch (error) {
+        throw new InvalidArgumentError(error instanceof Error ? error.message : "invalid JSON");
+      }
+    });
   }
   if (field.choices !== undefined) option.choices([...field.choices]);
   command.addOption(option);

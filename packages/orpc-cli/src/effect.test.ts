@@ -1,46 +1,17 @@
-import { oc, type AnySchema } from "@orpc/contract";
+import "@orpc/experimental-effect/extensions/input-output";
+import { oc } from "@orpc/contract";
 import { implement } from "@orpc/server";
-import { Effect, FileSystem, Layer, Path, Stdio, Terminal } from "effect";
+import { Effect, FileSystem, Layer, Path, Schema, Stdio, Terminal } from "effect";
 import { Command } from "effect/unstable/cli";
 import { ChildProcessSpawner } from "effect/unstable/process";
 import { describe, expect, it, vi } from "vitest";
-import { z } from "zod";
 
-import { cli, createEffectCli, type CliJsonSchema } from "./index";
+import { cli, createEffectCli } from "./index";
 
-const Create = z.object({ path: z.string().min(1) });
-const Show = z.object({
-  ref: z.object({ projectId: z.string(), sessionId: z.string() }),
+const Create = Schema.Struct({ path: Schema.String.check(Schema.isMinLength(1)) });
+const Show = Schema.Struct({
+  ref: Schema.Struct({ projectId: Schema.String, sessionId: Schema.String }),
 });
-const schemas = new Map<AnySchema, CliJsonSchema>([
-  [
-    Create,
-    {
-      type: "object",
-      properties: { path: { type: "string" } },
-      required: ["path"],
-    },
-  ],
-  [
-    Show,
-    {
-      type: "object",
-      properties: {
-        ref: {
-          type: "object",
-          properties: {
-            projectId: { type: "string" },
-            sessionId: { type: "string" },
-          },
-          required: ["projectId", "sessionId"],
-        },
-      },
-      required: ["ref"],
-    },
-  ],
-]);
-
-const toJsonSchema = (schema: AnySchema): CliJsonSchema | undefined => schemas.get(schema);
 
 const layer = Layer.mergeAll(
   FileSystem.layerNoop({}),
@@ -87,7 +58,7 @@ describe("createEffectCli", () => {
     const contract = {
       project: {
         create: oc.meta(cli({ description: "Register a project" })).input(Create),
-        list: oc.input(z.object({})),
+        list: oc.input(Schema.Struct({})),
       },
     };
     const base = implement(contract);
@@ -108,7 +79,6 @@ describe("createEffectCli", () => {
               list: base.project.list.handler(() => []),
             },
           }),
-          toJsonSchema,
         }),
         daemon,
       ]),
@@ -137,7 +107,6 @@ describe("createEffectCli", () => {
               }),
             },
           }),
-          toJsonSchema,
         }),
       ),
     );

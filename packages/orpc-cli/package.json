@@ -22,9 +22,9 @@
   },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",
+    "@orpc/experimental-effect": "catalog:orpc",
     "@types/node": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:",
-    "zod": "catalog:"
+    "vitest": "catalog:"
   }
 }

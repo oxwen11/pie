@@ -7,6 +7,7 @@ import {
   type AnyRouter,
   type Context,
 } from "@orpc/server";
+import { Schema } from "effect";
 
 export interface CliMeta {
   description?: string;
@@ -27,8 +28,6 @@ export interface CliAdapterOptions {
   router: AnyRouter;
   /** Passed to `call`. This package does not authenticate or authorize. */
   context?: Context;
-  /** Describe `.input()` schemas. Return undefined to expose only `--input`. */
-  toJsonSchema: (schema: AnySchema) => CliJsonSchema | undefined;
 }
 
 export interface CliField {
@@ -89,11 +88,8 @@ export function cli(meta: CliMeta = {}): ReturnType<typeof cliPlugin> {
 
 export { getCliMeta };
 
-export function readCliCommands(
-  router: AnyRouter,
-  toJsonSchema: CliAdapterOptions["toJsonSchema"],
-): readonly CliCommandSpec[] {
-  const specs = collect(router).map((entry) => toSpec(entry, toJsonSchema));
+export function readCliCommands(router: AnyRouter): readonly CliCommandSpec[] {
+  const specs = collect(router).map(toSpec);
   assertDistinct(specs);
   return specs;
 }
@@ -176,12 +172,13 @@ function collect(router: AnyRouter): ReadonlyArray<{
   return entries;
 }
 
-function toSpec(
-  entry: { procedure: AnyProcedure; path: readonly string[]; meta: CliMeta },
-  toJsonSchema: CliAdapterOptions["toJsonSchema"],
-): CliCommandSpec {
+function toSpec(entry: {
+  procedure: AnyProcedure;
+  path: readonly string[];
+  meta: CliMeta;
+}): CliCommandSpec {
   const schema = entry.procedure["~orpc"].inputSchemas?.at(-1);
-  const fields = schema === undefined ? [] : fieldsFor(schema, toJsonSchema);
+  const fields = schema === undefined ? [] : fieldsFor(schema);
   return {
     procedure: entry.procedure,
     path: entry.path,
@@ -208,8 +205,67 @@ function assertDistinct(specs: readonly CliCommandSpec[]): void {
   }
 }
 
-function fieldsFor(schema: AnySchema, toJsonSchema: CliAdapterOptions["toJsonSchema"]): CliField[] {
-  const json = toJsonSchema(schema);
+function jsonSchemaOf(schema: AnySchema): CliJsonSchema | undefined {
+  if (!Schema.isSchema(schema)) return undefined;
+  try {
+    return readJsonSchema(
+      Schema.toStandardJSONSchemaV1(schema)["~standard"].jsonSchema.input({ target: "draft-07" }),
+    );
+  } catch {
+    return undefined;
+  }
+}
+
+function readJsonSchema(raw: Record<string, unknown>): CliJsonSchema {
+  const schema: CliJsonSchema = {};
+  if (typeof raw.type === "string") schema.type = raw.type;
+  else if (Array.isArray(raw.type) && raw.type.every((item) => typeof item === "string")) {
+    schema.type = raw.type;
+  }
+  if (typeof raw.description === "string") schema.description = raw.description;
+  if (Array.isArray(raw.required) && raw.required.every((item) => typeof item === "string")) {
+    schema.required = raw.required;
+  }
+  if (isRecord(raw.properties)) {
+    const properties: Record<string, CliJsonSchema> = {};
+    for (const [key, value] of Object.entries(raw.properties)) {
+      if (isRecord(value)) properties[key] = readJsonSchema(value);
+    }
+    schema.properties = properties;
+  }
+  if (isRecord(raw.items)) schema.items = readJsonSchema(raw.items);
+  if (Array.isArray(raw.enum)) schema.enum = raw.enum.filter(isEnumValue);
+  const anyOf = readSchemaArray(raw.anyOf);
+  const oneOf = readSchemaArray(raw.oneOf);
+  if (anyOf !== undefined) schema.anyOf = anyOf;
+  if (oneOf !== undefined) schema.oneOf = oneOf;
+  return schema;
+}
+
+function readSchemaArray(value: unknown): CliJsonSchema[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const schemas: CliJsonSchema[] = [];
+  for (const item of value) {
+    if (isRecord(item)) schemas.push(readJsonSchema(item));
+  }
+  return schemas;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isEnumValue(value: unknown): value is string | number | boolean | null {
+  return (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
+}
+
+function fieldsFor(schema: AnySchema): CliField[] {
+  const json = jsonSchemaOf(schema);
   if (json === undefined) return [];
   const unwrapped = unwrap(json);
   if (!isObjectSchema(unwrapped)) return [];
