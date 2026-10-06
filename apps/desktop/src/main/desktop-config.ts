@@ -36,10 +36,10 @@ export function resolveServerEntry(isPackaged: boolean, resourcesPath: string): 
       "@getpie",
       "server",
       "dist",
-      "server.mjs",
+      "server.js",
     );
   }
-  return url.fileURLToPath(new URL("../../../../packages/server/dist/server.mjs", import.meta.url));
+  return url.fileURLToPath(new URL("../../../../packages/server/dist/server.js", import.meta.url));
 }
 
 /**

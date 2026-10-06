@@ -7,8 +7,8 @@ import path from "node:path";
 import { attachRelay } from "@getpie/server/relay";
 import { afterEach, describe, expect, it } from "vitest";
 
-const relayBin = path.join(import.meta.dirname, "../../dist/relay.mjs");
-const cliBin = path.join(import.meta.dirname, "../../dist/cli.mjs");
+const relayBin = path.join(import.meta.dirname, "../../dist/relay.js");
+const cliBin = path.join(import.meta.dirname, "../../dist/cli.js");
 
 function spawnRelay(args: string[], env: NodeJS.ProcessEnv) {
   return childProcess.spawn(process.execPath, args, {

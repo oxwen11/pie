@@ -6,16 +6,16 @@
   "type": "module",
   "exports": {
     "./compatibility": {
-      "types": "./dist/compatibility.d.mts",
-      "default": "./dist/compatibility.mjs"
+      "types": "./dist/compatibility.d.ts",
+      "default": "./dist/compatibility.js"
     },
     "./development-scope": {
-      "types": "./dist/development-scope.d.mts",
-      "default": "./dist/development-scope.mjs"
+      "types": "./dist/development-scope.d.ts",
+      "default": "./dist/development-scope.js"
     },
     "./executable": {
-      "types": "./dist/executable.d.mts",
-      "default": "./dist/executable.mjs"
+      "types": "./dist/executable.d.ts",
+      "default": "./dist/executable.js"
     }
   },
   "scripts": {

@@ -83,7 +83,7 @@ function makeHarness(
   };
 
   const config: LocalServerConfig = {
-    entry: "/fake/cli.mjs",
+    entry: "/fake/cli.js",
     environment: Effect.succeed({
       PATH: "/login/bin:/usr/bin",
       HTTPS_PROXY: "http://proxy.test:8443",
