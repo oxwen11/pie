@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# Crop or blur a public copy of a screenshot or video. Never overwrites.
+set -euo pipefail
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: redact-evidence (--crop WxH+X+Y | --blur WxH+X+Y) [--crop WxH+X+Y] [--blur WxH+X+Y] file...
+
+Write a sibling <name>.redacted.<ext>. Images use magick (-strip, optional
+region blur, optional crop). Video uses ffmpeg to crop and drop metadata;
+--blur is image-only. Refuses to overwrite. Does not print file contents.
+EOF
+}
+
+geometry() {
+  printf '%s\n' "$1" | grep -Eq '^[0-9]+x[0-9]+\+[0-9]+\+[0-9]+$' || die "invalid geometry: $1"
+}
+
+ffmpeg_crop() {
+  printf '%s\n' "$1" | sed -E 's/^([0-9]+)x([0-9]+)\+([0-9]+)\+([0-9]+)$/\1:\2:\3:\4/'
+}
+
+redact_image() {
+  local input="$1" output="$2"
+  set -- magick "$input" -strip
+  if [ -n "$BLUR" ]; then
+    set -- "$@" -region "$BLUR" -blur 0x12 +region
+  fi
+  if [ -n "$CROP" ]; then
+    set -- "$@" -crop "$CROP" +repage
+  fi
+  set -- "$@" "$output"
+  "$@"
+  [ -f "$output" ] || die "redaction did not create $output"
+}
+
+redact_video() {
+  local input="$1" output="$2" ext="$3" crop codec
+  [ -z "$BLUR" ] || die "--blur is image-only"
+  [ -n "$CROP" ] || die "video requires --crop"
+  crop=$(ffmpeg_crop "$CROP")
+  case "$ext" in
+    webm) codec=libvpx ;;
+    *) codec=libx264 ;;
+  esac
+  ffmpeg -y -loglevel error -i "$input" -vf "crop=${crop}" -map_metadata -1 -c:v "$codec" -an "$output"
+  [ -f "$output" ] || die "redaction did not create $output"
+}
+
+CROP=""
+BLUR=""
+FILES=()
+if [ $# -eq 0 ]; then
+  usage >&2
+  exit 1
+fi
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --crop)
+      shift
+      [ $# -gt 0 ] || die "--crop needs WxH+X+Y"
+      geometry "$1"
+      CROP=$1
+      shift
+      ;;
+    --blur)
+      shift
+      [ $# -gt 0 ] || die "--blur needs WxH+X+Y"
+      geometry "$1"
+      BLUR=$1
+      shift
+      ;;
+    --) shift; break ;;
+    -*) die "unknown option: $1" ;;
+    *)
+      FILES+=("$1")
+      shift
+      ;;
+  esac
+done
+while [ $# -gt 0 ]; do
+  FILES+=("$1")
+  shift
+done
+[ "${#FILES[@]}" -gt 0 ] || die "expected a file"
+[ -n "$CROP" ] || [ -n "$BLUR" ] || die "pass --crop or --blur"
+
+for input in "${FILES[@]}"; do
+  [ -f "$input" ] || die "not a file: $input"
+  base=$(basename "$input")
+  dir=$(dirname "$input")
+  ext=$(printf '%s\n' "$base" | tr 'A-Z' 'a-z')
+  ext=${ext##*.}
+  stem=${base%.*}
+  output="$dir/${stem}.redacted.${ext}"
+  [ ! -e "$output" ] || die "output exists: $output"
+  case "$ext" in
+    png|jpg|jpeg|webp)
+      need_cmd magick
+      redact_image "$input" "$output"
+      ;;
+    webm|mp4|mov)
+      need_cmd ffmpeg
+      redact_video "$input" "$output" "$ext"
+      ;;
+    *) die "unsupported file: $input" ;;
+  esac
+  printf '%s\n' "$output"
+done

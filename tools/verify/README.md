@@ -46,6 +46,21 @@ Each `evidence init` stops the current clip and selects the next number; cleanup
 stops and flushes the current recording. Always pass an explicit `open` URL. `web env` / `desktop env` remain an
 optional dump. `cli` has no page.
 
+## Capture
+
+```bash
+pnpm exec pie-verify web evidence screenshot <name>
+pnpm exec pie-verify web evidence note "what recording-NNN.webm shows"
+pnpm exec pie-verify web evidence path
+```
+
+Use `desktop` instead of `web` for Electron. `evidence init` rotates the
+60 fps clip; do not call `record start`, `restart`, or `stop`. Cleanup flushes
+the current recording. Evidence stays under
+`.agents/skills/verify-pie{,-desktop}/evidence/<run-id>/` and is gitignored.
+Attach it with `gh pr|issue comment --attach <png> --attach <webm>`.
+Crop or blur a public copy with `tools/pr/redact-evidence` before upload.
+
 ## Parallel verification
 
 Use **one worktree and one isolation root per task**. Keep `HOME` and the operator's

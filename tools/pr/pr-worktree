@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+# Detached worktree pinned to a pull request head. Does not switch branches.
+set -euo pipefail
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: pr-worktree <number> --sha <head> --dest <path> [--remote origin] [--repo OWNER/REPO]
+
+Fetch the pull request head and add a detached worktree at that commit.
+Refuses when GitHub's head or the fetched commit is not --sha, when dest
+exists, or when dest is inside the current checkout. Does not switch the
+current branch and does not install dependencies.
+EOF
+}
+
+abs_new_path() {
+  local dir base
+  dir=$(dirname "$1")
+  base=$(basename "$1")
+  [ -d "$dir" ] || die "parent directory does not exist: $dir"
+  dir=$(cd "$dir" && pwd -P)
+  printf '%s/%s\n' "$dir" "$base"
+}
+
+pr_init
+need_cmd gh
+need_cmd jq
+need_cmd git
+NUMBER=""
+EXPECTED=""
+DEST=""
+REMOTE="origin"
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --repo)
+      shift
+      [ $# -gt 0 ] || die "--repo needs OWNER/REPO"
+      set_repo "$1"
+      shift
+      ;;
+    --sha)
+      shift
+      [ $# -gt 0 ] || die "--sha needs a commit SHA"
+      EXPECTED=$1
+      shift
+      ;;
+    --dest)
+      shift
+      [ $# -gt 0 ] || die "--dest needs a path"
+      DEST=$1
+      shift
+      ;;
+    --remote)
+      shift
+      [ $# -gt 0 ] || die "--remote needs a name"
+      REMOTE=$1
+      shift
+      ;;
+    --) shift; break ;;
+    -*) die "unknown option: $1" ;;
+    *)
+      [ -z "$NUMBER" ] || die "unexpected argument: $1"
+      NUMBER=$1
+      shift
+      ;;
+  esac
+done
+[ $# -eq 0 ] || die "unexpected argument"
+require_number "$NUMBER"
+require_sha "$EXPECTED"
+[ -n "$DEST" ] || die "--dest is required"
+require_remote "$REMOTE"
+default_repo
+
+dest=$(abs_new_path "$DEST")
+top=$(cd "$(git rev-parse --show-toplevel)" && pwd -P)
+case "$dest/" in
+  "$top/"*) die "dest is inside the current checkout" ;;
+esac
+[ ! -e "$dest" ] || die "dest exists: $dest"
+
+gh_run pr view "$NUMBER" --repo "$REPO" --json headRefOid
+if [ "$GH_STATUS" -ne 0 ] || ! json_object "$GH_STDOUT_FILE"; then
+  show_gh_err
+  die "gh pr view failed"
+fi
+head=$(jq -r '.headRefOid // empty' "$GH_STDOUT_FILE")
+sha_eq "$head" "$EXPECTED" || die "pull request head is $head, expected $EXPECTED"
+
+git fetch --no-tags "$REMOTE" "refs/pull/${NUMBER}/head"
+fetched=$(git rev-parse FETCH_HEAD)
+sha_eq "$fetched" "$EXPECTED" || die "fetched $fetched, expected $EXPECTED"
+git worktree add --detach "$dest" "$fetched"
+printf 'worktree: %s\nhead: %s\n' "$dest" "$fetched"

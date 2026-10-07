@@ -11,6 +11,7 @@
 ## Changes and risks
 
 <!-- Summarize the approach, affected paths/callers, and relevant compatibility, data or security risks. -->
+<!-- New host writes, or a dependency on Pi's physical files? yes/no. -->
 
 ## Verification
 
