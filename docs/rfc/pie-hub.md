@@ -395,7 +395,7 @@ stop receiving events. A Hub-fired run records the existing reason `manual` and 
 effective prompt in the run snapshot; the receipt holds `eventId -> runId`, and the
 UI labels a run Hub-originated by joining it. Local Run now fires the saved prompt
 with no event context and has no receipt. Eligibility is derived from current
-records at hello and again at admission, never cached as authority.
+records when the mapping is created and again at admission, never cached as authority.
 
 ### Filter and event content
 
@@ -486,8 +486,8 @@ semantics, and the whole thing runs locally under the ordinary test and verify t
 
 **Storage: SQLite (Developer, revision 7).** Hub state is one SQLite file,
 `$HUB_HOME/hub.sqlite`, opened by the single process (directory `0700`, file `0600`,
-WAL, `synchronous=FULL`, `foreign_keys=ON`). Tables are those in section 9: `config`,
-`environments`, `enrollment_tokens`, `events` (later `conversation_routes`).
+WAL, `synchronous=FULL`, `foreign_keys=ON`). Tables are those in section 9: `environments`,
+`enrollment_tokens`, `events` (later `webhooks`, `conversation_routes`).
 Why SQLite rather than files: dedupe, hold, claim and ack are small transactions
 (`INSERT OR IGNORE` on the source delivery id, an attempt counter, oldest-first with
 caps by query), the same shapes the Phase 0 prototype ran inside a Durable Object's
