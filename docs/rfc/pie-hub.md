@@ -236,32 +236,42 @@ guessing.
 
 ### Webhooks
 
-A **webhook** is the trigger: a Hub URL for one source, bound to one Environment. The
-trigger looks at nothing but the webhook the request arrived on.
+A **webhook** is the trigger: a Hub URL for one source, bound to one Environment, with
+the **event types** it wants. The rule is deterministic and looks at metadata only
+(never at free text).
 
-- `POST /webhooks` (Hub token) with `source`, a target `environmentId` and an optional
-  label. Hub generates a random `webhookId` (the URL is `/webhook/<source>/<webhookId>`)
-  and a signing secret, and returns the URL and secret once; the user pastes both into
-  the vendor's webhook settings. `GET /webhooks` lists them without secrets;
-  `DELETE /webhooks/<id>` removes one. A new secret means a new webhook.
-- Which events and which repositories, teams, channels or projects are sent is chosen
-  **in the vendor's webhook settings**. Hub does not match on event type, scope or
-  content in V1. An adapter still drops an event it cannot normalize (`204`, no record).
+- `POST /webhooks` (Hub token) with `source`, a target `environmentId`, `events` (one or
+  more types from that source's catalog, below) and an optional label. Hub generates a
+  random `webhookId` (the URL is `/webhook/<source>/<webhookId>`) and a signing secret,
+  and returns the URL and secret once; the user pastes both into the vendor's webhook
+  settings. `PATCH /webhooks/<id>` changes `events`; `GET /webhooks` lists them without
+  secrets; `DELETE /webhooks/<id>` removes one. A new secret means a new webhook.
+- **Event-type catalog.** Each adapter owns a closed catalog in `packages/contract`:
+  normalized types such as `pull_request.merged`, each with a label, an optional group
+  (the nested "Pull request" → Opened, Pushed, Merged choice in a picker) and a fixed
+  rule that maps the vendor's event, its action and a few metadata fields (a merged or
+  draft flag, a review state, a conclusion) to that type. One vendor event can map to
+  several types (a pull request closed with `merged: true` is `pull_request.merged`).
+  The same catalog drives Hub's check and any picker Pie shows, so they cannot drift.
+- The adapter normalizes an arriving request to a catalog type; Hub drops it (`204`,
+  no record) when the type is not in the webhook's `events`. The vendor's own webhook
+  settings can narrow what it sends, but Hub does not rely on that.
 - Two Environments that want the same repository use two webhooks, each registered with
   the vendor: explicit, with no ambiguity to resolve.
-- Finer matching can be added later as an optional `where` on a webhook (event type or
-  scope attributes declared by the adapter); it is not designed now. Matching on content
-  is the consumer's filter (section 7), never part of the trigger.
+- **Not in the trigger:** matching on scope (which repository, team, channel, label) or
+  on content. Scope can be added later as an optional `where` on a webhook; content
+  belongs to the consumer's filter (section 7).
 - The daemon keeps no list of triggers and `hub.hello` carries none; Hub's webhook table
   is the single source. The daemon decides locally what to do with an event, by the
-  `webhookId` it carries (section 7).
+  `webhookId` and `type` it carries (section 7).
 
 ### Routing
 
 An event arriving on `/webhook/<source>/<webhookId>` is handled in this order: an
 unknown or disabled webhook is `404` and records nothing; the adapter verifies the
-request with that webhook's secret; the event goes to the webhook's Environment and
-is delivered, held or ended as in section 6. Revoking an Environment disables its
+request with that webhook's secret and normalizes it to a catalog type; a type not in
+the webhook's `events` is dropped; otherwise the event goes to the webhook's
+Environment and is delivered, held or ended as in section 6. Revoking an Environment disables its
 webhooks in the same transaction. Hub never fans an event out or chooses an
 Environment by arrival order, load or "first online". `hub` events (`POST /events`)
 name their target Environment explicitly.
@@ -299,14 +309,24 @@ assert them. A generic webhook has the same shape: a Hub-generated secret per we
 
 #### GitHub adapter
 
-Only `issue_comment.created`, `pull_request_review_comment.created` and
-`issues.labeled` are eligible. Verify HMAC-SHA256 over the bounded raw body with
-constant-time comparison **before** decoding. Require event/delivery headers and JSON
-content type. The normalized payload carries repository, actor, issue number and URL,
-title and event body; body is limited to 16,000 characters and title to 256, and
-oversized context is rejected, not truncated. Who may trigger (an actor allowlist) and
-whether a comment mentions Pie are the consumer's filter (section 7), not the
-trigger's.
+Verify HMAC-SHA256 over the bounded raw body with constant-time comparison **before**
+decoding. Require event/delivery headers and JSON content type. The normalized payload
+carries repository, actor, issue or pull request number and URL, title and event body;
+body is limited to 16,000 characters and title to 256, and oversized context is
+rejected, not truncated. Who may trigger (an actor allowlist) and whether a comment
+mentions Pie are the consumer's filter (section 7), not the trigger's.
+
+Proposed catalog (Phase 2; each rule is confirmed against GitHub's current webhook
+documentation when the adapter is built, and the list may grow):
+
+| Group                | Types                                                                           |
+| -------------------- | ------------------------------------------------------------------------------- |
+| Pull request         | `pull_request.opened`, `.draft_opened`, `.pushed`, `.merged`                    |
+| Comments             | `issue_comment.created`, `pull_request_review_comment.created`                  |
+| Reviews              | `pull_request_review.approved`, `.changes_requested`, `.commented`              |
+| Review threads       | `review_thread.resolved`, `.unresolved`                                         |
+| Checks and workflows | `check_suite.completed`, `workflow_run.completed` (success or failure variants) |
+| Other                | `issues.labeled`, `push.branch`                                                 |
 
 ## 5. Wire contract
 
@@ -636,19 +656,19 @@ The [host-write gate](../../.agents/rules/topics/persistence.md) requires Develo
 confirmation before formats are chosen. This is a candidate, not an approved plan;
 after approval update [host-persistence.md](../host-persistence.md) in each slice.
 
-| Location / owner                                                  | Data, scope and lifecycle                                                                                                                                          |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Hub SQLite `webhooks` (Phase 2)                                   | Webhook id, source, target Environment UUID, signing secret (raw, because HMAC needs it; the database is `0600`, shown once), disabled flag, creation time         |
-| Hub SQLite `environments`                                         | Environment UUID, credential hash, hold flag, state, creation time                                                                                                 |
-| Hub SQLite `enrollment_tokens`                                    | Token hash, expiry and used flag, at most ten unused; swept by the hold interval                                                                                   |
-| Hub SQLite `events`                                               | Event id (carries source and delivery id), normalized event, routing outcome, attempts, `expiresAt`; no raw body or headers; payload cleared at a terminal outcome |
-| Hub `conversation_routes` (later)                                 | Conversation key to Environment UUID only                                                                                                                          |
-| Daemon `$PIE_HOME/hub/enrollment.json`, target daemon writer only | Origin, Environment UUID, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                                      |
-| Daemon `$PIE_HOME/hub/webhooks.json` (Phase 3)                    | `webhookId` to Schedule mapping, filter and `reply` opt-in; no prompt, path or credential                                                                          |
-| Daemon `$PIE_HOME/hub/events/<eventId>.json`                      | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                    |
-| Daemon `$PIE_HOME/hub/inbox/<eventId>.json` (Phase 3, proposed)   | Bounded normalized event for the started agent to read; `0600`, removed when the run settles, orphans swept at startup; no copy in the receipt                     |
-| Daemon `$PIE_HOME/hub/conversations/<sha256(key)>.json` (later)   | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                                |
-| Existing Schedule files                                           | **No change.** Reason `manual`, effective prompt in the run snapshot; existing 20-run retention and fired counter remain                                           |
+| Location / owner                                                  | Data, scope and lifecycle                                                                                                                                                                                                 |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hub SQLite `webhooks` (Phase 2)                                   | Webhook id, source, target Environment UUID, event types (a non-empty JSON list from the source's catalog), signing secret (raw, because HMAC needs it; the database is `0600`, shown once), disabled flag, creation time |
+| Hub SQLite `environments`                                         | Environment UUID, credential hash, hold flag, state, creation time                                                                                                                                                        |
+| Hub SQLite `enrollment_tokens`                                    | Token hash, expiry and used flag, at most ten unused; swept by the hold interval                                                                                                                                          |
+| Hub SQLite `events`                                               | Event id (carries source and delivery id), normalized event, routing outcome, attempts, `expiresAt`; no raw body or headers; payload cleared at a terminal outcome                                                        |
+| Hub `conversation_routes` (later)                                 | Conversation key to Environment UUID only                                                                                                                                                                                 |
+| Daemon `$PIE_HOME/hub/enrollment.json`, target daemon writer only | Origin, Environment UUID, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                                                                                             |
+| Daemon `$PIE_HOME/hub/webhooks.json` (Phase 3)                    | `webhookId` to Schedule mapping, filter and `reply` opt-in; no prompt, path or credential                                                                                                                                 |
+| Daemon `$PIE_HOME/hub/events/<eventId>.json`                      | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                                                                           |
+| Daemon `$PIE_HOME/hub/inbox/<eventId>.json` (Phase 3, proposed)   | Bounded normalized event for the started agent to read; `0600`, removed when the run settles, orphans swept at startup; no copy in the receipt                                                                            |
+| Daemon `$PIE_HOME/hub/conversations/<sha256(key)>.json` (later)   | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                                                                                       |
+| Existing Schedule files                                           | **No change.** Reason `manual`, effective prompt in the run snapshot; existing 20-run retention and fired counter remain                                                                                                  |
 
 ### Hub SQLite schema (Phase 1; candidate)
 
@@ -823,9 +843,9 @@ Phase 1 needs 1 to 3 only; the rest can wait.
    are allowed at all.
 7. **Control surface (Phase 3):** Hub HTTP only (here) or also adapter-emitted
    commands such as a comment asking Pie to stop?
-8. **Trigger (Phase 2):** a webhook URL bound to one Environment, with event and scope
-   chosen in the vendor's settings and finer matching left for later (section 4),
-   rather than Hub-side subscriptions with attribute matching?
+8. **Trigger (Phase 2):** a webhook URL bound to one Environment plus a deterministic
+   selection of event types from the source's catalog (section 4), with scope and
+   content matching left for later and for the consumer's filter?
 9. **Filter (Phase 3):** evaluated by the daemon before any run (recommended) with
    literal and glob matching and a required actor allowlist, regular expressions or not,
    and a later optional model judge (section 7)? Or leave it to the agent after it

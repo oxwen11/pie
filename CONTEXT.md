@@ -120,7 +120,7 @@ One verified, normalized external occurrence, identified by `eventId` derived fr
 _Avoid_: eventId as sessionId, bare SessionRef across Environments, exactly-once agent effects, raw webhook request
 
 **Hub webhook**:
-The trigger: a Hub URL for one source, bound to one Environment. Hub looks only at which webhook an event arrived on; which events and scopes the vendor sends is set in the vendor's webhook settings. Conditions on an event's content belong to the consumer's filter, not the trigger.
+The trigger: a Hub URL for one source, bound to one Environment, with the event types it wants chosen from that source's closed catalog (for example `pull_request.merged`). The rule is deterministic and uses event metadata only. Conditions on an event's content belong to the consumer's filter, not the trigger.
 _Avoid_: Hub-side matching on event content, fan-out to several Environments, treating a new Hub enrollment as automatic authorization for old Schedules
 
 **Conversation**:
