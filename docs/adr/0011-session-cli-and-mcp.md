@@ -25,11 +25,15 @@ pull-request services. Neither door owns a store.
   deleted through CLI, oRPC, or MCP; archive is the only way to put one away.
 - `pie mcp` prints a bearer derived from the daemon token. It is not the daemon
   credential, so it opens `/mcp` and nothing under `/api/`.
+  Under `pie serve` there is no daemon token: `/mcp` is still mounted but accepts only the
+  per-process tokens issued to in-process Pi, and `pie mcp` has nothing to derive.
+- `tools/list` publishes each tool's input schema (Effect Schema through
+  `EffectSchemaToJsonSchemaConverter`). A model has no other way to learn the arguments.
 - `pr` is a Session's saved PR association (`link`, `ls`, `exclude`). `pullRequest` is the GitHub pull request. Do not use one name for both.
 - Session is the default CLI object. Use `pie ls`, not `pie session ls`.
   `pie session queue` is a full replace of `session.queue` (`steering` and
   `followUp`; empty arrays clear it). Schedule verbs match `scheduleContract`:
-  list, get, create, update, delete, runNow. There is no pause verb and no
+  list, get, create, update, rm, run. There is no pause verb and no
   heartbeat. A recurring prompt into an existing Session is a Schedule with
   `session.policy: "existing"`.
 - Project list and create call `project.ls` and `project.create`. They do not
