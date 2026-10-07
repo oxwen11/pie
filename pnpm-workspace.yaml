@@ -100,10 +100,9 @@ overrides:
   # @types/node stays on the catalog so workspace packages and tools share
   # one Node types package.
   vite: "catalog:"
-  # Vite 8.3.1 vendors a dev runtime built with Rolldown 1.2.9
-  # (`registerFactory(id, kind, fn)` / `factory.fn`). Its range `~1.2.9`
-  # also installs 1.2.10+, which stores a bare function; lazy routes then
-  # throw `factory.fn is not a function`.
+  # Rolldown 1.2.11+ changes registerFactory from (id, kind, fn) to
+  # (id, fn). Pin Vite's copy to 1.2.9 so the compiler and DevRuntime
+  # stay on one shape. electron-vite keeps its own Rolldown.
   "vite>rolldown": 1.2.9
   vitest: "catalog:"
   "@vitest/browser-playwright": "catalog:"
