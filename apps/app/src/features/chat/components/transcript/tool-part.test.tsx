@@ -49,6 +49,26 @@ describe("ToolPart", () => {
     await expect.element(page.getByText("bash pnpm test")).toBeVisible();
   });
 
+  it("renders a codemode script as a code block, not a JSON dump", async () => {
+    await render(
+      <ToolPart
+        part={{
+          type: "tool-codemode",
+          toolCallId: "codemode-1",
+          state: "output-available",
+          input: { code: "const out = await tools.read(args); return text(out);" },
+          output: { content: [] as [], details: { calls: [] } },
+        }}
+      />,
+    );
+
+    await page.getByText("codemode").click();
+    await expect
+      .element(page.getByRole("code"))
+      .toHaveTextContent("const out = await tools.read(args); return text(out);");
+    await expect.element(page.getByText('"code"')).not.toBeInTheDocument();
+  });
+
   it("does not render generic tool output", async () => {
     await render(
       <ToolPart
