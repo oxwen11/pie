@@ -119,9 +119,9 @@ _Avoid_: relay, second daemon, Hub-owned Schedule store, workflow engine, per-us
 One verified, normalized external occurrence, identified by `eventId` derived from the source delivery id. Delivery is at-least-once with a receipt on the daemon; a retry is the same event, and an uncertain outcome is not permission to repeat its effects. An offline Environment may have events held (opt-in, bounded, 24 hours).
 _Avoid_: eventId as sessionId, bare SessionRef across Environments, exactly-once agent effects, raw webhook request
 
-**Hub subscription**:
-A consumer-declared trigger: a source plus attribute conditions (the event type and a scope such as repository, team, workspace or project), never event content, stored on the daemon and advertised to Hub in hello. Hub routes an event only to exactly one matching subscription. A later phase may attach a manual Schedule; the Schedule file is unchanged.
-_Avoid_: a Schedule `trigger` field, a second job definition, treating a new Hub enrollment as automatic authorization for old Schedules
+**Hub webhook**:
+The trigger: a Hub URL for one source, bound to one Environment. Hub looks only at which webhook an event arrived on; which events and scopes the vendor sends is set in the vendor's webhook settings. Conditions on an event's content belong to the consumer's filter, not the trigger.
+_Avoid_: Hub-side matching on event content, fan-out to several Environments, treating a new Hub enrollment as automatic authorization for old Schedules
 
 **Conversation**:
 The continuity of one external thread (for example a GitHub issue), recorded by the target daemon as `conversationKey -> Session`. Hub names it only by an opaque key and never sends or receives a `SessionRef`; a Session a person created is not part of any conversation.
