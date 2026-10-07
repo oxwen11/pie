@@ -28,7 +28,6 @@ import {
 
 import { piBashExtension } from "../bash";
 import { applyFffNodePath, FFF_OVERRIDE_FLAGS, fffExtensionEntry } from "../fff";
-import { sessionToolsExtensionFactory } from "../session-tools-extension";
 import { runRpcMode } from "./rpc-mode";
 
 process.title = "pie-pi-process";
@@ -39,6 +38,9 @@ if (!fs.existsSync(bundledFff)) {
   throw new Error(`bundled fff island missing: ${bundledFff}`);
 }
 applyFffNodePath(process.env, import.meta.filename);
+
+const mcpExtensionPath = (flag: boolean | string | undefined): string[] =>
+  typeof flag === "string" && flag.length > 0 ? [flag] : [];
 
 const openSessionManager = async (sessionId: string | undefined, cwd: string) => {
   if (sessionId !== undefined) {
@@ -66,12 +68,11 @@ export const main = async (): Promise<void> => {
       modelRuntimeSignal: AbortSignal.timeout(15_000),
       extensionFlagValues: FFF_OVERRIDE_FLAGS,
       resourceLoaderOptions: {
-        extensionFactories: [
-          ...builtInExtensions,
-          piBashExtension(options.cwd),
-          sessionToolsExtensionFactory,
+        extensionFactories: [...builtInExtensions, piBashExtension(options.cwd)],
+        additionalExtensionPaths: [
+          bundledFff,
+          ...mcpExtensionPath(parsed.unknownFlags.get("pie-mcp-extension")),
         ],
-        additionalExtensionPaths: [bundledFff],
       },
     });
     const resolved = resolveCliModel({

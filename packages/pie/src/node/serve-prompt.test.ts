@@ -145,11 +145,11 @@ describe("shipped pie serve prompt", () => {
     expect(Array.isArray(models.models)).toBe(true);
 
     const project = await client.project.create({ path: workspace });
-    const created = await client.agent.session.create({ projectId: project.id });
-    const events = await client.agent.session.subscribe({
+    const created = await client.session.create({ projectId: project.id });
+    const events = await client.session.subscribe({
       scope: { kind: "session", ref: created.ref },
     });
-    await client.agent.session.prompt({
+    await client.session.send({
       ref: created.ref,
       parts: [{ type: "text", text: "ping" }],
     });
@@ -167,6 +167,6 @@ describe("shipped pie serve prompt", () => {
     }
     expect(ended).toBe(true);
     expect(streamed).toContain("pong");
-    await client.agent.session.close({ ref: created.ref });
+    await client.session.close({ ref: created.ref });
   });
 });

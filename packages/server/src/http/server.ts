@@ -12,6 +12,7 @@ import { createRpcRuntime, createWsRPCHandler, type RpcRuntime } from "../rpc";
 import { makeRequestApp } from "./app";
 import { createTicketStore, type TicketStore } from "./auth";
 import { isAllowedOrigin, isLoopbackHost } from "./cors";
+import { deriveMcpToken } from "./mcp";
 import { createPairingStore, type PairingStore } from "./pairing";
 import { createUIHandler, type UIApp } from "./ui";
 
@@ -275,6 +276,10 @@ const buildServer = (
           allowedHosts,
           tickets,
           pairing,
+          mcp: {
+            token: authToken === undefined ? undefined : deriveMcpToken(authToken),
+            context: rpcRuntime.context,
+          },
           environmentId: resolvedEnvironmentId,
           shutdown,
           registerElectron:

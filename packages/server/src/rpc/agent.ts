@@ -5,7 +5,6 @@ import { PiAgentService } from "../pi/agent-service";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";
-import { sessionRouter } from "./session";
 
 const orpc = implement(agentContract).$context<RpcContext>();
 
@@ -56,7 +55,6 @@ export const agentRouter = orpc.router({
       }),
     );
   }),
-  session: sessionRouter,
 });
 
 export type AgentRouter = typeof agentRouter;

@@ -7,7 +7,7 @@ description: Isolated launch/doctor/drive/cleanup for the Pie web chat UI (Vite 
 
 Pie's primary user surface is the **web chat SPA** in `apps/app`. A local Node server (`packages/pie` → `pie serve`) owns Projects, Sessions, and the oRPC WebSocket. Vite on **4190** proxies `/api` and `/ws/rpc` to the server on **4180**. Desktop (`apps/desktop`) is a second host of the same SPA — do not drive it with this skill; use `.cursor/skills/verify-pie-desktop`. The CLI daemon is `.cursor/skills/verify-pie-cli`.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify web`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash. Not Bun** — Pie, `tsx`, `pnpm`, and the daemon are Node 24.
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify web`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash.** The helper `pie-verify` is Node 24. Source `pie serve` is Node (`node --experimental-transform-types --import ../../tools/node/register-ts-hook.mjs src/node/cli.ts` from `packages/pie`).
 
 ## Launch
 
@@ -115,7 +115,7 @@ Stable handles (from source, not guesses):
 | Session heading | window titlebar heading is the session title (prompt text after create) or **New chat**; project is an icon labeled **Project: \<name\>**, not text beside the title |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
 
-Do not call `agent.session.create` / `project.create` over raw RPC to "skip" the UI. Those are the production procedures the page already uses; driving them from a script is not a user path. After a UI action, **do** read `$PIE_HOME` to confirm the side effect.
+Do not call `session.create` / `project.create` over raw RPC to "skip" the UI. Those are the production procedures the page already uses; driving them from a script is not a user path. After a UI action, **do** read `$PIE_HOME` to confirm the side effect.
 
 `pi` (the coding agent binary) is required only for assistant streaming. Session create, the user bubble, and sidebar rows must still happen if `pi` is missing — expect **Model request failed** / **Thinking…** then an error, not a missing `/session/<uuid>`.
 

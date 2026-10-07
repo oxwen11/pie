@@ -7,3 +7,4 @@ export { daemonServeEnvironment, resolveServeConfig, runServe, serve, serveFlags
 export type { ServeConfig } from "./serve";
 export { createPairingStore, PAIRING_CODE_TTL_MS, parsePairingExchange } from "./pairing";
 export type { PairingMint, PairingSession, PairingStore } from "./pairing";
+export { deriveMcpToken, MCP_PATH } from "./mcp";

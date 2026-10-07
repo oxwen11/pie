@@ -2,6 +2,7 @@ import type {
   AgentToolResult,
   BashToolDetails,
   BashToolInput,
+  CodemodeToolDetails,
   EditToolDetails,
   EditToolInput,
   FindToolDetails,
@@ -37,6 +38,9 @@ export type PiTools = {
   grep: { input: GrepToolInput; output: AgentToolResult<GrepToolDetails> };
   find: { input: FindToolInput; output: AgentToolResult<FindToolDetails> };
   ls: { input: LsToolInput; output: AgentToolResult<LsToolDetails> };
+  // Ships with pi as a registered-but-inactive extension tool. Input inlined:
+  // CodemodeToolInput is not exported from the package root.
+  codemode: { input: { code: string }; output: AgentToolResult<CodemodeToolDetails> };
 };
 
 export type PieUserMetadata = {
@@ -76,5 +80,5 @@ export type PieAssistantUIMessage = UIMessage<PieAssistantMetadata, PieDataTypes
 export type PieUIMessage = PieUserUIMessage | PieAssistantUIMessage;
 export type PieUIMessageChunk = InferUIMessageChunk<PieUIMessage>;
 
-/** Pi's seven static tool parts plus extension/custom dynamic tools. */
+/** Pi's static tool parts plus extension/custom dynamic tools. */
 export type PieToolUIPart = ToolUIPart<PiTools> | DynamicToolUIPart;

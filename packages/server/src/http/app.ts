@@ -7,8 +7,10 @@ import { ByteSize, Effect } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/http";
 
 import { SessionImageAssets } from "../assets";
+import type { RpcContext } from "../rpc/context";
 import { bearerToken, type TicketStore, tokensMatch } from "./auth";
 import { corsHeaders, isLoopbackHost } from "./cors";
+import { handleMcp, MCP_PATH } from "./mcp";
 import { parsePairingExchange, type PairingStore } from "./pairing";
 import type { UIApp } from "./ui";
 
@@ -31,6 +33,12 @@ export type RequestAppOptions = {
   /** Present only for authenticated daemon mode. Must return before shutdown starts. */
   readonly shutdown: (() => void) | undefined;
   readonly registerElectron: ((registration: ElectronRegistration) => void) | undefined;
+  /**
+   * MCP door, always mounted. `token` is the bearer derived from the daemon
+   * token for `pie mcp`; it is undefined without one (`pie serve`), where only
+   * the per-process tokens issued to in-process Pi are accepted.
+   */
+  readonly mcp: { readonly token: string | undefined; readonly context: RpcContext };
   /** Everything the API routes below do not claim. */
   readonly ui: UIApp;
 };
@@ -143,6 +151,11 @@ const route = (
     // headers are computed, so a rebound request gets none of them.
     if (!isLoopbackHost(request.headers.host, options.allowedHosts)) {
       return forbidden;
+    }
+
+    // No CORS and no daemon token: it has its own bearer and refuses any Origin.
+    if (new URL(request.url, "http://localhost").pathname === MCP_PATH) {
+      return yield* handleMcp(options.mcp);
     }
 
     const headers = corsHeaders(request.headers.origin, {

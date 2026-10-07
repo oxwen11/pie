@@ -51,9 +51,9 @@ export function SessionActionsMenu({
   const [renaming, setRenaming] = useState(false);
 
   const setArchived = useMutation({
-    mutationKey: orpcQueryUtils.agent.session.archive.key(),
+    mutationKey: orpcQueryUtils.session.archive.key(),
     mutationFn: (archived: boolean) =>
-      orpcQueryUtils.agent.session.archive.call({
+      orpcQueryUtils.session.archive.call({
         ref: {
           projectId: session.projectId,
           sessionId: session.sessionId,
@@ -62,7 +62,7 @@ export function SessionActionsMenu({
       }),
     onSuccess: (_, archived) => {
       const listKey = (isArchived: boolean) =>
-        orpcQueryUtils.agent.session.list.queryOptions({
+        orpcQueryUtils.session.ls.queryOptions({
           input: { projectId: session.projectId, archived: isArchived },
         }).queryKey;
       const refreshLists = Promise.all([
@@ -102,7 +102,7 @@ export function SessionActionsMenu({
           </ContextMenuItem>
           <ContextMenuItem
             onClick={() => {
-              void orpcQueryUtils.agent.session.transcriptPath
+              void orpcQueryUtils.session.transcriptPath
                 .call({
                   ref: { projectId: session.projectId, sessionId: session.sessionId },
                 })

@@ -4,8 +4,8 @@ import type {
   PieUIMessage,
   SessionCapabilities,
   SessionPendingPrompt,
+  SessionRef,
 } from "@getpie/contract";
-import type { PullRequestRef, SessionPullRequestLink } from "@getpie/contract/pull-request";
 import { Context, Effect, type Scope, Stream } from "effect";
 
 import type {
@@ -110,17 +110,12 @@ export type PiAgentShape = {
 
 export class PiAgent extends Context.Service<PiAgent, PiAgentShape>()("PiAgent") {}
 
-/** Callbacks capture the validated SessionRef and await the Session service's durable writes. */
-export type PiSessionToolsShape = {
-  readonly list: Effect.Effect<ReadonlyArray<SessionPullRequestLink>, unknown>;
-  readonly register: (
-    ref: PullRequestRef,
-    restore: boolean,
-  ) => Effect.Effect<"linked" | "exists" | "excluded", unknown>;
-  readonly exclude: (ref: PullRequestRef) => Effect.Effect<void, unknown>;
-};
-
-/** Supplied at runtime acquisition, never a dependency of PiAgent's construction layer. */
-export class PiSessionTools extends Context.Service<PiSessionTools, PiSessionToolsShape>()(
-  "PiSessionTools",
-) {}
+/**
+ * The Session whose runtime is being acquired. Supplied by the Session service
+ * around acquisition, never by the model; the Pi adapter binds its MCP bearer
+ * to this ref so `pr_*` tools act on the caller's own Session.
+ */
+export class PiSessionIdentity extends Context.Service<
+  PiSessionIdentity,
+  { readonly ref: SessionRef }
+>()("PiSessionIdentity") {}

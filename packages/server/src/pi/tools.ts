@@ -2,6 +2,7 @@ import type {
   AgentToolResult,
   BashToolDetails,
   BashToolInput,
+  CodemodeToolDetails,
   EditToolDetails,
   EditToolInput,
   FindToolDetails,
@@ -60,9 +61,15 @@ export const ls = tool({
   inputSchema: z.custom<LsToolInput>(),
   outputSchema: z.custom<AgentToolResult<LsToolDetails>>(),
 });
+// Pi's codemode tool (registered but inactive until enabled). Input inlined:
+// CodemodeToolInput is not exported from the package root.
+export const codemode = tool({
+  inputSchema: z.custom<{ code: string }>(),
+  outputSchema: z.custom<AgentToolResult<CodemodeToolDetails>>(),
+});
 
-/** Registry of pi's built-in tools. Keys are the wire tool names. */
-export const piTools = { read, bash, edit, write, grep, find, ls } satisfies ToolSet;
+/** Registry of pi's built-in tools (codemode included). Keys are the wire tool names. */
+export const piTools = { read, bash, edit, write, grep, find, ls, codemode } satisfies ToolSet;
 
 export type PiTools = InferUITools<typeof piTools>;
 

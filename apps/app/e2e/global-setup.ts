@@ -9,9 +9,8 @@ import { DEFAULT_E2E_REPLY, e2ePiProcessEnv } from "@getpie/test/seed-e2e-pi-age
 
 const fromHere = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
-const repoRoot = fromHere("../../..");
 const cliEntry = fromHere("../../../packages/pie/src/node/cli.ts");
-const tsx = path.join(repoRoot, "node_modules/.bin/tsx");
+const sourceHook = fromHere("../../../tools/node/register-ts-hook.mjs");
 const fakeGh = fakeGhPath;
 
 const SAMPLE = "sample";
@@ -91,10 +90,21 @@ export default async function setup({
     PIE_DAEMON_COMPATIBILITY_KEY: "githash:00000000",
   };
 
-  const serve = childProcess.spawn(tsx, [cliEntry, "serve"], {
-    env,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
+  const serve = childProcess.spawn(
+    process.execPath,
+    [
+      "--experimental-transform-types",
+      "--disable-warning=ExperimentalWarning",
+      "--import",
+      sourceHook,
+      cliEntry,
+      "serve",
+    ],
+    {
+      env,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
   const httpBaseUrl = await waitReady(serve);
   const wsBaseUrl = httpBaseUrl.replace(/^http/, "ws");
 

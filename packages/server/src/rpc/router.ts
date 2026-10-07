@@ -6,8 +6,9 @@ import { gitRouter } from "./git";
 import { os } from "./orpc";
 import { packagesRouter } from "./packages";
 import { projectRouter } from "./project";
-import { pullRequestRouter } from "./pull-request";
+import { prRouter, pullRequestRouter } from "./pull-request";
 import { scheduleRouter } from "./schedule";
+import { sessionRootRouter, sessionRouter } from "./session";
 import { settingsRouter } from "./settings";
 import { skillsRouter } from "./skills";
 import { terminalRouter } from "./terminal";
@@ -15,6 +16,13 @@ import { terminalRouter } from "./terminal";
 const orpc = os.$context<RpcContext>();
 
 export const router = orpc.router({
+  run: sessionRootRouter.run,
+  send: sessionRootRouter.send,
+  ls: sessionRootRouter.ls,
+  logs: sessionRootRouter.logs,
+  wait: sessionRootRouter.wait,
+  interrupt: sessionRootRouter.interrupt,
+  session: sessionRouter,
   agent: agentRouter,
   assets: assetsRouter,
   project: projectRouter,
@@ -24,6 +32,7 @@ export const router = orpc.router({
   settings: settingsRouter,
   packages: packagesRouter,
   skills: skillsRouter,
+  pr: prRouter,
   pullRequest: pullRequestRouter,
   terminal: terminalRouter,
 });

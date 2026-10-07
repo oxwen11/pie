@@ -1,0 +1,21 @@
+diff --git a/dist/shared/orpc-mcp.DhbUTBkN.mjs b/dist/shared/orpc-mcp.DhbUTBkN.mjs
+index ee289f864f3b256193ba34ffbacddd0ea1863cab..fd449240790caa09bf9757ec042ac627b174e0f3 100644
+--- a/dist/shared/orpc-mcp.DhbUTBkN.mjs
++++ b/dist/shared/orpc-mcp.DhbUTBkN.mjs
+@@ -1,6 +1,15 @@
+ import { DelegatingJsonSchemaConverter, StandardJsonSchemaConverter } from '@orpc/json-schema';
+ import { walkProcedureContractsAsync, unlazy, getRouter, Procedure } from '@orpc/server';
+-import { tryDecodeURIComponent, toArray } from '@orpc/shared';
++import { toArray } from '@orpc/shared';
++
++// @orpc/shared 2.0.0-beta.42 no longer exports this helper.
++function tryDecodeURIComponent(value) {
++  try {
++    return decodeURIComponent(value);
++  } catch {
++    return value;
++  }
++}
+ 
+ function createMCPMetaPlugin(incoming) {
+   return {

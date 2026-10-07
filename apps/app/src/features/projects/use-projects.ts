@@ -5,7 +5,7 @@ import { useCallback } from "react";
 import { useCatalogOrpc } from "@/lib/environment-orpc";
 
 /**
- * Shared `project.list` readers. Writers are the import dialog and draft
+ * Shared `project.ls` readers. Writers are the import dialog and draft
  * allocate (both update this cache on success).
  */
 function useProjectListQuery<TData>(
@@ -13,7 +13,7 @@ function useProjectListQuery<TData>(
 ): UseQueryResult<TData> {
   const orpcQueryUtils = useCatalogOrpc();
   return useQuery({
-    ...orpcQueryUtils.project.list.queryOptions(),
+    ...orpcQueryUtils.project.ls.queryOptions(),
     select,
   });
 }
