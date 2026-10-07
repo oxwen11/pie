@@ -507,7 +507,7 @@ function daemonPid(meta: ReturnType<typeof readRunMeta>, runDir: string): number
   return pid;
 }
 
-/** pnpm/tsx launcher PID is not the process that samples or binds the port. */
+/** The launcher may be the listener, or a parent of the process that binds the port. */
 function runtimeListenPid(port: number, launcher: number | undefined): number {
   for (const pid of listenPids(port)) {
     if (!pidAlive(pid)) continue;

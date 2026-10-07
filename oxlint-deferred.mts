@@ -222,6 +222,9 @@ export const deferredUltraciteRules = {
 } as const;
 
 export const deferredVitestUltraciteRules = {
+  // Ultracite 7.12 turns this on. The repo mixes top-level `it` with `test`
+  // inside `describe`; rename in a later slice instead of this dependency bump.
+  "vitest/consistent-test-it": "off",
   "vitest/consistent-test-filename": "off",
   "vitest/max-expects": "off",
   "vitest/max-nested-describe": "off",
