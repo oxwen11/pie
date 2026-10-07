@@ -284,9 +284,9 @@ characters and title to 256, and oversized context is rejected, not truncated.
 
 HTTP: invalid signature or actor 403; malformed 400; oversized 413 (1 MiB); an
 unsupported action 204 with no record. A verified delivery gets 202 only after its
-event and routing outcome are durably stored; a duplicate delivery id with the same
-payload hash gets 200 with the existing safe receipt; the same id with a different
-hash is 409; storage failure is 503. The response never waits for a consumer.
+event and routing outcome are durably stored; a duplicate delivery id gets 200 with
+the existing safe receipt (delivery ids are GitHub-generated GUIDs under an HMAC, so
+Hub does not compare bodies); storage failure is 503. The response never waits for a consumer.
 
 ## 5. Wire contract
 
@@ -325,7 +325,8 @@ operator at enrollment or later):
   receipt) or relationship revocation. Hub stores the **verified, normalized
   event**, never the raw request or any header. On reconnect Hub delivers oldest
   first, per relationship, in order; a conflict or reject ack ends that event.
-- Caps: 1,000 events, 50 MiB and 100 per conversation key per relationship; at a cap
+- Caps: 1,000 held events per relationship (each payload is at most 64 KiB, which
+  bounds storage); at the cap
   new events are terminal `inbox_full` while already-held events still deliver.
   Turning hold off deletes held events.
 - Time: Hub sets `receivedAt` and never trusts a sender timestamp. A later phase's
@@ -583,15 +584,74 @@ after approval update [host-persistence.md](../host-persistence.md) in each slic
 | Location / owner                                                                 | Data, scope and lifecycle                                                                                                                                            |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hub SQLite `config`                                                              | Non-empty actor allowlist and default mention/label, operator-supplied; no empty seed. Operator bearer and GitHub secret come from the process environment, not rows |
-| Hub SQLite `relationships`                                                       | Relationship id, Environment UUID, label, credential hash, hold flag, state, timestamps, last cached subscriptions (no paths, prompts or credentials)                |
-| Hub SQLite `enrollment_tokens`                                                   | Token hash and expiry, at most ten pending; swept by the hold interval                                                                                               |
-| Hub SQLite `events`                                                              | Event id, source delivery id and raw-body SHA-256, normalized event, routing outcome, delivery state, attempts, `expiresAt`; no raw body or headers                  |
+| Hub SQLite `relationships`                                                       | Relationship id, Environment UUID, credential hash, hold flag, state, creation time, last cached subscriptions (no paths, prompts or credentials)                    |
+| Hub SQLite `enrollment_tokens`                                                   | Token hash, expiry and used flag, at most ten pending; swept by the hold interval                                                                                    |
+| Hub SQLite `events`                                                              | Event id (carries source and delivery id), normalized event, routing outcome, attempts, `expiresAt`; no raw body or headers; payload cleared at a terminal outcome   |
 | Hub `conversation_routes` (later)                                                | Conversation key to relationship id only                                                                                                                             |
 | Daemon `$PIE_HOME/hub/relationship.json`, target daemon writer only              | Origin, Environment UUID, relationship id, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                       |
 | Daemon `$PIE_HOME/hub/subscriptions.json`                                        | Subscriptions naming a relationship; no prompt, path or credential                                                                                                   |
 | Daemon `$PIE_HOME/hub/events/<relationshipId>/<eventId>.json`                    | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                      |
 | Daemon `$PIE_HOME/hub/conversations/<relationshipId>/<sha256(key)>.json` (later) | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                                  |
 | Existing Schedule files                                                          | **No change.** Reason `manual`, effective prompt in the run snapshot; existing 20-run retention and fired counter remain                                             |
+
+### Hub SQLite schema (Phase 1; candidate)
+
+Strict tables with constraints, minimal fields, no ORM; hand-written SQL in one store
+module, one function and transaction per operation. Times are Unix milliseconds set
+by Hub. `PRAGMA journal_mode=WAL`, `synchronous=FULL`, `foreign_keys=ON`; migrations
+are an ordered SQL list keyed by `PRAGMA user_version`. Later phases add tables
+(`config`, `conversation_routes`) without changing these.
+
+```sql
+CREATE TABLE relationships (
+  id              TEXT PRIMARY KEY,
+  environment_id  TEXT NOT NULL,
+  credential_hash BLOB,
+  state           TEXT NOT NULL CHECK (state IN ('active', 'revoked')),
+  hold            INTEGER NOT NULL DEFAULT 0 CHECK (hold IN (0, 1)),
+  subscriptions   TEXT NOT NULL DEFAULT '[]' CHECK (json_valid(subscriptions)),
+  created_at      INTEGER NOT NULL,
+  CHECK ((state = 'active') = (credential_hash IS NOT NULL AND length(credential_hash) = 32))
+) STRICT;
+CREATE UNIQUE INDEX relationships_live_env ON relationships (environment_id) WHERE state = 'active';
+
+CREATE TABLE enrollment_tokens (
+  token_hash BLOB PRIMARY KEY CHECK (length(token_hash) = 32),
+  expires_at INTEGER NOT NULL,
+  used       INTEGER NOT NULL DEFAULT 0 CHECK (used IN (0, 1))
+) STRICT;
+
+CREATE TABLE events (
+  event_id        TEXT PRIMARY KEY,
+  relationship_id TEXT REFERENCES relationships (id),
+  type            TEXT NOT NULL,
+  key             TEXT CHECK (length(key) <= 200),
+  payload         TEXT CHECK (payload IS NULL OR json_valid(payload)),
+  received_at     INTEGER NOT NULL,
+  expires_at      INTEGER NOT NULL,
+  outcome         TEXT CHECK (outcome IN ('accepted', 'duplicate', 'rejected', 'expired', 'no_route',
+                    'ambiguous_route', 'daemon_not_connected', 'inbox_full', 'revoked', 'hold_disabled')),
+  attempts        INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  CHECK (outcome IS NULL OR payload IS NULL)
+) STRICT;
+CREATE INDEX events_pending ON events (relationship_id, received_at);
+```
+
+- `outcome IS NULL` means pending. Terminal rows keep no payload but stay 48 hours as
+  the dedupe record (`event_id` is `<source>:<delivery id>` and is the primary key, so
+  a duplicate is an `INSERT ... ON CONFLICT DO NOTHING` that changes nothing).
+- The event row and its routing outcome commit in one transaction before any 202 or ack.
+  Backoff timers are in memory; after a restart pending rows redeliver oldest first on
+  reconnect, which at-least-once delivery already permits.
+- Enrollment is one transaction: token unused and unexpired, relationship inserted
+  (the partial unique index rejects an already-enrolled UUID), token marked used. A
+  retry with the same relationship id and credential hash after a lost ack succeeds.
+- Revoke, in one transaction: state `revoked`, credential hash cleared, pending events
+  `revoked` with payload cleared; sockets close afterwards. Turning hold off does the
+  same with `hold_disabled`.
+- The sweep marks pending rows past `expires_at` as `expired` with payload cleared and
+  deletes rows received more than 48 hours ago and expired tokens, in bounded batches.
+- Enum values are checked in the database and again by Effect Schema at the boundary.
 
 Candidate rules needing explicit approval:
 
@@ -661,8 +721,7 @@ Turbo tests. Focus on public seams:
 - Wrong UUID, replayed or expired enrollment token, lost enroll ack, duplicate
   socket, `4403` revocation, and a second Environment cannot read or ack the first's
   events. Enrollment or delivery with A's UUID on B fails before any write.
-- Duplicate source deliveries produce one event; the same id with a different body is
-  `409`; a lost ack redelivers and is handled once; restart each side at every write
+- Duplicate source deliveries produce one event; a lost ack redelivers and is handled once; restart each side at every write
   boundary. Hold respects TTL, caps, order and opt-out deletion; held events never
   contain raw bodies or headers.
 - Routing: zero, one, two matching Environments; two subscriptions in one; stale
