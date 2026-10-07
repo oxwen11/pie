@@ -2,10 +2,10 @@ import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 import { readUIMessageStream } from "ai";
 import { describe, expect, it } from "vitest";
 
-import { entriesToUIMessages } from "../../../src/harness/pi/history";
-import type { AgentSessionEvent } from "../../../src/harness/pi/protocol";
-import { createPiTransform } from "../../../src/harness/pi/transform";
-import type { PiUIMessage, PiUIMessageChunk } from "../../../src/harness/pi/ui-message";
+import { entriesToUIMessages } from "../../../src/pi/history";
+import type { AgentSessionEvent } from "../../../src/pi/protocol";
+import { createPiTransform } from "../../../src/pi/transform";
+import type { PiUIMessage, PiUIMessageChunk } from "../../../src/pi/ui-message";
 
 const entry = (value: unknown) => value as SessionEntry;
 
@@ -556,6 +556,52 @@ describe("entriesToUIMessages", () => {
       "s1",
     );
     expect(messages.map((message) => message.id)).toEqual(["u1", "a1"]);
+  });
+
+  it("closes the assistant run on a hidden background bash notice", () => {
+    const messages = entriesToUIMessages(
+      [
+        userEntry("u1", null, "go", "2026-01-01T00:00:00.000Z"),
+        assistantEntry(
+          "a1",
+          "u1",
+          [{ type: "text", text: "STARTED" }],
+          {},
+          "2026-01-01T00:00:02.000Z",
+        ),
+        entry({
+          type: "custom_message",
+          id: "n1",
+          parentId: "a1",
+          timestamp: "2026-01-01T00:00:20.000Z",
+          customType: "pie.bash.background",
+          content: "Background command 1 finished",
+          display: false,
+        }),
+        assistantEntry(
+          "a2",
+          "n1",
+          [{ type: "text", text: "NOTICED" }],
+          {},
+          "2026-01-01T00:00:21.000Z",
+        ),
+      ],
+      "a2",
+      "s1",
+    );
+    expect(messages.map((message) => ({ id: message.id, role: message.role }))).toEqual([
+      { id: "u1", role: "user" },
+      { id: "a1", role: "assistant" },
+      { id: "a2", role: "assistant" },
+    ]);
+    expect(messages[1]?.parts).toEqual([{ type: "text", text: "STARTED", state: "done" }]);
+    expect(messages[2]?.parts).toEqual([{ type: "text", text: "NOTICED", state: "done" }]);
+    expect(messages[1]?.metadata).toMatchObject({
+      messageEndTimestamp: "2026-01-01T00:00:02.000Z",
+    });
+    expect(messages[2]?.metadata).toMatchObject({
+      messageEndTimestamp: "2026-01-01T00:00:21.000Z",
+    });
   });
 
   it("matches the live transform's folded message part-for-part (no steer)", async () => {

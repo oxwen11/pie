@@ -4,7 +4,7 @@ import url from "node:url";
 
 import { Effect, FileSystem } from "effect";
 
-import { findExecutable, type FindExecutableDeps } from "../executable";
+import { findExecutable, type FindExecutableDeps } from "../harness/executable";
 
 /** How the server spawns pie-pi-process. */
 export type PiExecutable = {

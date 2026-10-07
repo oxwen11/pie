@@ -4,9 +4,9 @@ import { Cause, Context, Effect, Layer, ManagedRuntime, Option } from "effect";
 import type { WebSocket } from "ws";
 
 import { ResourceMonitoring, ResourceMonitoringDisabled } from "../observability/resources";
+import { AgentRuntimeLayer } from "../runtime";
 import type { RpcContext } from "./context";
 import { router } from "./router";
-import { AgentRuntimeLayer } from "./runtime";
 
 /**
  * Wrap every `.effect()` procedure. The oRPC effect bridge applies

@@ -30,7 +30,7 @@ import {
   Scope,
   Semaphore,
 } from "effect";
-import { ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcessSpawner } from "effect/process";
 
 import { LoginShellEnvironment } from "../server/login-shell-environment";
 

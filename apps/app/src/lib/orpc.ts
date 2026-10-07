@@ -98,8 +98,10 @@ export function createEnvironmentOrpc(
     staleTime: 30_000,
   });
   // App default refetches on focus, which would spawn a Pi process each time.
+  // Pickers and the draft render a listing failure inline with their own Retry.
   queryClient.setQueryDefaults(orpc.agent.listModels.key(), {
     refetchOnWindowFocus: false,
+    meta: { errorMode: "inline" },
   });
   queryClient.setQueryDefaults(orpc.agent.commands.key(), {
     refetchOnWindowFocus: false,

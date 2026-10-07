@@ -8,7 +8,7 @@ import url from "node:url";
 import { describe, it } from "vitest";
 
 import { copyFffIsland } from "../../../scripts/copy-fff";
-import { fffNodePathEnv } from "../../../src/harness/pi/fff";
+import { fffNodePathEnv } from "../../../src/pi/fff";
 
 const processBundle = url.fileURLToPath(
   new URL("../../../dist/pi-process/pi-process.js", import.meta.url),

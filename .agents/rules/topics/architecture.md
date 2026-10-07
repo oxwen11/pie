@@ -12,6 +12,7 @@ Dependencies flow from app/runtime packages toward shared leaves, not back:
 | `packages/contract` | Shared wire vocabulary and Effect schemas; no runtime/app dependencies |
 | `packages/server` | Domain services, Pi runtime, RPC, HTTP/WS, daemon |
 | `packages/client` | Typed oRPC WebSocket client |
+| `packages/orpc-cli` | Opt-in oRPC CLI metadata, with Commander and Effect CLI adapters. Not the product `pie` CLI. |
 | `packages/ui` | Shared UI; import through package subpaths |
 | `packages/ssh` | SSH launch and loopback tunnels; no Electron, renderer, or oRPC |
 | `packages/tailscale` | Discovery/Serve integration; no Electron, renderer, or oRPC; never log CLI stderr |
@@ -35,7 +36,7 @@ extraction does not require expanding a package's public surface.
 - `PiAgentSessionService` owns orchestration, native-id translation, metadata,
   validation, and collection events. The RPC router resolves workspace context
   and maps errors; avoid duplicating that domain logic there.
-- `packages/server/src/rpc/runtime.ts` composes the runtime. Session code lives
+- `packages/server/src/runtime.ts` composes the runtime. Session code lives
   under `packages/server/src/harness/`; the directory name is legacy, not support
   for multiple agents. Layer lifetime constraints are in [runtime.md](runtime.md).
 

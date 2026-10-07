@@ -1,3 +1,4 @@
+import { BACKGROUND_BASH_CUSTOM_TYPE } from "./bash";
 import type { SessionEntry, SessionMessageEntry } from "./protocol";
 import { adaptPiToolResult } from "./tool-result";
 import { isDynamicPiTool } from "./tools";
@@ -280,6 +281,12 @@ export function entriesToUIMessages(
 
   for (const entry of rebuildBranch(entries, leafId)) {
     if (entry.type !== "message") {
+      // A background-bash notice is model context, not a transcript bubble,
+      // but it starts a new run. Close the open assistant so the reply does
+      // not merge into the previous one after reload.
+      if (entry.type === "custom_message" && entry.customType === BACKGROUND_BASH_CUSTOM_TYPE) {
+        assistant = null;
+      }
       // Skipped entry kinds (ADR 0003): bookkeeping, extension state, and the
       // summaries/custom_message gap deferred to their own ticket. The
       // satisfies keeps the list exhaustive — a new entry type fails

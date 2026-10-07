@@ -1,15 +1,8 @@
-import {
-  type DaemonCompatibilityKey,
-  decodeDaemonCompatibilityKey,
-} from "@getpie/core/compatibility";
+import { type DaemonDiscoveryRecord, parseDaemonDiscoveryRecord } from "@getpie/core/compatibility";
 import { writeFileAtomic } from "@getpie/effect-json-store";
 import { Effect, FileSystem, type PlatformError } from "effect";
 
 import { daemonRecordPath } from "./paths";
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
 
 /**
  * The discovery record the launcher writes to `$PIE_DAEMON_DIR/daemon.pid`
@@ -18,18 +11,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * log. It is the single-instance marker: staleness is decided by "is the pid alive",
  * never a lock the server holds. The server itself never reads or writes it.
  */
-export type DaemonRecord = {
-  /** The detached server process's pid. */
-  readonly pid: number;
-  /** Where the daemon listens, e.g. `http://127.0.0.1:41234`. */
-  readonly address: string;
-  /** The auth token the daemon was started with; front-doors read it from here. */
-  readonly token: string;
-  /** Epoch millis the record was written. */
-  readonly startedAt: number;
-  /** Exact-match compatibility class; absent on legacy or malformed records. */
-  readonly compatibilityKey?: DaemonCompatibilityKey;
-};
+export type DaemonRecord = DaemonDiscoveryRecord;
 
 /** Read and validate the record, or `undefined` if missing/garbage. */
 export const readRecord = (
@@ -45,24 +27,7 @@ export const readRecord = (
     const parsed = yield* Effect.try((): unknown => JSON.parse(raw)).pipe(
       Effect.orElseSucceed(() => undefined),
     );
-    if (!isRecord(parsed)) return undefined;
-
-    const candidate = parsed;
-    if (
-      typeof candidate.pid === "number" &&
-      typeof candidate.address === "string" &&
-      typeof candidate.token === "string"
-    ) {
-      const compatibilityKey = decodeDaemonCompatibilityKey(candidate.compatibilityKey);
-      return {
-        pid: candidate.pid,
-        address: candidate.address,
-        token: candidate.token,
-        startedAt: typeof candidate.startedAt === "number" ? candidate.startedAt : 0,
-        ...(compatibilityKey === undefined ? undefined : { compatibilityKey }),
-      };
-    }
-    return undefined;
+    return parseDaemonDiscoveryRecord(parsed);
   });
 
 /**

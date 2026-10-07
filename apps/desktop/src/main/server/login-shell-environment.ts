@@ -1,5 +1,5 @@
 import { Context, Effect, Option } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 const SHELL_TIMEOUT_MS = 5_000;
 const LAUNCHCTL_TIMEOUT_MS = 2_000;

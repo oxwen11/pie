@@ -5,7 +5,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Effect, FileSystem } from "effect";
 
-import { listAvailablePiModels } from "../../../src/harness/pi/list-available-models";
+import { listAvailablePiModels } from "../../../src/pi/list-available-models";
 
 layer(NodeServices.layer)("listAvailablePiModels", (it) => {
   it.effect("includes models registered by Project extensions", () =>

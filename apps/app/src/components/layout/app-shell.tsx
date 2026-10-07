@@ -32,6 +32,8 @@ interface AppShellContextValue {
     readonly maximized: boolean;
     /** Switch the content panel between maximized and docked presentation. */
     readonly setMaximized: (maximized: boolean) => void;
+    /** Titlebar slot above the content-panel column; hosts its tab strip. */
+    readonly titleTarget: HTMLDivElement | null;
   };
 }
 
@@ -112,15 +114,17 @@ export function AppShellBody({ children }: AppShellBodyProps) {
     (maximized: boolean) => session?.setPresentation(maximized ? "maximized" : "docked"),
     [session],
   );
+  const [contentTitleTarget, setContentTitleTarget] = useState<HTMLDivElement | null>(null);
   const context = useMemo(
     () => ({
       contentPanel: {
         visible: hasVisibleContentPanel,
         maximized: isContentPanelMaximized,
         setMaximized: setContentPanelMaximized,
+        titleTarget: contentTitleTarget,
       },
     }),
-    [hasVisibleContentPanel, isContentPanelMaximized, setContentPanelMaximized],
+    [hasVisibleContentPanel, isContentPanelMaximized, setContentPanelMaximized, contentTitleTarget],
   );
 
   const platform = usePlatform();
@@ -128,22 +132,44 @@ export function AppShellBody({ children }: AppShellBodyProps) {
   const { isMobile } = useSidebar();
   const [titleTarget, setTitleTarget] = useState<HTMLDivElement | null>(null);
   const shellRef = useRef<HTMLDivElement>(null);
-  const measureLeading = useCallback((shell: HTMLDivElement) => {
+  const measure = useCallback((shell: HTMLDivElement) => {
+    const left = shell.getBoundingClientRect().left;
+    let leading = 0;
     const toggle = shell.querySelector<HTMLElement>("[aria-label='Toggle Sidebar']");
-    if (toggle === null) return;
-    const leading = toggle.getBoundingClientRect().right - shell.getBoundingClientRect().left + 8;
-    shell.style.setProperty("--shell-leading", `${leading}px`);
+    if (toggle !== null) {
+      leading = toggle.getBoundingClientRect().right - left + 8;
+      shell.style.setProperty("--shell-leading", `${leading}px`);
+    }
+    // The content slot spans the panel column up to the trailing toggle. The
+    // toggle sits after the title's reserve margin, so zero the reserve before
+    // reading: one pass, no feedback loop with the value this writes.
+    shell.style.setProperty("--shell-content-reserve", "0px");
+    const column = shell.querySelector<HTMLElement>("[data-slot=content-panel-column]");
+    const trailing = shell.querySelector<HTMLElement>("[aria-label='Toggle content panel']");
+    const start = column?.getBoundingClientRect().left ?? 0;
+    // The strip never starts inside the leading controls (traffic lights,
+    // brand, sidebar toggle), even when a maximized column does.
+    const stripLeft = Math.max(start - left, leading);
+    const width =
+      column === null || trailing === null
+        ? 0
+        : Math.max(0, trailing.getBoundingClientRect().left - 8 - stripLeft);
+    shell.style.setProperty("--shell-content-left", `${stripLeft}px`);
+    shell.style.setProperty("--shell-content-width", `${width}px`);
+    shell.style.setProperty("--shell-content-reserve", width > 0 ? `${width + 8}px` : "0px");
   }, []);
   useLayoutEffect(() => {
     const shell = shellRef.current;
     if (shell === null) return undefined;
-    const measure = () => measureLeading(shell);
-    measure();
+    const run = () => measure(shell);
+    run();
     shell.style.setProperty("--shell-rail", isMobile ? "0px" : "3.25rem");
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(run);
     observer.observe(shell);
+    const column = shell.querySelector("[data-slot=content-panel-column]");
+    if (column !== null) observer.observe(column);
     return () => observer.disconnect();
-  }, [isMobile, measureLeading]);
+  }, [isMobile, measure]);
   return (
     <AppShellContext value={context}>
       <ShellTitleContext value={titleTarget}>
@@ -176,12 +202,30 @@ export function AppShellBody({ children }: AppShellBodyProps) {
               }}
             />
             <div
-              className="flex h-full min-w-0 flex-1 items-center"
+              className={cn(
+                "flex h-full min-w-0 flex-1 items-center",
+                isContentPanelMaximized && "hidden",
+              )}
               data-slot="shell-title"
               ref={setTitleTarget}
               style={{
                 marginInlineStart:
                   "max(0px, calc(var(--shell-rail, 0px) + var(--shell-sidebar-width, 0px) + var(--shell-gutter, 0px) + 8px - var(--shell-leading, 0px)))",
+                marginInlineEnd: "var(--shell-content-reserve, 0px)",
+              }}
+            />
+            <div
+              className={cn(
+                // The rule continues the panel's column divider into the titlebar.
+                "before:bg-border absolute inset-y-0 flex min-w-0 items-center before:absolute before:top-1/2 before:-left-px before:h-5 before:w-px before:-translate-y-1/2",
+                !hasVisibleContentPanel && "hidden",
+                isContentPanelMaximized && "before:hidden",
+              )}
+              data-slot="shell-content-title"
+              ref={setContentTitleTarget}
+              style={{
+                left: "var(--shell-content-left, 0px)",
+                width: "var(--shell-content-width, 0px)",
               }}
             />
             <ContentPanelToggle className="ms-auto" />
@@ -213,7 +257,7 @@ export function AppShellSessionPanel(): ReactNode {
       maximized={contentPanel.maximized}
       sessionKey={sessionKey}
     >
-      <ContentPanelOutlet />
+      <ContentPanelOutlet tabStripTarget={contentPanel.titleTarget} />
     </ShellContentPanel>
   );
 }

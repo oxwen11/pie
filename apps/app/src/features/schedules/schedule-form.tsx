@@ -282,12 +282,15 @@ function ScheduleFormFields({
               <PromptInputTools>
                 <ModelSelectorPicker
                   aria-label="Model"
+                  error={models.isError ? models.error.message : undefined}
                   modelId={model?.modelId}
                   models={modelOptions}
                   onChange={(provider, modelId) =>
                     setForm((current) => ({ ...current, model: { provider, modelId } }))
                   }
+                  onRetry={() => void models.refetch()}
                   providerId={model?.provider}
+                  loading={models.isFetching}
                 />
               </PromptInputTools>
             </PromptInputToolbar>

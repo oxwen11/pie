@@ -1,5 +1,5 @@
 import { Cause, Context, Effect, Option, Redacted, Scope } from "effect";
-import { Command, Flag } from "effect/unstable/cli";
+import { Command, Flag } from "effect/cli";
 
 import {
   npmPackageVersion,

@@ -1,6 +1,6 @@
 import { v7 as uuid } from "uuid";
 
-import type { SessionEvent } from "../events/framework";
+import type { SessionEvent } from "../harness/events/framework";
 import type { AgentSessionEvent } from "./protocol";
 import { adaptPiToolResult } from "./tool-result";
 import { isDynamicPiTool } from "./tools";

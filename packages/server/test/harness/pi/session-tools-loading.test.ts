@@ -5,12 +5,12 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import type { SessionPullRequestLink } from "@getpie/contract/pull-request";
 import { Deferred, Effect, Fiber, FileSystem, Stream } from "effect";
-import * as ChildProcessSpawner from "effect/unstable/process/ChildProcessSpawner";
+import * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { afterEach, vi } from "vitest";
 
-import { makePiAgent } from "../../../src/harness/pi/agent";
-import { makePiProcess } from "../../../src/harness/pi/process";
-import { PiSessionTools, type PiSessionToolsShape } from "../../../src/harness/pi/session-tools";
+import { makePiAgent } from "../../../src/pi/agent";
+import { makePiProcess } from "../../../src/pi/process";
+import { PiSessionTools, type PiSessionToolsShape } from "../../../src/pi/session-tools";
 
 const provider = url.fileURLToPath(new URL("./fixtures/registration-provider.js", import.meta.url));
 const cli = url.fileURLToPath(

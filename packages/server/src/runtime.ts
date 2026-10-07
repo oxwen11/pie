@@ -5,29 +5,30 @@ import * as NodeHttpPlatform from "@effect/platform-node/NodeHttpPlatform";
 import * as NodePath from "@effect/platform-node/NodePath";
 import { Context, Crypto, Effect, Layer } from "effect";
 
-import { SessionImageAssetsLayer } from "../assets";
-import { PathsLayer } from "../config/paths";
-import { EventBusLayer, EventBus } from "../events";
-import { FileSystemServiceLayer } from "../fs";
-import { GitServiceLayer, WorktreeServiceLayer } from "../git";
+import { SessionImageAssetsLayer } from "./assets";
+import { PathsLayer } from "./config/paths";
+import { EventBusLayer, EventBus } from "./events";
+import { FileSystemServiceLayer } from "./fs";
+import { GitServiceLayer, WorktreeServiceLayer } from "./git";
 import {
   PiAgentSessionManagerLayer,
-  PiAgentServiceLayer,
   PiAgentSessionServiceLayer,
   PiAgentSessionService,
-} from "../harness";
-import { makePiAgent, PiAgent } from "../harness/pi/agent";
-import { makePiProcess, type PiProcess } from "../harness/pi/process";
-import { resolvePiExecutable } from "../harness/pi/resolve-executable";
-import { ResourceMonitoring } from "../observability/resources";
-import { PackageServiceLayer } from "../packages";
-import { ProjectRepositoryLayer, ProjectServiceLayer, ProjectService } from "../project";
-import { PullRequestServiceLayer, PullRequestService } from "../pull-request";
-import { makePullRequestCoordinator, PullRequestCoordinator } from "../pull-request/coordinator";
-import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "../schedule";
-import { SettingsRepositoryLayer } from "../settings";
-import { SkillServiceLayer } from "../skills";
-import { TerminalManagerLayer } from "../terminal";
+} from "./harness";
+import { PiAgent } from "./harness/pi-port";
+import { ResourceMonitoring } from "./observability/resources";
+import { PackageServiceLayer } from "./packages";
+import { makePiAgent } from "./pi/agent";
+import { PiAgentServiceLayer } from "./pi/agent-service";
+import { makePiProcess, type PiProcess } from "./pi/process";
+import { resolvePiExecutable } from "./pi/resolve-executable";
+import { ProjectRepositoryLayer, ProjectServiceLayer, ProjectService } from "./project";
+import { PullRequestServiceLayer, PullRequestService } from "./pull-request";
+import { makePullRequestCoordinator, PullRequestCoordinator } from "./pull-request/coordinator";
+import { runScheduleLoop, ScheduleRepositoryLayer, ScheduleServiceLayer } from "./schedule";
+import { SettingsRepositoryLayer } from "./settings";
+import { SkillServiceLayer } from "./skills";
+import { TerminalManagerLayer } from "./terminal";
 
 export class PiProcessTag extends Context.Service<PiProcessTag, PiProcess>()("PiProcess") {}
 

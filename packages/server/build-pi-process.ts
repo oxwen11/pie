@@ -5,7 +5,7 @@ import url from "node:url";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { Effect, FileSystem } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
+import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
 import { copyFffIsland } from "./scripts/copy-fff";
 
@@ -21,7 +21,7 @@ NodeRuntime.runMain(
     yield* fs.remove(outDir, { recursive: true, force: true });
     yield* fs.makeDirectory(outDir, { recursive: true });
 
-    const piProcess = url.fileURLToPath(new URL("./src/harness/pi/rpc/entry.ts", import.meta.url));
+    const piProcess = url.fileURLToPath(new URL("./src/pi/rpc/entry.ts", import.meta.url));
     // Codemode embeds quickjs.wasm as a sibling asset. --outfile cannot emit it.
     const piProcessExit = yield* spawner.exitCode(
       ChildProcess.make(

@@ -2,36 +2,15 @@ import http from "node:http";
 import path from "node:path";
 
 import * as NodeHttpServer from "@effect/platform-node/NodeHttpServer";
-import type { PullRequestRef, SessionPullRequestLink } from "@getpie/contract/pull-request";
-import {
-  ByteSize,
-  Context,
-  Crypto,
-  Deferred,
-  Effect,
-  FileSystem,
-  Schema,
-  type Scope,
-} from "effect";
-import { HttpIncomingMessage, HttpServerRequest, HttpServerResponse } from "effect/unstable/http";
+import type { PullRequestRef } from "@getpie/contract/pull-request";
+import { ByteSize, Crypto, Deferred, Effect, FileSystem, Schema, type Scope } from "effect";
+import { HttpIncomingMessage, HttpServerRequest, HttpServerResponse } from "effect/http";
 
-import { PiTransportError } from "../errors";
+import { PiTransportError } from "../harness/errors";
+import { PiSessionTools, type PiSessionToolsShape } from "../harness/pi-port";
 import { sessionToolsExtension } from "./session-tools-extension";
 
-/** Callbacks capture the validated SessionRef and await the Session service's durable writes. */
-export type PiSessionToolsShape = {
-  readonly list: Effect.Effect<ReadonlyArray<SessionPullRequestLink>, unknown>;
-  readonly register: (
-    ref: PullRequestRef,
-    restore: boolean,
-  ) => Effect.Effect<"linked" | "exists" | "excluded", unknown>;
-  readonly exclude: (ref: PullRequestRef) => Effect.Effect<void, unknown>;
-};
-
-/** Supplied at runtime acquisition, never a dependency of PiAgent's construction layer. */
-export class PiSessionTools extends Context.Service<PiSessionTools, PiSessionToolsShape>()(
-  "PiSessionTools",
-) {}
+export { PiSessionTools, type PiSessionToolsShape };
 
 const RegisterSchema = Schema.Struct({
   url: Schema.String,
