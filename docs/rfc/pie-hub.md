@@ -116,7 +116,7 @@ Checked t3code `main` at `9bd1d8009` and paseo `main` at `a7f7405c` (both
 Adopted: bounded reconnect with jitter and a revocation close code (paseo);
 event ids that survive restarts (t3code's derived `commandId`); a dedupe record that
 outlives the hold TTL and is released only on retryable outcomes; the Durable Object
-plus SQLite plus alarm hold with TTL and caps; an opt-in hold that deletes on opt-out.
+plus SQLite plus alarm hold with TTL and caps; a hold with TTL and caps that deletes on opt-out.
 
 Not copied: a token in the URL path (GitHub signs deliveries); plaintext secrets;
 holding raw requests; daemon-wide authority; a webhook route on daemon HTTP or the
@@ -347,12 +347,12 @@ retry of a handled event returns `duplicate`. The same `eventId` with a differen
 payload hash is `execution_conflict`. Effects, which come later, add the stricter
 at-most-once rule of section 7.
 
-**Hold** is per Environment and **off by default** (`hold: true` set
-at enrollment or later):
+**Hold** is per Environment and **on by default**; it can be turned off at
+enrollment or later:
 
-- Not held: if the Environment is not connected when an event is routed, the event
+- Hold off: if the Environment is not connected when an event arrives, the event
   is a terminal `daemon_not_connected` receipt. No queue, no replay.
-- Held: the event stays `pending` until delivered, `expiresAt` (24 hours after
+- Hold on: the event stays `pending` until delivered, `expiresAt` (24 hours after
   receipt) or Environment revocation. Hub stores the **verified event**
   (the vendor's JSON and its event name), never any header or the signature. On reconnect Hub delivers oldest
   first, per Environment, in order; a conflict or reject ack ends that event.
@@ -513,8 +513,12 @@ closest open-source precedent (`nikuscs/orbs`, section 8) takes the same route. 
   raw copy of a live WAL file; the Dokploy volume backup alone is not safe unless Hub is
   stopped or the copy goes through SQLite.
 
-Host choice still to settle in the Phase 1 slice, not here: the TLS/reverse-proxy recipe (Hub speaks plain HTTP behind a reverse
-proxy; it never terminates TLS itself). Runtime: Node 24 and Bun both provide
+**HTTPS.** Everything public is HTTPS and WSS: webhook URLs, the enrollment and
+administration API, and the daemon's connection (the daemon already refuses a non-HTTPS
+origin, section 3). TLS is terminated by a reverse proxy in front of Hub (the planned
+Dokploy host's Traefik, or Caddy); only the private hop from the proxy to the Hub
+process is plain HTTP, and Hub never terminates TLS itself. Still to settle in the
+Phase 1 slice, not here: the proxy recipe. Runtime: Node 24 and Bun both provide
 HTTP, WebSocket and a built-in synchronous SQLite. A single process has no hibernation, so
 heartbeat is an ordinary timer and the hold sweep is an interval, not an alarm.
 
@@ -665,7 +669,7 @@ CREATE TABLE environments (
   environment_id  TEXT PRIMARY KEY,
   credential_hash BLOB,
   state           TEXT NOT NULL CHECK (state IN ('active', 'revoked')),
-  hold            INTEGER NOT NULL DEFAULT 0 CHECK (hold IN (0, 1)),
+  hold            INTEGER NOT NULL DEFAULT 1 CHECK (hold IN (0, 1)),
   created_at      INTEGER NOT NULL,
   CHECK ((state = 'active') = (credential_hash IS NOT NULL AND length(credential_hash) = 32))
 ) STRICT;
@@ -754,7 +758,7 @@ Contract; secure storage capability; Hub host (Node process, SQLite store, confi
 enrollment and revocation; daemon enrollment and administration RPC; event
 delivery with ack and receipts; `POST /events`, which names the target `environmentId`
 (an unknown or revoked target is an error and records nothing; webhooks start in
-Phase 2); opt-in hold; CLI
+Phase 2); hold (on by default, per-Environment opt-out); CLI
 administration. The daemon has no effect handler: it logs a safe summary and exposes the last event through `hub.status`.
 
 ### Phase 2: GitHub and webhooks
@@ -807,8 +811,8 @@ Phase 1 needs 1 to 3 only; the rest can wait.
 1. **Host:** settled in revision 7: Node/Bun self-hosted first, Cloudflare later
    behind the Effect seam. Storage: SQLite via `node:sqlite`, checked under Bun. Still open for Phase 1: TLS/proxy recipe.
    Deployment itself needs separate consent.
-2. **Hold defaults:** per-Environment opt-in, 24-hour TTL, the section 6 caps,
-   verified events only (the vendor's JSON, no headers)?
+2. **Hold defaults (settled):** on by default with a per-Environment opt-out, 24-hour
+   TTL, the section 6 caps, verified events only (the vendor's JSON, no headers).
 3. **Enrollment and storage:** Hub-token enrollment with the token holder
    pinning the UUID, no password or login; the section 9 worksheet's owners, modes,
    retained and capped receipts, and no power-loss guarantee on the daemon?
