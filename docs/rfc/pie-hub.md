@@ -1,6 +1,7 @@
 # Pie Hub: a single-deployment event broker for Environments
 
 Status: proposed, not implemented. Rebased against `origin/main` at `91247adf`.
+Revision 7 changes the V1 host from Cloudflare to Node/Bun (section 8).
 Revision 6 reshapes the proposal around the Developer's direction: Hub is
 **deployed once** by **one operator** and **receives events for many
 Environments**. It receives, verifies, stores and delivers; what an Environment
@@ -20,8 +21,10 @@ Settled by the Developer:
 - Build the connection first; Schedules, Sessions and write-back come later.
 - Offline events may be held.
 
-Recommended here, still to confirm: Cloudflare Worker + one Durable Object as the
-host after a local prototype (section 8); the hold defaults (section 6); the
+Settled by the Developer (revision 7): build the **Node/Bun self-hosted** Hub first;
+Cloudflare is a later host, kept reachable by the Effect seam (section 8).
+
+Recommended here, still to confirm: the hold defaults (section 6); the
 enrollment and storage choices (sections 3 and 9).
 
 ## 1. Current baseline, not proposed capabilities
@@ -82,14 +85,15 @@ system, tenant isolation, or per-user configuration. A Desktop may still connect
 other Environments that are not enrolled. Multi-tenant hosting is out of scope and
 would be a separate design.
 
-| Owner                                                  | Responsibility                                                              | Forbidden                                                              |
-| ------------------------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `packages/hub` (`@getpie/hub`), Cloudflare Worker + DO | Public webhook, enrollment, Environment sockets, event store, routing, hold | Pi, workspace access, daemon RPC proxy, SPA, imports of server/CLI     |
-| `packages/server/src/hub/`                             | Target-local relationship, connector, receipts, subscriptions               | Starting Hub, selecting another Environment, exposing a public webhook |
-| `packages/pie`                                         | Project Hub administration contract onto CLI                                | Writing relationship files or choosing a focused Desktop Environment   |
-| `packages/contract`                                    | Validated Hub frames and daemon administration contract                     | Runtime implementation imports                                         |
+| Owner                                            | Responsibility                                                              | Forbidden                                                              |
+| ------------------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `packages/hub` (`@getpie/hub`), Node/Bun process | Public webhook, enrollment, Environment sockets, event store, routing, hold | Pi, workspace access, daemon RPC proxy, SPA, imports of server/CLI     |
+| `packages/server/src/hub/`                       | Target-local relationship, connector, receipts, subscriptions               | Starting Hub, selecting another Environment, exposing a public webhook |
+| `packages/pie`                                   | Project Hub administration contract onto CLI                                | Writing relationship files or choosing a focused Desktop Environment   |
+| `packages/contract`                              | Validated Hub frames and daemon administration contract                     | Runtime implementation imports                                         |
 
-Hub depends only on the contract leaf plus Web-platform APIs (section 8).
+Hub depends only on the contract leaf, Effect, and the Node/Bun platform; its core
+uses Web-standard APIs where possible so a Cloudflare host stays possible (section 8).
 
 ### Compared with t3code and paseo, not copied
 
@@ -413,16 +417,31 @@ unavailable Environment is shown as unavailable, never as local. A Session badge
 deferred; origin is learned by joining the receipt, and absence of `source` never
 proves a human created a Session.
 
-## 8. Hosting: Cloudflare Worker and one Durable Object
+## 8. Hosting: Node/Bun first, Cloudflare later
 
-Deployed once, always on, public, no servers to run: a Worker routes
-`/webhook/github`, `/enroll`, `/operator/*` and `/daemon` (WebSocket) to **one
-SQLite-backed Durable Object**. For one operator with tens of Environments this keeps
-event claim, routing and hold in one serialized transaction domain, which replaces
-a process lock. `ponytail: single object; split per Environment if throughput
-matters` (Cloudflare calls a global singleton a bottleneck at high traffic).
+**V1 host: one long-lived Node (24) process**, also runnable under Bun, that the
+operator deploys once on any machine with a public HTTPS endpoint (a VPS, a container
+platform, or a tailnet/Funnel address). It serves `/webhook/github`, `/enroll`,
+`/operator/*` and `/daemon` (WebSocket). One process with one SQLite file is the
+transaction domain, which replaces a distributed lock; a second Hub process on the
+same file is unsupported. Tradeoff accepted: the operator runs and patches a server and
+owns uptime; in exchange the deployment needs no vendor account, quotas or hibernation
+semantics, and the whole thing runs locally under the ordinary test and verify tools.
 
-Verified in Cloudflare documentation (2026-10-06): SQLite-backed Durable Objects
+Host choices still to settle in the Phase 1 slice, not here: the SQLite binding
+(`node:sqlite` on Node 24 versus `bun:sqlite`, behind the store seam so tests run on
+either) and the TLS/reverse-proxy recipe (Hub speaks plain HTTP behind the operator's
+proxy; it never terminates TLS itself). A single process has no hibernation, so
+heartbeat is an ordinary timer and the hold sweep is an interval, not an alarm.
+
+**Cloudflare later.** The earlier design (Worker + one SQLite Durable Object) stays a
+viable second host and the Phase 0 result below stands as evidence for it. It is not
+built in V1, and nothing in V1 may make it harder: the core is Effect programs over
+the `Context.Service` seams in "Effect as the host seam", with Web-standard APIs
+(`Request`/`Response`, `crypto.subtle` for HMAC) in the core and platform code only in
+the Node layer. Adding Cloudflare is then one new Layer plus a Worker entry, to be
+proposed when there is a reason to (no server to run, public ingress without a
+proxy). Verified in Cloudflare documentation (2026-10-06) and prototyped locally: SQLite-backed Durable Objects
 are available on the Free and Paid plans, up to 10 GB per object, with point-in-time
 recovery; the Hibernation WebSocket API keeps connections while the object is
 evicted (up to 32,768 per object, per-connection state via `serializeAttachment`);
@@ -494,7 +513,7 @@ operator's explicit consent; this RFC authorizes none.
 
 The core is written as Effect programs over a few `Context.Service` seams (store,
 connections, scheduler, configuration) and each host supplies a `Layer`; only the
-Cloudflare layer is built in V1, and a Node layer can be added later without touching
+Node layer is built in V1, and a Cloudflare layer can be added later without touching
 the core. The prototype ran `Effect.runSync` of a Schema-validated ingest program
 inside `transactionSync` on `effect@4.0.0-rc.115` in workerd: duplicates were
 detected, invalid input produced a Schema failure, and the bundle was 708 KiB
@@ -523,9 +542,12 @@ range does not match the prerelease `4.0.0-rc.115` this repository uses, so adop
 would need an override and an untested rc-to-stable API check. Write the ack-after-
 persist step ourselves; none of them models it.
 
-Node-only and a Worker/DO adapter are not both built: the Worker is the single V1
-host. `packages/hub` therefore uses Web APIs and DO storage, not `node:fs` or
-`@getpie/effect-json-store`.
+Only the Node layer is built in V1. The Cloudflare layer would supply the same seams
+from Durable Object storage and WebSocket hibernation; the prototype above is the
+feasibility evidence, not a commitment. Keep `node:fs`-style access out of the core
+so that layer stays an adapter and not a rewrite. Whether to reuse
+`@getpie/effect-json-store` is a Phase 1 decision; the event store needs SQL, so it
+likely does not apply.
 
 ## 9. Persistence approval worksheet — not shipped inventory
 
@@ -533,18 +555,18 @@ The [host-write gate](../../.agents/rules/topics/persistence.md) requires Develo
 confirmation before formats are chosen. This is a candidate, not an approved plan;
 after approval update [host-persistence.md](../host-persistence.md) in each slice.
 
-| Location / owner                                                                 | Data, scope and lifecycle                                                                                                                             |
-| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hub DO SQLite `config`                                                           | Non-empty actor allowlist and default mention/label, operator-supplied; no empty seed. Operator bearer and GitHub secret are Worker secrets, not rows |
-| Hub `relationships`                                                              | Relationship id, Environment UUID, label, credential hash, hold flag, state, timestamps, last cached subscriptions (no paths, prompts or credentials) |
-| Hub `enrollment_tokens`                                                          | Token hash and expiry, at most ten pending; swept by alarm                                                                                            |
-| Hub `events`                                                                     | Event id, source delivery id and raw-body SHA-256, normalized event, routing outcome, delivery state, attempts, `expiresAt`; no raw body or headers   |
-| Hub `conversation_routes` (later)                                                | Conversation key to relationship id only                                                                                                              |
-| Daemon `$PIE_HOME/hub/relationship.json`, target daemon writer only              | Origin, Environment UUID, relationship id, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation        |
-| Daemon `$PIE_HOME/hub/subscriptions.json`                                        | Subscriptions naming a relationship; no prompt, path or credential                                                                                    |
-| Daemon `$PIE_HOME/hub/events/<relationshipId>/<eventId>.json`                    | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                       |
-| Daemon `$PIE_HOME/hub/conversations/<relationshipId>/<sha256(key)>.json` (later) | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                   |
-| Existing Schedule files                                                          | **No change.** Reason `manual`, effective prompt in the run snapshot; existing 20-run retention and fired counter remain                              |
+| Location / owner                                                                 | Data, scope and lifecycle                                                                                                                                            |
+| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hub SQLite `config`                                                              | Non-empty actor allowlist and default mention/label, operator-supplied; no empty seed. Operator bearer and GitHub secret come from the process environment, not rows |
+| Hub `relationships`                                                              | Relationship id, Environment UUID, label, credential hash, hold flag, state, timestamps, last cached subscriptions (no paths, prompts or credentials)                |
+| Hub `enrollment_tokens`                                                          | Token hash and expiry, at most ten pending; swept by the hold interval                                                                                               |
+| Hub `events`                                                                     | Event id, source delivery id and raw-body SHA-256, normalized event, routing outcome, delivery state, attempts, `expiresAt`; no raw body or headers                  |
+| Hub `conversation_routes` (later)                                                | Conversation key to relationship id only                                                                                                                             |
+| Daemon `$PIE_HOME/hub/relationship.json`, target daemon writer only              | Origin, Environment UUID, relationship id, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                       |
+| Daemon `$PIE_HOME/hub/subscriptions.json`                                        | Subscriptions naming a relationship; no prompt, path or credential                                                                                                   |
+| Daemon `$PIE_HOME/hub/events/<relationshipId>/<eventId>.json`                    | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                      |
+| Daemon `$PIE_HOME/hub/conversations/<relationshipId>/<sha256(key)>.json` (later) | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                                  |
+| Existing Schedule files                                                          | **No change.** Reason `manual`, effective prompt in the run snapshot; existing 20-run retention and fired counter remain                                             |
 
 Candidate rules needing explicit approval:
 
@@ -560,8 +582,8 @@ Candidate rules needing explicit approval:
 - A Schedule run with `provider`/`modelId` persists Pi's shared default outside
   `$PIE_HOME`; do not claim Environment isolation for it, serialize proof that uses
   one, and never guess-restore the previous default.
-- Atomic rename covers process failure, not power loss. Hub's DO storage commits
-  before its output gate releases a response; daemon JSON does not claim power-loss
+- Atomic rename covers process failure, not power loss. Hub's SQLite commit (WAL, `synchronous=FULL`)
+  precedes any response or ack; daemon JSON does not claim power-loss
   durability. If that is required, decide fsync or a database first.
 - No automatic receipt pruning on either side: deleting receipts reopens duplicate
   execution. Cap 100,000 per side; at the cap refuse new admissions but keep duplicate
@@ -570,7 +592,8 @@ Candidate rules needing explicit approval:
 - Disconnect and revoke keep receipts and Schedule history and delete neither
   checkouts nor Pi state; revocation and erasure are distinct. Never silently clear a
   corrupt receipt to make a request work.
-- Hub logs bounded, redacted structured output to Cloudflare's log sink; the daemon
+- Hub logs bounded, redacted structured output to stdout (the operator's process
+  manager collects it); the daemon
   reuses `pie.log`. Enrollment tokens are stored only as hashes with expiry. No new
   Desktop or browser store.
 
@@ -581,12 +604,13 @@ it needs and the worksheet are confirmed. Phases land independently.
 
 ### Phase 0: prototype (no deploy) — done locally
 
-Result in section 8. Remaining before implementation: a deployed-network check of
-output-gate behavior and latency, with the operator's consent.
+Result in section 8; it supports the later Cloudflare host and does not block the
+Node V1. Output-gate behavior and real-network latency stay unverified and matter
+only if Cloudflare is proposed.
 
 ### Phase 1: connection, events and hold
 
-Contract; secure storage capability; Hub host (Worker, DO, config, schema);
+Contract; secure storage capability; Hub host (Node process, SQLite, config, schema);
 enrollment and revocation; daemon relationship and administration RPC; event
 delivery with ack and receipts; `POST /operator/events`; opt-in hold; CLI
 administration. Hello carries no subscriptions yet and the daemon has no effect
@@ -624,7 +648,7 @@ Turbo tests. Focus on public seams:
   Session a person created, is refused; control and continue never reach outside the
   table; pause racing admission; busy, archived and missing-worktree Sessions.
 
-Runtime proof is separate and per phase. Phase 1: isolated Hub (local `wrangler dev`)
+Runtime proof is separate and per phase. Phase 1: isolated Hub process (local, temporary SQLite file and port)
 and two daemon homes with distinct UUIDs, both enrolled; inject events to each;
 verify receipts, no cross-delivery, hold across a daemon restart, and revocation.
 A real signed GitHub delivery needs a public HTTPS endpoint and is a production
@@ -639,8 +663,9 @@ screenshots and video. This documentation revision claims none of these gates.
 
 Phase 1 needs 1 to 3 only; the rest can wait.
 
-1. **Host:** Cloudflare Worker + one Durable Object, gated on the Phase 0
-   prototype? Deployment itself needs separate consent.
+1. **Host:** settled in revision 7: Node/Bun self-hosted first, Cloudflare later
+   behind the Effect seam. Still open for Phase 1: SQLite binding, TLS/proxy recipe.
+   Deployment itself needs separate consent.
 2. **Hold defaults:** per-relationship opt-in, 24-hour TTL, the section 6 caps,
    verified normalized events only?
 3. **Enrollment and storage:** operator-bearer enrollment with the token holder
