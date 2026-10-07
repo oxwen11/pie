@@ -36,7 +36,7 @@ extraction does not require expanding a package's public surface.
 - `PiAgentSessionService` owns orchestration, native-id translation, metadata,
   validation, and collection events. The RPC router resolves workspace context
   and maps errors; avoid duplicating that domain logic there.
-- `packages/server/src/rpc/runtime.ts` composes the runtime. Session code lives
+- `packages/server/src/runtime.ts` composes the runtime. Session code lives
   under `packages/server/src/harness/`; the directory name is legacy, not support
   for multiple agents. Layer lifetime constraints are in [runtime.md](runtime.md).
 

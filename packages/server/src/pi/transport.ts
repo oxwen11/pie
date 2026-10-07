@@ -1,7 +1,7 @@
 import { Deferred, type Duration, Effect, Queue, Ref, Stream, type Scope } from "effect";
 import { ChildProcess, ChildProcessSpawner } from "effect/process";
 
-import { AgentProcessExited, PiRpcError, PiTransportError } from "../errors";
+import { AgentProcessExited, PiRpcError, PiTransportError } from "../harness/errors";
 import { fffNodePathEnv } from "./fff";
 import {
   isBlockingUiRequest,

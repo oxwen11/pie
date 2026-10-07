@@ -7,8 +7,8 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Deferred, Effect, Fiber, Option, Stream } from "effect";
 
-import { makePiAgent } from "../../../src/harness/pi/agent";
-import { makePiProcess } from "../../../src/harness/pi/process";
+import { makePiAgent } from "../../../src/pi/agent";
+import { makePiProcess } from "../../../src/pi/process";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");

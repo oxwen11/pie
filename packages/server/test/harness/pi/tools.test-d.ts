@@ -10,7 +10,7 @@ import type {
 import type { PiTools } from "@getpie/contract";
 import { describe, expectTypeOf, test } from "vitest";
 
-import type { PiTools as RuntimePiTools } from "../../../src/harness/pi/tools";
+import type { PiTools as RuntimePiTools } from "../../../src/pi/tools";
 
 type In<K extends keyof PiTools> = PiTools[K]["input"];
 type Out<K extends keyof PiTools> = PiTools[K]["output"];

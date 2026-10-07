@@ -1,11 +1,4 @@
-import {
-  SessionCapabilitiesSchema,
-  type AgentModelState,
-  type AgentResponse,
-  type SessionCapabilities,
-  type SessionPendingPrompt,
-  type PieUIMessage,
-} from "@getpie/contract";
+import { SessionCapabilitiesSchema, type SessionCapabilities } from "@getpie/contract";
 import { Effect, Queue, Ref, Scope, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 
@@ -13,24 +6,24 @@ import {
   AgentOpenError,
   AgentOperationError,
   AgentRequestUnavailable,
-  type CapabilityUnsupported,
   SessionClosed,
   SessionNotResumable,
   TurnAlreadyRunning,
-} from "../errors";
-import type { SessionEnvelopeDraft, SessionEvent } from "../events/framework";
-import { streamFromQueueOne } from "../queue-stream";
+} from "../harness/errors";
+import type { SessionEnvelopeDraft, SessionEvent } from "../harness/events/framework";
+import type { PiAgentRuntime, PiSessionToolsShape } from "../harness/pi-port";
+import { streamFromQueueOne } from "../harness/queue-stream";
 import type {
   CreateSessionInput,
   PromptReceipt,
   ResumeSessionInput,
-  RuntimePromptReceipt,
   UserInput,
-} from "../session-io";
+} from "../harness/session-io";
 import { entriesToUIMessages } from "./history";
 import type { PiProcess } from "./process";
-import type { PiSessionToolsShape } from "./session-tools";
 import type { PiUIMessageChunk } from "./ui-message";
+
+export type { PiAgentRuntime };
 
 export {
   CreateSessionInput,
@@ -56,40 +49,6 @@ const toPromptText = (input: UserInput): string =>
             .join(", ")}`,
     )
     .join("\n");
-
-/** Live Pi child for one agent session: events, prompt, interrupt, and close. */
-export type PiAgentRuntime = {
-  readonly sessionId: string;
-  readonly events: Stream.Stream<SessionEnvelopeDraft, AgentOperationError>;
-  readonly prompt: (
-    input: UserInput,
-  ) => Effect.Effect<
-    RuntimePromptReceipt,
-    SessionClosed | TurnAlreadyRunning | AgentOperationError
-  >;
-  readonly interrupt: Effect.Effect<void, SessionClosed | AgentOperationError>;
-  readonly replaceQueue: (
-    pending: SessionPendingPrompt,
-  ) => Effect.Effect<void, SessionClosed | AgentOperationError>;
-  readonly respondToAgentRequest: (
-    requestId: string,
-    response: AgentResponse,
-  ) => Effect.Effect<void, AgentRequestUnavailable | AgentOperationError>;
-  readonly getCapabilities: Effect.Effect<
-    SessionCapabilities,
-    CapabilityUnsupported | AgentOperationError
-  >;
-  readonly getMessages: Effect.Effect<
-    ReadonlyArray<PieUIMessage>,
-    SessionClosed | AgentOperationError
-  >;
-  readonly getModelState: Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
-  readonly setModel: (model: {
-    readonly provider: string;
-    readonly modelId: string;
-  }) => Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
-  readonly close: Effect.Effect<void>;
-};
 
 export const makePiAgentRuntime = (
   process: PiProcess,

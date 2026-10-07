@@ -12,7 +12,7 @@ import {
   executePieBash,
   filterPiBashEnv,
   openBashLog,
-} from "../../../src/harness/pi/bash";
+} from "../../../src/pi/bash";
 
 const HOST_ENV: NodeJS.ProcessEnv = {
   PIE_DAEMON_DIR: "daemon-beta",
