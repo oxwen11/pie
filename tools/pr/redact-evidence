@@ -89,6 +89,8 @@ done
 
 for input in "${FILES[@]}"; do
   [ -f "$input" ] || die "not a file: $input"
+  # Keep a leading-dash name from reaching magick/ffmpeg as an option.
+  case "$input" in -*) input="./$input" ;; esac
   base=$(basename "$input")
   dir=$(dirname "$input")
   ext=$(printf '%s\n' "$base" | tr 'A-Z' 'a-z')

@@ -72,11 +72,13 @@ plain_merge() {
   gh_run pr merge "$NUMBER" --repo "$REPO" --squash --match-head-commit "$PR_HEAD"
   if [ "$GH_STATUS" -ne 0 ]; then
     show_gh_err
+    # Refused or unknown: never fall through to a merge record.
+    unverified "gh pr merge failed; nothing recorded. Inspect GitHub before retrying."
   fi
 }
 
 poll_merged() {
-  local tries limit state oid
+  local tries limit state oid head
   tries=0
   limit="${PR_POLL_ATTEMPTS:-30}"
   while [ "$tries" -lt "$limit" ]; do
@@ -87,6 +89,10 @@ poll_merged() {
     if [ "$GH_STATUS" -eq 0 ] && json_object "$GH_STDOUT_FILE"; then
       state=$(jq -r '.state // empty' "$GH_STDOUT_FILE")
       oid=$(jq -r '.mergeCommit.oid // empty' "$GH_STDOUT_FILE")
+      head=$(jq -r '.headRefOid // empty' "$GH_STDOUT_FILE")
+      if [ "$state" = "MERGED" ] && ! sha_eq "$head" "$EXPECTED"; then
+        die "merged at head $head, not $EXPECTED; nothing recorded"
+      fi
       if [ "$state" = "MERGED" ] && is_sha "$oid"; then
         PR_MERGE_OID=$oid
         return 0

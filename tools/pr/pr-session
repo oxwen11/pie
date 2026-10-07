@@ -84,11 +84,8 @@ for home in "${HOMES[@]}"; do
   fi
   seen_dir=1
   while IFS= read -r -d '' file; do
-    if jq -e 'type == "object"' "$file" >/dev/null 2>/dev/null; then
-      jq -c --argjson n "$NUMBER" --arg home "$home" --arg file "$file" "$JQ_PROGRAM" "$file" | scrub
-    else
-      printf 'pr: skip unreadable %s\n' "$file" >&2
-    fi
+    jq -c --argjson n "$NUMBER" --arg home "$home" --arg file "$file" "$JQ_PROGRAM" "$file" 2>/dev/null \
+      | scrub || printf 'pr: skip unreadable %s\n' "$file" >&2
   done < <(find "$sessions" -type f -name '*.json' -print0)
 done
 [ "$seen_dir" -eq 1 ] || die "no storage/sessions directory"

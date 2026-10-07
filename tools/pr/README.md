@@ -16,7 +16,8 @@ cleanup, and daemon-token redaction.
 
 Each script accepts `--help`. They use the `gh` already authenticated on this
 machine and do not print tokens. `pr-merge` does not pass `--admin`, `--auto`,
-or `bypass_rules`. An unverified merge or sync exits 2.
+or `bypass_rules`. An unverified merge or sync exits 2. `redact-evidence` writes
+`*.redacted.*` next to the original; attach only those files, not a glob.
 
 Requirements: `gh` and `jq` (1.6+). `pr-worktree` also needs `git`.
 `redact-evidence` also needs `magick` for images and `ffmpeg` for video.

@@ -46,7 +46,7 @@ case "$*" in
     ;;
   *"pr view"*)
     if [ -f "$GH_MERGED" ]; then
-      printf '{"state":"MERGED","url":"https://github.com/oxwen11/pie/pull/1","headRefOid":"%s","mergeCommit":{"oid":"%s"}}\n' "$FIX_HEAD" "$MERGE_SHA"
+      printf '{"state":"MERGED","url":"https://github.com/oxwen11/pie/pull/1","headRefOid":"%s","mergeCommit":{"oid":"%s"}}\n' "${FIX_MERGED_HEAD:-$FIX_HEAD}" "$MERGE_SHA"
       exit 0
     fi
     if [ -f "$GH_UPDATED" ]; then
@@ -91,6 +91,10 @@ case "$*" in
     ;;
   *"pr merge "*)
     if [ "${FIX_MERGE_EXIT:-0}" != "0" ]; then
+      # Race: someone else merges a newer head while ours is refused.
+      if [ -n "${FIX_MERGED_HEAD:-}" ]; then
+        touch "$GH_MERGED"
+      fi
       echo "merge refused" >&2
       exit "$FIX_MERGE_EXIT"
     fi
@@ -141,9 +145,10 @@ reset() {
   FIX_ASYNC=merged
   FIX_SYNC_STICKY=0
   FIX_MERGE_EXIT=0
+  FIX_MERGED_HEAD=
   GH_LEAK=0
   export FIX_HEAD FIX_BASE FIX_STATE FIX_DRAFT FIX_MERGEABLE FIX_MERGE_STATE FIX_REVIEW_JSON
-  export FIX_BEHIND FIX_CHECKS FIX_CHECKS_EXIT FIX_STACK FIX_ASYNC FIX_SYNC_STICKY FIX_MERGE_EXIT GH_LEAK
+  export FIX_BEHIND FIX_CHECKS FIX_CHECKS_EXIT FIX_STACK FIX_ASYNC FIX_SYNC_STICKY FIX_MERGE_EXIT FIX_MERGED_HEAD GH_LEAK
   rm -f "$GH_MERGED" "$GH_UPDATED"
   : > "$GH_LOG"
   : > "$MAGICK_LOG"
@@ -326,6 +331,47 @@ reset
 expect_code 1 "$PR/pr-merge" 12 --repo oxwen11/pie --sha "$OTHER_SHA"
 log_not "pr merge "
 
+step merge-conflicting
+reset
+FIX_MERGEABLE=CONFLICTING
+export FIX_MERGEABLE
+expect_code 1 "$PR/pr-merge" 12 --repo oxwen11/pie --sha "$HEAD_SHA"
+grep -q 'mergeable is CONFLICTING' "$ERR" || fail "missing conflict reason"
+log_not "pr merge "
+
+step merge-checks-failed
+reset
+FIX_CHECKS='[{"name":"Code check","state":"FAILURE","bucket":"fail","link":"https://example.test/check"}]'
+export FIX_CHECKS
+expect_code 1 "$PR/pr-merge" 12 --repo oxwen11/pie --sha "$HEAD_SHA"
+grep -q 'required checks are not all passing' "$ERR" || fail "missing checks reason"
+log_not "pr merge "
+
+step merge-behind
+reset
+FIX_BEHIND=1
+export FIX_BEHIND
+expect_code 1 "$PR/pr-merge" 12 --repo oxwen11/pie --sha "$HEAD_SHA"
+grep -q 'behind base by 1' "$ERR" || fail "missing behind reason"
+log_not "pr merge "
+
+step merge-refused-race
+reset
+FIX_MERGE_EXIT=1
+FIX_MERGED_HEAD=$OTHER_SHA
+export FIX_MERGE_EXIT FIX_MERGED_HEAD
+expect_code 2 "$PR/pr-merge" 12 --repo oxwen11/pie --sha "$HEAD_SHA"
+log_not "pr comment"
+if printf '%s\n' "$OUT" | grep -q merged; then fail "reported a merge"; fi
+
+step merge-other-head
+reset
+FIX_MERGED_HEAD=$OTHER_SHA
+export FIX_MERGED_HEAD
+expect_code 1 "$PR/pr-merge" 12 --repo oxwen11/pie --sha "$HEAD_SHA"
+grep -q "merged at head $OTHER_SHA" "$ERR" || fail "missing head mismatch"
+log_not "pr comment"
+
 step merge-refused
 reset
 FIX_MERGE_EXIT=1
@@ -385,6 +431,7 @@ cat > "$HOME/.pie/storage/sessions/p3/other.json" <<EOF
 {"version":1,"data":{"sessionId":"s3","projectId":"p3","title":"other","pullRequests":[{"ref":{"host":"github.com","owner":"oxwen11","repository":"pie","number":9},"source":"agent","linkedAt":"2026-01-01T00:00:00Z","excluded":false,"snapshot":{"token":"ghp_LEAKEDTOKEN123"},"stack":null,"stackCheckedAt":null}]}}
 EOF
 printf '{\n' > "$HOME/.pie/storage/sessions/p1/bad.json"
+printf '%s\n' '{"version":1,"data":{"pullRequests":"oops"}}' > "$HOME/.pie/storage/sessions/p1/odd.json"
 export HOME
 unset PIE_HOME || true
 expect_code 0 "$PR/pr-session" 424
@@ -395,7 +442,8 @@ has_not_token
 if printf '%s\n' "$OUT" | grep -q '"title":"other"'; then
   fail "unrelated session matched"
 fi
-grep -q 'skip unreadable' "$ERR" || fail "bad session was not skipped"
+grep -q 'skip unreadable .*bad.json' "$ERR" || fail "bad session was not skipped"
+grep -q 'skip unreadable .*odd.json' "$ERR" || fail "odd session was not skipped"
 
 step session-pie-home
 PIE_HOME=$TMP/only
@@ -455,3 +503,10 @@ expect_code 0 "$PR/redact-evidence" --crop 8x8+1+1 "$TMP/clip.webm"
 has "$TMP/clip.redacted.webm"
 grep -q 'libvpx' "$FFMPEG_LOG" || fail "webm codec missing"
 grep -q 'crop=8:8:1:1' "$FFMPEG_LOG" || fail "ffmpeg crop missing"
+: > "$MAGICK_LOG"
+mkdir -p "$TMP/dash"
+printf 'x\n' > "$TMP/dash/-x.png"
+run_in "$TMP/dash" "$PR/redact-evidence" --crop 8x8+0+0 -- -x.png
+[ "$CODE" -eq 0 ] || fail "dash file failed"
+has "./-x.redacted.png"
+grep -q '^\./-x.png ' "$MAGICK_LOG" || fail "dash file reached magick as an option"
