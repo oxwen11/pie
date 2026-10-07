@@ -32,6 +32,9 @@ export function useSessionModels(ref: SessionRef) {
 
   return {
     models: modelsQuery.data?.models ?? [],
+    modelsError: modelsQuery.isError ? modelsQuery.error.message : undefined,
+    modelsLoading: modelsQuery.isFetching,
+    retryModels: () => void modelsQuery.refetch(),
     providerId: stateQuery.data?.provider,
     modelId: stateQuery.data?.modelId,
     setModel: (provider: string, modelId: string) => setModel.mutate({ provider, modelId }),
