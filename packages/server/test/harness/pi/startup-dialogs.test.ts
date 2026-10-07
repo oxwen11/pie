@@ -6,10 +6,10 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Effect, Fiber, FileSystem, Schedule, Stream } from "effect";
 
-import { listAvailablePiModels } from "../../../src/harness/pi/list-available-models";
-import { PI_PROJECT_PROCESS_ARGS } from "../../../src/harness/pi/project-resource-policy";
-import { resolvePiExecutable } from "../../../src/harness/pi/resolve-executable";
-import { makePiTransport } from "../../../src/harness/pi/transport";
+import { listAvailablePiModels } from "../../../src/pi/list-available-models";
+import { PI_PROJECT_PROCESS_ARGS } from "../../../src/pi/project-resource-policy";
+import { resolvePiExecutable } from "../../../src/pi/resolve-executable";
+import { makePiTransport } from "../../../src/pi/transport";
 
 // Opens dialogs at startup and from a command; records each answer.
 const writeDialogExtension = (cwd: string) =>

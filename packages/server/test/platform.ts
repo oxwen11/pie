@@ -6,7 +6,7 @@ import * as Observability from "../src/observability";
 import { ResourceMonitoringDiscard } from "../src/observability/resources";
 
 /**
- * The real Node platform services, mirroring what `rpc/runtime.ts` provides,
+ * The real Node platform services, mirroring what `runtime.ts` provides,
  * plus `Observability.discard` so `Effect.log*` does not leak to stdout.
  * Tests that write `$PIE_HOME/logs` provide `Observability.layer()`, which
  * replaces this logger.

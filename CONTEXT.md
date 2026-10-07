@@ -45,10 +45,10 @@ The outward session service the RPC router calls, addressed by SessionRef: gener
 **PiAgentSessionManager** (`harness/session-manager.ts`):
 The sole owner of live session state: the table of sessions keyed by ref (each `Live` or `Closing`), and the `acquire` a session runs when it decides it needs a runtime. Sole caller of `PiAgent.create`/`resume`. A ref with nothing live reads as idle at cursor 0 rather than failing.
 
-**PiAgent** (`harness/pi/agent.ts`):
-Effect Context service: availability check, create/resume, and cold reads. Constructed once in `rpc/runtime.ts` with availability cached for the process lifetime.
+**PiAgent** (`harness/pi-port.ts`, implemented in `pi/agent.ts`):
+Effect Context service: availability check, create/resume, and cold reads. Constructed once in `runtime.ts` with availability cached for the process lifetime.
 
-**PiAgentRuntime / PiProcess** (`harness/pi/runtime.ts`, `harness/pi/process.ts`):
+**PiAgentRuntime / PiProcess** (`harness/pi-port.ts`, `pi/runtime.ts`, `pi/process.ts`):
 `PiAgentRuntime` is the live execution resource (prompt/events/close) for one agent session id. `PiProcess` spawns and owns the underlying pie-owned `pie-pi-process` (`dist/pi-process/pi-process.js`, JSONL over stdio, bun-build). The process hosts one Pi `AgentSession` from `@earendil-works/pi-coding-agent`.
 
 **pie-pi-process**:

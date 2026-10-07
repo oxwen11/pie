@@ -13,9 +13,7 @@ import {
   type GitWorktreeFailure,
 } from "../../src/git/worktree-service";
 import { TurnAlreadyRunning, AgentUnavailable } from "../../src/harness/errors";
-import { PiAgent, type PiAgentShape } from "../../src/harness/pi/agent";
-import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
-import type { SessionInfoResult } from "../../src/harness/pi/types";
+import { PiAgent, type PiAgentShape, type SessionInfoResult } from "../../src/harness/pi-port";
 import type { UserInput } from "../../src/harness/session-io";
 import {
   SessionMetadataLocks,
@@ -37,6 +35,7 @@ import {
   PiAgentSessionService,
   PiAgentSessionServiceCoreLayer,
 } from "../../src/harness/session-service";
+import type { PiAgentRuntime } from "../../src/pi/runtime";
 import { ProjectService } from "../../src/project/service";
 
 export type Spy = {
@@ -254,11 +253,14 @@ export const run = <A, E>(
             return makeSession(sessionId);
           }),
         ),
-      ...(opts.coldHistory !== undefined
-        ? { getMessages: () => Effect.succeed(opts.coldHistory ?? []) }
-        : undefined),
-      ...(opts.coldModel !== undefined
-        ? { getModelState: () => Effect.succeed(opts.coldModel ?? {}) }
+      ...(opts.coldHistory !== undefined || opts.coldModel !== undefined
+        ? {
+            readSession: () =>
+              Effect.succeed({
+                messages: opts.coldHistory ?? [],
+                model: opts.coldModel ?? {},
+              }),
+          }
         : undefined),
       getSessionInfo: () => Effect.succeed<SessionInfoResult>({ _tag: "unsupported" }),
     } satisfies PiAgentShape;

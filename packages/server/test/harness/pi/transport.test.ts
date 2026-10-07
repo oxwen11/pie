@@ -7,7 +7,7 @@ import * as NodeServices from "@effect/platform-node/NodeServices";
 import { layer } from "@effect/vitest";
 import { Effect, Fiber, Stream } from "effect";
 
-import { makePiTransport } from "../../../src/harness/pi/transport";
+import { makePiTransport } from "../../../src/pi/transport";
 
 const FAKE = `#!/usr/bin/env node
 const readline = require("node:readline");
