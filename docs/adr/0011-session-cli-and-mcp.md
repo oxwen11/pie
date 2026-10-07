@@ -20,8 +20,10 @@ pull-request services. Neither door owns a store.
   require `2026-07-28`. Pi's client does not speak that revision.
 - The human CLI uses the daemon credential. An in-process Pi gets a bearer
   minted for that process. It opens `/mcp` only, and it is gone when the process
-  exits. It is not bound to one Session. Bash keeps stripping every `PIE_*`
-  variable. `respond` is not an MCP tool. `pie session respond` stays human. Sessions cannot be
+  exits. The server binds it to the one Session that process was spawned for,
+  from its own record of who the bearer was issued to; the model never supplies
+  that identity. A runtime acquired without a known Session gets no bearer. Bash
+  keeps stripping every `PIE_*` variable. `respond` is not an MCP tool. `pie session respond` stays human. Sessions cannot be
   deleted through CLI, oRPC, or MCP; archive is the only way to put one away.
 - `pie mcp` prints a bearer derived from the daemon token. It is not the daemon
   credential, so it opens `/mcp` and nothing under `/api/`.
@@ -30,6 +32,18 @@ pull-request services. Neither door owns a store.
 - `tools/list` publishes each tool's input schema (Effect Schema through
   `EffectSchemaToJsonSchemaConverter`). A model has no other way to learn the arguments.
 - `pr` is a Session's saved PR association (`link`, `ls`, `exclude`). `pullRequest` is the GitHub pull request. Do not use one name for both.
+- `pr_link`, `pr_ls` and `pr_exclude` act on the calling Session. With a bound bearer,
+  `ref` / `refs` may be omitted and mean that Session; naming any other Session is
+  `FORBIDDEN` and writes nothing. Every other caller (CLI, app, the `pie mcp` bearer) must
+  pass `ref` / `refs`, else `INVALID_ARGUMENT`. The extension adds a short prompt guidance:
+  link a PR right after creating it or starting work on it, each stack member separately,
+  list before finishing, never `restore` unasked.
+- This follows [session-pull-request-sync](../rfc/session-pull-request-sync.md) §3.2 for
+  PR association: the server determines the full `SessionRef`, and the registration grant
+  covers only the current Session. That RFC is unchanged. The orchestration tools
+  (`session_*`, `schedule_*`, `project_*`) are a separate grant to the in-process Pi decided
+  here; they are not PR-registration authority, and they still exclude the daemon token,
+  `/api/`, delete and respond.
 - Session is the default CLI object. Use `pie ls`, not `pie session ls`.
   `pie session queue` is a full replace of `session.queue` (`steering` and
   `followUp`; empty arrays clear it). Schedule verbs match `scheduleContract`:
@@ -53,6 +67,16 @@ pull-request services. Neither door owns a store.
 | Schedule                                     | `pie schedule list\|get\|create\|update\|rm\|run`     | same names                                            |
 | Project                                      | `pie project ls` / `create`                           | `project_ls` / `project_create`                       |
 
+## Compatibility
+
+The oRPC renames are a deliberate break with no aliases. A client and a daemon must run
+the same side of it: `agent.session.*` → `session.*`, `project.list` → `project.ls`,
+`schedule.delete` → `schedule.rm`, `schedule.runNow` → `schedule.run`, and
+`pullRequest.{link,ls,exclude}` → `pr.*`. A new Desktop against an older remote daemon
+(and an old Desktop against a new daemon) fails every renamed call. SSH environments run
+whatever `pie` is on the remote PATH, with no version gate. The Developer accepted this;
+see also [ADR 0005](0005-environment-rpc-routing.md).
+
 ## Rejected
 
 Provider switch, agent profiles, capability flags, native subagents, fork and
@@ -70,6 +94,8 @@ transcript text.
 
 - MCP tests cover the bearer boundary: a missing token, the daemon token, and
   a browser Origin are refused. `respond` is not a tool, and there is no delete.
+  They also cover the binding: a bearer issued to a spawned Pi child links PRs to
+  that Session without a `ref`, and cannot link, exclude or list for another.
 - Extend `packages/pie/src/node/session-cli.test.ts`, which already starts
   isolated `pie serve` with `PIE_E2E_PI_EXECUTABLE` pointing at
   `tools/test/fake-pi.js`. Cover `--from`, delivery, queue replace, `pie ls`,

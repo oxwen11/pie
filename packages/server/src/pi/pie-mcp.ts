@@ -3,6 +3,8 @@ import fs from "node:fs";
 import path from "node:path";
 import url from "node:url";
 
+import type { SessionRef } from "@getpie/contract";
+
 import { tokensMatch } from "../http/auth";
 
 const ASAR_SEGMENT = `${path.sep}app.asar${path.sep}`;
@@ -44,7 +46,8 @@ interface EndpointState {
   endpoint?: string;
 }
 const state: EndpointState = {};
-const issued = new Set<string>();
+/** Per-process bearers, each bound to the Session whose Pi child holds it. */
+const issued = new Map<string, SessionRef>();
 
 export function setAgentMcpEndpoint(next: string | undefined): void {
   state.endpoint = next;
@@ -64,9 +67,9 @@ export function agentMcpListenUrl(host: string, port: number): string {
   return `http://${formatted}:${port}/mcp`;
 }
 
-export function issueAgentMcpToken(): string {
+export function issueAgentMcpToken(ref: SessionRef): string {
   const token = crypto.randomBytes(32).toString("base64url");
-  issued.add(token);
+  issued.set(token, { projectId: ref.projectId, sessionId: ref.sessionId });
   return token;
 }
 
@@ -74,9 +77,12 @@ export function revokeAgentMcpToken(token: string): void {
   issued.delete(token);
 }
 
-export function agentMcpTokenMatches(actual: string | null): boolean {
-  if (actual === null) return false;
-  let matched = false;
-  for (const token of issued) matched = tokensMatch(token, actual) || matched;
-  return matched;
+/** The Session a per-process bearer is bound to, or undefined if it is not one. */
+export function agentMcpSession(actual: string | null): SessionRef | undefined {
+  if (actual === null) return undefined;
+  let session: SessionRef | undefined;
+  for (const [token, ref] of issued) {
+    if (tokensMatch(token, actual)) session = ref;
+  }
+  return session;
 }

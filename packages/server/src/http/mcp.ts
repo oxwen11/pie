@@ -6,7 +6,7 @@ import { Effect } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/http";
 import { MCPHandler } from "orpc-mcp/fetch";
 
-import { agentMcpTokenMatches } from "../pi/pie-mcp";
+import { agentMcpSession } from "../pi/pie-mcp";
 import type { RpcContext } from "../rpc/context";
 import { router } from "../rpc/router";
 import { bearerToken, tokensMatch } from "./auth";
@@ -47,13 +47,18 @@ export const handleMcp = (options: {
     }
     const presented = bearerToken(request.headers.authorization);
     const derived = options.token !== undefined && tokensMatch(options.token, presented);
-    if (!derived && !agentMcpTokenMatches(presented)) {
+    // Only a per-process bearer is bound; the ref comes from the server's own
+    // record of who it was issued to, never from the request.
+    const mcpSession = derived ? undefined : agentMcpSession(presented);
+    if (!derived && mcpSession === undefined) {
       return HttpServerResponse.text("Unauthorized", { status: 401 });
     }
     const web = yield* HttpServerRequest.toWeb(request).pipe(Effect.option);
     if (web._tag === "None") return HttpServerResponse.text("Bad Request", { status: 400 });
     const handled = yield* Effect.promise(() =>
-      handler.handle(web.value, { context: options.context }),
+      handler.handle(web.value, {
+        context: mcpSession === undefined ? options.context : { ...options.context, mcpSession },
+      }),
     );
     return handled.response === undefined
       ? HttpServerResponse.text("Not Found", { status: 404 })

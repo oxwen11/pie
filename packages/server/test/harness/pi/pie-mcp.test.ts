@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   agentMcpListenUrl,
-  agentMcpTokenMatches,
+  agentMcpSession,
   issueAgentMcpToken,
   pieMcpExtensionPath,
   revokeAgentMcpToken,
@@ -15,12 +15,19 @@ describe("pie mcp extension", () => {
     expect(extension?.startsWith("/")).toBe(true);
   });
 
-  it("accepts an issued token only until revoke", () => {
-    const token = issueAgentMcpToken();
-    expect(agentMcpTokenMatches(token)).toBe(true);
-    expect(agentMcpTokenMatches("nope")).toBe(false);
+  it("maps an issued token to the Session it was issued for, until revoke", () => {
+    const ref = { projectId: "p", sessionId: "s" };
+    const other = { projectId: "p", sessionId: "t" };
+    const token = issueAgentMcpToken(ref);
+    const otherToken = issueAgentMcpToken(other);
+    expect(agentMcpSession(token)).toEqual(ref);
+    expect(agentMcpSession(otherToken)).toEqual(other);
+    expect(agentMcpSession("nope")).toBeUndefined();
+    expect(agentMcpSession(null)).toBeUndefined();
     revokeAgentMcpToken(token);
-    expect(agentMcpTokenMatches(token)).toBe(false);
+    expect(agentMcpSession(token)).toBeUndefined();
+    expect(agentMcpSession(otherToken)).toEqual(other);
+    revokeAgentMcpToken(otherToken);
   });
 
   it("dials loopback when the bind address is unspecified", () => {

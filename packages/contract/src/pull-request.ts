@@ -277,43 +277,63 @@ const actionErrors = {
   HOST_REJECTED: {},
 };
 
-/** Saved associations on a Session. Matches `pie pr`. */
+const callerErrors = { ...currentErrors, FORBIDDEN: {}, INVALID_ARGUMENT: {} };
+
+/**
+ * Saved associations on a Session. Matches `pie pr`.
+ *
+ * `ref` / `refs` are optional only for a caller the server has bound to its own
+ * Session (an in-process Pi's MCP bearer): omitted means that Session, and any
+ * other Session is FORBIDDEN. Every other caller must pass them.
+ */
 export const prContract = {
   ls: oc
     .meta(
       mcp.tool({
         name: "pr_ls",
-        description: "Read saved PR associations for sessions, including exclusions.",
+        description:
+          "Read this session's saved PR associations, including exclusions. `refs` defaults to the calling session.",
       }),
     )
-    .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema).check(Schema.isMaxLength(100)) }))
-    .errors(currentErrors)
+    .input(
+      Schema.Struct({
+        refs: Schema.optionalKey(Schema.Array(SessionRefSchema).check(Schema.isMaxLength(100))),
+      }),
+    )
+    .errors(callerErrors)
     .output(Schema.Array(PullRequestSessionStatusSchema)),
   exclude: oc
     .meta(
       mcp.tool({
         name: "pr_exclude",
-        description: "Persist an exclusion for a PR. Does not close the GitHub PR.",
+        description:
+          "Persist an exclusion for a PR on this session. Does not close the GitHub PR. `ref` defaults to the calling session.",
       }),
     )
-    .input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema }))
-    .errors({ ...currentErrors, STORE_WRITE_FAILED: {} })
+    .input(
+      Schema.Struct({
+        ref: Schema.optionalKey(SessionRefSchema),
+        pullRequest: PullRequestRefSchema,
+      }),
+    )
+    .errors({ ...callerErrors, STORE_WRITE_FAILED: {} })
     .output(Schema.Void),
   link: oc
     .meta(
       mcp.tool({
         name: "pr_link",
-        description: "Persist a known GitHub PR association without querying GitHub.",
+        description:
+          "Persist a known GitHub PR association on this session without querying GitHub. `ref` defaults to the calling session.",
       }),
     )
     .input(
       Schema.Struct({
-        ref: SessionRefSchema,
+        ref: Schema.optionalKey(SessionRefSchema),
         pullRequest: PullRequestRefSchema,
         restore: Schema.optionalKey(Schema.Boolean),
       }),
     )
-    .errors({ ...currentErrors, STORE_WRITE_FAILED: {} })
+    .errors({ ...callerErrors, STORE_WRITE_FAILED: {} })
     .output(Schema.Literals(["linked", "exists", "excluded"])),
 };
 

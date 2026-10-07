@@ -69,6 +69,14 @@ Non-React consumers use the same registry directly:
 
 Provider remounting is not a routing mechanism. The global `QueryClient` never changes.
 
+## Compatibility
+
+The procedure names above follow [ADR 0011](0011-session-cli-and-mcp.md), which renamed
+the session, project and schedule procedures with no aliases. A Desktop and a remote
+daemon on opposite sides of that rename cannot talk to each other: every renamed call
+fails. SSH environments run the `pie` on the remote PATH without a version check, so a
+remote must be upgraded together with the Desktop. This break is accepted.
+
 ## Verification
 
 Required coverage:

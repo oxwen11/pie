@@ -49,7 +49,7 @@ import {
   SessionNotResumable,
   type TurnAlreadyRunning,
 } from "./errors";
-import { PiAgent, type PiAgentRuntime, type SessionInfoResult } from "./pi-port";
+import { PiAgent, PiSessionIdentity, type PiAgentRuntime, type SessionInfoResult } from "./pi-port";
 import { inSession } from "./session-identity";
 import type { PromptReceipt, RuntimePromptReceipt, UserInput } from "./session-io";
 import { SessionMetadataLocks, SessionMetadataLocksLayer } from "./session-locks";
@@ -389,6 +389,9 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           yield* changedPullRequests(ref);
         }),
       );
+    const withSessionIdentity = (ref: SessionRef) =>
+      Effect.provideService(PiSessionIdentity, { ref });
+
     const ensureRuntimeForPrompt = (
       ref: SessionRef,
       metadata: SessionWithCwd,
@@ -430,7 +433,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           { sessionId: metadata.agentSessionId, cwd: metadata.cwd },
           ref,
         );
-      });
+      }).pipe(withSessionIdentity(ref));
 
     const deliverPrompt = (
       ref: SessionRef,
@@ -472,7 +475,9 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
       cwd: string,
       run: (runtime: PiAgentRuntime) => Effect.Effect<A, SessionClosed | AgentOperationError | E>,
     ): Effect.Effect<A, ResumeSessionError | SessionClosed | AgentOperationError | E> =>
-      manager.ensureRuntime(runtimeInput(agentSessionId, cwd), ref).pipe(Effect.flatMap(run));
+      manager
+        .ensureRuntime(runtimeInput(agentSessionId, cwd), ref)
+        .pipe(withSessionIdentity(ref), Effect.flatMap(run));
 
     const prompt = Effect.fn("PiAgentSessionService.prompt")(function* (input: PromptInput) {
       const userInput = yield* toUserInput(input.parts, input.delivery);

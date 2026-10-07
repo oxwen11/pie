@@ -8,10 +8,11 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { deriveMcpToken, MCP_PATH } from "../../src/http/mcp";
 import type { ManagedServer } from "../../src/http/server";
-import { issueAgentMcpToken, revokeAgentMcpToken } from "../../src/pi/pie-mcp";
+import { issueAgentMcpToken, revokeAgentMcpToken, setAgentMcpEndpoint } from "../../src/pi/pie-mcp";
 import { discardContext } from "../platform";
 
 const TOKEN = "test-token-mcp";
+const someSession = { projectId: "project-x", sessionId: "session-x" };
 const ToolList = Schema.Struct({
   tools: Schema.Array(
     Schema.Struct({
@@ -32,6 +33,9 @@ const rl = readline.createInterface({ input: process.stdin });
 const send = (f) => process.stdout.write(JSON.stringify(f) + "\\n");
 const sidIndex = process.argv.indexOf("--session-id");
 const sessionId = sidIndex === -1 ? "default-sid" : process.argv[sidIndex + 1];
+if (process.env.FAKE_TOKEN_DIR && process.env.PIE_MCP_TOKEN) {
+  require("node:fs").writeFileSync(require("node:path").join(process.env.FAKE_TOKEN_DIR, String(process.pid)), process.env.PIE_MCP_TOKEN);
+}
 process.stdout.write("pi startup banner (not json)\\n");
 send({ type: "extension_ui_request", id: "st", method: "setStatus", statusKey: "k", statusText: "v" });
 const assistant = (over = {}) => ({ role: "assistant", content: [], api: "a", provider: "p", model: "m1", usage: { input: 1, output: 2 }, stopReason: "stop", timestamp: 0, ...over });
@@ -150,7 +154,7 @@ describe("external MCP door", () => {
       await fetch(`${base}/api/ws-ticket`, { method: "POST", headers: authorized }),
     ];
     expect(refused.map((response) => response.status)).toEqual([401, 401, 403, 405, 401]);
-    const agentToken = issueAgentMcpToken();
+    const agentToken = issueAgentMcpToken(someSession);
     const accepted = await post({ authorization: `Bearer ${agentToken}` }, ping);
     expect(accepted.status).toBe(200);
     // A process token opens /mcp and nothing else.
@@ -297,11 +301,203 @@ describe("external MCP door", () => {
       });
     const none = await post({});
     expect(none.status).toBe(401);
-    const agentToken = issueAgentMcpToken();
+    const agentToken = issueAgentMcpToken(someSession);
     const accepted = await post({ authorization: `Bearer ${agentToken}` });
     expect(accepted.status).toBe(200);
     revokeAgentMcpToken(agentToken);
     const revoked = await post({ authorization: `Bearer ${agentToken}` });
     expect(revoked.status).toBe(401);
   });
+
+  const bootBinding = async () => {
+    const fakeDir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-mcp-bind-"));
+    const fakePi = path.join(fakeDir, "fake-pi.js");
+    fs.writeFileSync(fakePi, FAKE);
+    fs.chmodSync(fakePi, 0o755);
+    const workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-ws-mcp-bind-"));
+    process.env.PIE_E2E = "1";
+    process.env.PIE_E2E_PI_EXECUTABLE = fakePi;
+    process.env.PIE_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-mcp-bind-"));
+
+    const { createServer } = await import("../../src/http/server");
+    const started = await createServer({
+      authToken: TOKEN,
+      shutdown: () => {},
+      effectContext: await discardContext(),
+    });
+    server = started;
+    await new Promise<void>((resolve) => {
+      started.listen(0, "127.0.0.1", resolve);
+    });
+    const address = started.address();
+    if (address === null || typeof address === "string") throw new Error("no TCP address");
+    const url = `http://127.0.0.1:${address.port}${MCP_PATH}`;
+    const derived = deriveMcpToken(TOKEN);
+    const call = async (bearer: string, name: string, args: unknown) => {
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          authorization: `Bearer ${bearer}`,
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: 1,
+          method: "tools/call",
+          params: { name, arguments: args },
+        }),
+      });
+      const body = (await response.json()) as {
+        result?: { isError?: boolean; content?: Array<{ text?: string }> };
+        error?: { message?: string };
+      };
+      if (body.error !== undefined) return { isError: true, value: body.error.message ?? "" };
+      const text = body.result?.content?.[0]?.text ?? "";
+      return { isError: body.result?.isError === true, value: text };
+    };
+    const Statuses = Schema.Array(
+      Schema.Struct({
+        ref: Schema.Struct({ sessionId: Schema.String }),
+        links: Schema.Array(
+          Schema.Struct({
+            ref: Schema.Struct({ number: Schema.Number }),
+            excluded: Schema.Boolean,
+          }),
+        ),
+      }),
+    );
+    const linksOf = async (ref: { projectId: string; sessionId: string }) => {
+      const read = await call(derived, "pr_ls", { refs: [ref] });
+      expect(read.isError).toBe(false);
+      const [status] = Schema.decodeUnknownSync(Statuses)(JSON.parse(read.value));
+      return status?.links ?? [];
+    };
+
+    const created = await call(derived, "project_create", { path: workspace });
+    const projectId = Schema.decodeUnknownSync(Schema.Struct({ id: Schema.String }))(
+      JSON.parse(created.value),
+    ).id;
+    const Ran = Schema.Struct({
+      ref: Schema.Struct({ projectId: Schema.String, sessionId: Schema.String }),
+    });
+    const refOf = async (prompt: string) =>
+      Schema.decodeUnknownSync(Ran)(
+        JSON.parse(await valueOf(derived, "session_run", { projectId, prompt })),
+      ).ref;
+    const pr = (number: number) => ({ host: "github.com", owner: "o", repository: "r", number });
+    const valueOf = async (bearer: string, name: string, args: unknown) => {
+      const result = await call(bearer, name, args);
+      return result.value;
+    };
+    const fails = async (bearer: string, name: string, args: unknown) => {
+      const result = await call(bearer, name, args);
+      return result.isError;
+    };
+    const linkNumbers = async (ref: { projectId: string; sessionId: string }) => {
+      const links = await linksOf(ref);
+      return links.map((link) => link.ref.number);
+    };
+    const linkExcluded = async (ref: { projectId: string; sessionId: string }) => {
+      const links = await linksOf(ref);
+      return links.map((link) => link.excluded);
+    };
+    return { url, derived, call, valueOf, fails, linkNumbers, linkExcluded, refOf, pr, Statuses };
+  };
+
+  it("binds a per-process bearer to its own Session for pr_* and refuses every other", async () => {
+    const { url, derived, call, valueOf, fails, linkNumbers, linkExcluded, refOf, pr, Statuses } =
+      await bootBinding();
+    const a = await refOf("session a");
+    const b = await refOf("session b");
+    const tokenA = issueAgentMcpToken(a);
+    const tokenB = issueAgentMcpToken(b);
+
+    // No ref: lands on the caller's own Session, not any other.
+    const linked = await call(tokenA, "pr_link", { pullRequest: pr(7) });
+    expect(linked.isError).toBe(false);
+    expect(linked.value).toBe("linked");
+    await expect(linkNumbers(a)).resolves.toEqual([7]);
+    await expect(linkNumbers(b)).resolves.toEqual([]);
+
+    // Naming its own Session is the same thing; naming another is refused and writes nothing.
+    await expect(valueOf(tokenA, "pr_link", { ref: a, pullRequest: pr(7) })).resolves.toBe(
+      "exists",
+    );
+    const foreignLink = await call(tokenA, "pr_link", { ref: b, pullRequest: pr(8) });
+    expect(foreignLink.isError).toBe(true);
+    expect(foreignLink.value).toContain("own session");
+    await expect(linkNumbers(b)).resolves.toEqual([]);
+    const foreignExclude = await call(tokenA, "pr_exclude", { ref: b, pullRequest: pr(8) });
+    expect(foreignExclude.isError).toBe(true);
+    await expect(linkNumbers(b)).resolves.toEqual([]);
+    await expect(fails(tokenA, "pr_ls", { refs: [b] })).resolves.toBe(true);
+    await expect(fails(tokenA, "pr_ls", { refs: [a, b] })).resolves.toBe(true);
+
+    // pr_ls with no refs reads its own Session; another process writes only to its own.
+    const own = Schema.decodeUnknownSync(Statuses)(JSON.parse(await valueOf(tokenA, "pr_ls", {})));
+    expect(own.map((status) => status.ref.sessionId)).toEqual([a.sessionId]);
+    await expect(fails(tokenB, "pr_link", { pullRequest: pr(9) })).resolves.toBe(false);
+    await expect(linkNumbers(a)).resolves.toEqual([7]);
+    await expect(linkNumbers(b)).resolves.toEqual([9]);
+
+    // Exclusion also defaults to the caller's Session.
+    await expect(fails(tokenA, "pr_exclude", { pullRequest: pr(7) })).resolves.toBe(false);
+    await expect(linkExcluded(a)).resolves.toEqual([true]);
+
+    // A credential that is not bound must say which Session.
+    const unbound = await call(derived, "pr_link", { pullRequest: pr(10) });
+    expect(unbound.isError).toBe(true);
+    expect(unbound.value).toContain("session ref is required");
+    await expect(linkNumbers(a)).resolves.toEqual([7]);
+
+    revokeAgentMcpToken(tokenA);
+    revokeAgentMcpToken(tokenB);
+    const gone = await fetch(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        accept: "application/json, text/event-stream",
+        authorization: `Bearer ${tokenA}`,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+    });
+    expect(gone.status).toBe(401);
+  });
+
+  it("gives each spawned Pi a bearer bound to the Session it was spawned for", async () => {
+    const tokenDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-mcp-tokens-"));
+    process.env.FAKE_TOKEN_DIR = tokenDir;
+    const { url, valueOf, fails, linkNumbers, refOf, pr } = await bootBinding();
+    setAgentMcpEndpoint(url);
+    try {
+      const childTokens = () =>
+        fs.readdirSync(tokenDir).map((name) => fs.readFileSync(path.join(tokenDir, name), "utf8"));
+      const waitForChild = async (count: number) => {
+        for (let attempt = 0; attempt < 100 && childTokens().length < count; attempt += 1) {
+          await new Promise<void>((resolve) => {
+            setTimeout(resolve, 100);
+          });
+        }
+        expect(childTokens()).toHaveLength(count);
+      };
+      const a = await refOf("child a");
+      await waitForChild(1);
+      const [tokenA] = childTokens();
+      const b = await refOf("child b");
+      await waitForChild(2);
+      const tokenB = childTokens().find((token) => token !== tokenA);
+      if (tokenA === undefined || tokenB === undefined) throw new Error("missing child tokens");
+
+      await expect(valueOf(tokenA, "pr_link", { pullRequest: pr(1) })).resolves.toBe("linked");
+      await expect(valueOf(tokenB, "pr_link", { pullRequest: pr(2) })).resolves.toBe("linked");
+      await expect(linkNumbers(a)).resolves.toEqual([1]);
+      await expect(linkNumbers(b)).resolves.toEqual([2]);
+      await expect(fails(tokenA, "pr_link", { ref: b, pullRequest: pr(3) })).resolves.toBe(true);
+      await expect(linkNumbers(b)).resolves.toEqual([2]);
+    } finally {
+      setAgentMcpEndpoint(undefined);
+      delete process.env.FAKE_TOKEN_DIR;
+    }
+  }, 30_000);
 });

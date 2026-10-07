@@ -4,7 +4,7 @@ import type {
   AgentModelState,
   SessionPendingPrompt,
 } from "@getpie/contract";
-import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
+import { Deferred, Effect, Exit, Option, Queue, Ref, Scope, Semaphore, Stream } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { v7 as uuid } from "uuid";
@@ -16,6 +16,7 @@ import {
   HarnessSessionNotFound,
   TurnAlreadyRunning,
 } from "../harness/errors";
+import { PiSessionIdentity } from "../harness/pi-port";
 import { drainQueue, streamFromQueueOne } from "../harness/queue-stream";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
 import {
@@ -722,7 +723,12 @@ export const makePiProcess = (
       Effect.gen(function* () {
         const mcpExtension = pieMcpExtensionPath(options.executable?.prefixArgs.at(-1));
         const mcpUrl = agentMcpEndpoint();
-        const mcpToken = mcpUrl === undefined ? undefined : issueAgentMcpToken();
+        // A bearer exists only for a runtime acquired for a known Session.
+        const identity = yield* Effect.serviceOption(PiSessionIdentity);
+        const mcpToken =
+          mcpUrl === undefined || Option.isNone(identity)
+            ? undefined
+            : issueAgentMcpToken(identity.value.ref);
         if (mcpToken !== undefined) {
           yield* Effect.addFinalizer(() => Effect.sync(() => revokeAgentMcpToken(mcpToken)));
         }

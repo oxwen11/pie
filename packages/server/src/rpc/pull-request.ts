@@ -114,27 +114,74 @@ const catchAction = <
       Effect.fail(errors.HOST_REJECTED({ message: "GitHub rejected the action" })),
   });
 
+type CallerErrors = {
+  FORBIDDEN: (input: { message: string }) => unknown;
+  INVALID_ARGUMENT: (input: { message: string }) => unknown;
+};
+
+const sameSession = (a: SessionRef, b: SessionRef) =>
+  a.projectId === b.projectId && a.sessionId === b.sessionId;
+
+/**
+ * Which Sessions a `pr_*` call acts on. A caller the server bound to its own
+ * Session (an in-process Pi's bearer) gets that Session by default and may not
+ * name another. Any other caller must say which Session.
+ */
+const sessionsForCaller = (
+  bound: SessionRef | undefined,
+  requested: ReadonlyArray<SessionRef> | undefined,
+  errors: CallerErrors,
+): Effect.Effect<ReadonlyArray<SessionRef>, unknown> => {
+  if (requested === undefined) {
+    return bound === undefined
+      ? Effect.fail(errors.INVALID_ARGUMENT({ message: "A session ref is required" }))
+      : Effect.succeed([bound]);
+  }
+  if (bound !== undefined && !requested.every((ref) => sameSession(ref, bound))) {
+    return Effect.fail(
+      errors.FORBIDDEN({ message: "This credential may only act on its own session" }),
+    );
+  }
+  return Effect.succeed(requested);
+};
+
+const sessionForCaller = (
+  bound: SessionRef | undefined,
+  requested: SessionRef | undefined,
+  errors: CallerErrors,
+): Effect.Effect<SessionRef, unknown> =>
+  Effect.gen(function* () {
+    const [ref] = yield* sessionsForCaller(
+      bound,
+      requested === undefined ? undefined : [requested],
+      errors,
+    );
+    // Exactly one ref in, exactly one out.
+    return ref ?? (yield* Effect.die("session ref resolved to nothing"));
+  });
+
 export const prRouter = pr.router({
-  ls: pr.ls.effect(function* ({ input }) {
-    return yield* (yield* PullRequestCoordinator).statuses(input.refs);
+  ls: pr.ls.effect(function* ({ input, context, errors }) {
+    const refs = yield* sessionsForCaller(context.mcpSession, input.refs, errors);
+    return yield* (yield* PullRequestCoordinator).statuses(refs);
   }),
-  exclude: pr.exclude.effect(function* ({ input, errors }) {
-    return yield* (yield* PiAgentSessionService)
-      .excludePullRequest(input.ref, input.pullRequest)
-      .pipe(
-        Effect.catchTags({
-          SessionNotFound: () =>
-            Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
-          StoreReadError: () =>
-            Effect.fail(errors.INTERNAL({ data: { message: "Session store could not be read" } })),
-          StoreWriteError: () =>
-            Effect.fail(errors.STORE_WRITE_FAILED({ message: "Association could not be saved" })),
-        }),
-      );
+  exclude: pr.exclude.effect(function* ({ input, context, errors }) {
+    const ref = yield* sessionForCaller(context.mcpSession, input.ref, errors);
+    return yield* (yield* PiAgentSessionService).excludePullRequest(ref, input.pullRequest).pipe(
+      Effect.catchTags({
+        SessionNotFound: () =>
+          Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
+        StoreReadError: () =>
+          Effect.fail(errors.INTERNAL({ data: { message: "Session store could not be read" } })),
+        StoreWriteError: () =>
+          Effect.fail(errors.STORE_WRITE_FAILED({ message: "Association could not be saved" })),
+      }),
+    );
   }),
-  link: pr.link.effect(function* ({ input, errors }) {
+  link: pr.link.effect(function* ({ input, context, errors }) {
+    const ref = yield* sessionForCaller(context.mcpSession, input.ref, errors);
     return yield* (yield* PiAgentSessionService)
-      .registerPullRequest(input.ref, input.pullRequest, "agent", input.restore === true)
+      .registerPullRequest(ref, input.pullRequest, "agent", input.restore === true)
       .pipe(
         Effect.catchTags({
           SessionNotFound: () =>
