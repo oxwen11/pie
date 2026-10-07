@@ -171,21 +171,25 @@ A **Hub token**, supplied to Hub as a secret, authenticates calls to Hub's own A
 It is distinct from the webhook secret and the daemon bearer. No password database,
 CLI login file, or `login/logout`.
 
-1. `POST /enrollment-tokens` (Hub token) with an optional label
-   mints a 256-bit token, valid ten minutes, at most ten pending; Hub stores only its
-   hash and expiry.
+1. `POST /enrollment-tokens` (Hub token) with an optional label mints a 256-bit
+   token; Hub stores only its hash. An unused token expires after ten minutes; at most
+   ten are unused at once.
 2. On the target, `pie hub connect` takes the Hub origin, `--token-stdin` and an
-   optional daemon `--url`, and sends the token through authenticated target RPC. No
-   secret in argv, URLs, stdout or logs.
-3. The daemon generates a 256-bit credential, persists a **pending** enrollment,
-   then calls `POST /enroll` with it, its Environment UUID and the token. In one serialized step Hub consumes the token, **pins the
-   presented UUID** (whoever holds the token is trusted to enroll) and stores the credential
-   hash. A UUID already enrolled and active is a conflict; a revoked one re-enrolls with the
+   optional daemon `--url`, and sends the token through authenticated target RPC. The
+   daemon persists a **pending** enrollment (origin, its Environment UUID, the token as
+   its credential). No secret in argv, URLs, stdout or logs.
+3. The daemon opens the WSS with the token as its bearer and its Environment UUID in
+   `hub.hello`. On the first valid connection Hub, in one transaction, checks the token
+   is unused and unexpired, **pins the presented UUID** (whoever holds the token is
+   trusted to enroll), stores the token's hash as that Environment's credential and marks
+   the token used. A UUID already active is a conflict; a revoked one re-enrolls with the
    new credential.
-4. The daemon authenticates the WSS with the credential; an acknowledged handshake
-   promotes pending to active. If the `/enroll` ack was lost, retry authentication
-   with the same pending credential, never re-enroll with a new secret. If the token
-   expired, report enrollment incomplete and require a fresh token.
+4. An acknowledged handshake promotes pending to active. After that the same token is
+   the Environment's long-lived credential, so it is handled as a secret (stdin only,
+   0600 on the daemon, hash only on Hub). If the connection drops before the
+   acknowledgement, reconnecting with the same token and UUID simply authenticates; if
+   the token expired before its first use, report enrollment incomplete and require a
+   fresh token.
 5. `hub.status` returns the Environment UUID, origin,
    pending/active/disconnected/revoked, connectivity, held/last event counts and a
    safe error code.
@@ -218,7 +222,7 @@ type HubEvent = {
   source: string; // adapter name: "hub", "github"; later "webhook", "slack", "sentry", "linear"
   type: string; // e.g. "issue_comment.created"
   key?: string; // opaque conversation key, <= 200 chars, e.g. "github:owner/repo#123"
-  attributes: Record<string, string | string[]>; // routing facts set by the adapter; see Subscriptions
+  attributes: Record<string, string>; // trigger facts set by the adapter; see Subscriptions
   receivedAt: string; // timezone-aware ISO, set by Hub
   expiresAt: string; // receivedAt + hold TTL, or + 60 s when not held
   payload: unknown; // source-specific, validated, <= 64 KiB serialized
@@ -239,39 +243,47 @@ Environment so it can route to (and hold for) an Environment that is offline.
 ```ts
 type HubSubscription = {
   id: string;
-  kind: "event"; // V1's only kind; see below
   source: string; // adapter name, e.g. "github"
   where: Record<string, string[]>; // attribute name -> accepted values
   // later phases: scheduleId?, reply?
 };
 ```
 
-For example, "`@pie` comments in `owner/repo`":
-`{ id: "s1", kind: "event", source: "github", where: { repository: ["github.com/owner/repo"], type: ["issue_comment.created", "pull_request_review_comment.created"], mentions: ["pie"] } }`.
+A subscription is only a **trigger**: which events reach this Environment. It does not
+read, extract or shape event content; that is the consumer's business (section 7).
 
-**Matching is source-agnostic.** An adapter puts the facts that matter for routing in
-the event's `attributes` (for GitHub: `type`, `repository`, `actor`, `mentions`,
-`labels`); a subscription names the values it accepts. Different attributes combine
-with AND; several values for one attribute combine with OR; an attribute that is itself
-a list matches when it shares any value with the subscription. Comparison is literal
-and case-normalized by the adapter: no regular expressions or wildcards. Hub's router
-therefore knows no source, and a new source adds an adapter and its attribute names to
-`packages/contract`, not a new subscription shape.
+For example, "comments in `owner/repo`":
+`{ id: "s1", source: "github", where: { type: ["issue_comment.created"], repository: ["github.com/owner/repo"] } }`.
+
+**Matching is source-agnostic.** An adapter puts the facts the vendor already gives as
+event metadata into the event's `attributes`: `type` (the vendor's own name, normalized
+to `<resource>.<action>`) and a scope such as repository, team, workspace or project.
+They are single-valued strings. A subscription names the values it accepts: different
+attributes combine with AND, several values for one attribute with OR. Comparison is
+literal and case-normalized by the adapter, with no regular expressions or wildcards.
+Hub's router therefore knows no source and never reads a body.
+
+Each adapter declares its attributes in `packages/contract`, marking which are
+required, because sources differ in what they can say:
+
+| Source          | Required             | Optional                                          |
+| --------------- | -------------------- | ------------------------------------------------- |
+| GitHub          | `type`, `repository` | `label` (for `issues.labeled`, the label applied) |
+| Linear          | `type`, `team`       |                                                   |
+| Slack           | `type`, `workspace`  | `channel`                                         |
+| Sentry          | `type`, `project`    |                                                   |
+| Generic webhook | `hook`               | `type`                                            |
 
 Bounds and checks at `hub.hello`: at most 8 attributes of at most 32 values of at most
-200 characters per subscription; events carry at most 16 attributes. An attribute name
-the source does not declare rejects that subscription (a typo must not silently never
-match), and a `where` with no narrowing attribute is rejected (a source adapter may
-require specific ones, e.g. GitHub requires `repository`). A subscription whose `kind`
-Hub does not know is rejected with a stable code without failing the hello; hello
-advertises supported kinds as an optional feature.
+200 characters per subscription. A subscription is rejected, with a stable code and
+without failing the hello, when it names an attribute its source does not declare (a
+typo must not silently never match) or omits a required one (it would otherwise
+trigger on everything the source sends).
 
-**Kinds.** Only `event` exists in V1: it filters events that sources push to Hub, which
-covers GitHub, Slack, Sentry, Linear and a generic webhook. Other kinds (for example
-Hub polling a source with no webhook, or holding an outbound stream for a source) are
-different in lifecycle, not just filter, and would add a union member whose adapter
-supplies optional `activate`/`deactivate` hooks. Their fields are not designed now.
-Because a Daemon's list is stored as JSON, adding a kind needs no schema migration.
+Other kinds of trigger (for example Hub polling a source that has no webhook) differ in
+lifecycle, not only filter. They are not designed now; when one appears it adds an
+optional `kind` field whose absence means the shape above, so existing subscriptions
+and the JSON column stay valid.
 
 Subscriptions live in the daemon's `$PIE_HOME/hub/subscriptions.json`, written by
 `hub.subscribe` / `hub.unsubscribe` (with `expectedEnvironmentId`), and are cleared when the
@@ -318,14 +330,14 @@ Common HTTP: bad signature or unauthorized actor 403; malformed 400; oversized 4
 durably stored; a duplicate delivery gets 200 with the existing safe receipt (Hub does
 not compare bodies); storage failure 503. The response never waits for a consumer.
 
-| Source           | When    | Path              | Attributes (declared by the adapter)                         |
-| ---------------- | ------- | ----------------- | ------------------------------------------------------------ |
-| GitHub           | Phase 2 | `/webhook/github` | `type`, `repository`, `actor`, `mentions`, `labels`          |
-| `hub` (injected) | Phase 1 | `POST /events`    | `type`                                                       |
-| Generic webhook  | later   | `/webhook/<name>` | `hook` (the name), `type`                                    |
-| Slack            | later   | `/webhook/slack`  | to be set when built (for example channel, user, type)       |
-| Sentry           | later   | `/webhook/sentry` | to be set when built (for example resource, action, project) |
-| Linear           | later   | `/webhook/linear` | to be set when built (for example type, action, team)        |
+| Source           | When    | Path              | Attributes (declared by the adapter)                   |
+| ---------------- | ------- | ----------------- | ------------------------------------------------------ |
+| GitHub           | Phase 2 | `/webhook/github` | `type`, `repository`, `label`                          |
+| `hub` (injected) | Phase 1 | `POST /events`    | `type`                                                 |
+| Generic webhook  | later   | `/webhook/<name>` | `hook` (the name), `type`                              |
+| Slack            | later   | `/webhook/slack`  | `type`, `workspace`, `channel` (to confirm when built) |
+| Sentry           | later   | `/webhook/sentry` | `type`, `project` (to confirm when built)              |
+| Linear           | later   | `/webhook/linear` | `type`, `team` (to confirm when built)                 |
 
 Vendor-specific signature headers, replay windows and payload fields are decided when
 each adapter is built, from that vendor's current documentation; this RFC does not
@@ -337,19 +349,19 @@ Only `issue_comment.created`, `pull_request_review_comment.created` and
 `issues.labeled` are eligible. Verify HMAC-SHA256 over the bounded raw body with
 constant-time comparison **before** decoding. Require event/delivery headers, JSON
 content type and a non-empty Hub-configured `fromUsers` allowlist (logins compared
-case-insensitively). `mentions` holds the literal `@handle` tokens found in a comment
-(lowercased, at most 20, not regex or longer-handle matches) and `labels` the label an
-`issues.labeled` event applied. The subscription chooses which mention (default
-`pie`) or label it wants. The normalized payload carries repository, actor, issue
-number and URL, title and event body; body is limited to 16,000 characters and title to
-256, and oversized context is rejected, not truncated.
+case-insensitively); the allowlist is an authorization check on who may trigger, not a
+subscription condition. Attributes are `type`, `repository` and, for `issues.labeled`,
+`label`. The normalized payload carries repository, actor, issue number and URL, title
+and event body; body is limited to 16,000 characters and title to 256, and oversized
+context is rejected, not truncated. Whether a comment mentions Pie is a content
+question for the consumer (section 7), not part of the trigger.
 
 ## 5. Wire contract
 
 One socket per Environment. Frames are Effect Schemas in `packages/contract`:
 
 - `hub.hello` (daemon to Hub): protocol version, the Environment UUID,
-  subscriptions, optional features (including the subscription kinds it supports).
+  subscriptions, optional features.
 - `hub.event.deliver` (Hub to daemon): a `HubEvent` plus `deliveryAttempt`.
 - `hub.event.ack` (daemon to Hub): `{ eventId, status }` with `status` one of
   `accepted | rejected | duplicate`, a stable `code` on rejection, and nothing else.
@@ -432,6 +444,28 @@ UI labels a run Hub-originated by joining it. Local Run now fires the saved prom
 with no event context and has no receipt. Eligibility is derived from current
 records at hello and again at admission, never cached as authority.
 
+### Filter and event content
+
+Three layers stay separate. The **trigger** (section 4) is Hub's: source, type and
+scope, decided without reading content. The **filter** and the **content** are the
+consumer's and arrive with Phase 3.
+
+- **Filter:** an optional, deterministic predicate the daemon evaluates on the
+  normalized event at admission, before any Session or model run, for example "the
+  comment text contains `@pie`" (GitHub has no server-side mention filter; Slack and
+  Linear expose a mention as its own event type, which is already a trigger). It is not
+  the agent's job: starting a model run per event costs tokens and hands untrusted text
+  to the model to decide. A filtered-out event acks `accepted` and records a receipt
+  outcome `filtered`, with no run. Syntax is a decision below: literal token and glob,
+  with regular expressions only if wanted, because the input is untrusted text.
+- **Content handoff:** the daemon writes the bounded normalized event to a file and the
+  prompt carries only a short instruction and the path, so the agent reads the content
+  itself after it starts. This keeps untrusted text out of the instruction text and
+  bounds its size; it is not a security boundary, since the agent is unsandboxed and
+  the text stays untrusted. The file is a host write (decision below): owner-only,
+  removed when the run settles, orphans swept at startup, and never copied into the
+  receipt.
+
 ### Conversations
 
 A **conversation** is an external thread's continuity. The daemon owns
@@ -478,7 +512,7 @@ proves a human created a Session.
 
 **V1 host: one long-lived Node (24) process**, also runnable under Bun, that is
 deployed once on any machine with a public HTTPS endpoint (a VPS, a container
-platform, or a tailnet/Funnel address). It serves `/webhook/github`, `/enroll`,
+platform, or a tailnet/Funnel address). It serves `/webhook/github`,
 `/enrollment-tokens`, `/events`, `/environments` and `/daemon` (WebSocket). One process owning one data directory
 is the transaction domain, which replaces a distributed lock; a second Hub process on
 the same directory is unsupported (an exclusive lock file refuses it). Tradeoff accepted: whoever hosts it runs and patches a server and
@@ -641,12 +675,13 @@ after approval update [host-persistence.md](../host-persistence.md) in each slic
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hub SQLite `config`                                               | Non-empty GitHub actor allowlist (`fromUsers`) and per-name generic webhook secrets, supplied at deployment; no empty seed. The Hub token and GitHub secret come from the process environment, not rows |
 | Hub SQLite `environments`                                         | Environment UUID, credential hash, hold flag, state, creation time, last cached subscriptions (no paths, prompts or credentials)                                                                        |
-| Hub SQLite `enrollment_tokens`                                    | Token hash, expiry and used flag, at most ten pending; swept by the hold interval                                                                                                                       |
+| Hub SQLite `enrollment_tokens`                                    | Token hash, expiry and used flag, at most ten unused; swept by the hold interval                                                                                                                        |
 | Hub SQLite `events`                                               | Event id (carries source and delivery id), normalized event, routing outcome, attempts, `expiresAt`; no raw body or headers; payload cleared at a terminal outcome                                      |
 | Hub `conversation_routes` (later)                                 | Conversation key to Environment UUID only                                                                                                                                                               |
 | Daemon `$PIE_HOME/hub/enrollment.json`, target daemon writer only | Origin, Environment UUID, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                                                                           |
 | Daemon `$PIE_HOME/hub/subscriptions.json`                         | Subscriptions for the enrolled Hub; no prompt, path or credential                                                                                                                                       |
 | Daemon `$PIE_HOME/hub/events/<eventId>.json`                      | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                                                         |
+| Daemon `$PIE_HOME/hub/inbox/<eventId>.json` (Phase 3, proposed)   | Bounded normalized event for the started agent to read; `0600`, removed when the run settles, orphans swept at startup; no copy in the receipt                                                          |
 | Daemon `$PIE_HOME/hub/conversations/<sha256(key)>.json` (later)   | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                                                                     |
 | Existing Schedule files                                           | **No change.** Reason `manual`, effective prompt in the run snapshot; existing 20-run retention and fired counter remain                                                                                |
 
@@ -697,10 +732,10 @@ CREATE INDEX events_pending ON events (environment_id, received_at);
 - The event row and its routing outcome commit in one transaction before any 202 or ack.
   Backoff timers are in memory; after a restart pending rows redeliver oldest first on
   reconnect, which at-least-once delivery already permits.
-- Enrollment is one transaction: token unused and unexpired, environment row inserted
-  (the primary key rejects an already-active UUID; a revoked row is updated to active
-  with the new credential hash), token marked used. A retry with the same UUID and
-  credential hash after a lost ack succeeds.
+- Enrollment is one transaction at the first valid connection: token unused and
+  unexpired, environment row inserted with the token's hash as `credential_hash` (the
+  primary key rejects an already-active UUID; a revoked row is updated to active), token
+  marked used. Later connections authenticate by comparing the hash.
 - Revoke, in one transaction: state `revoked`, credential hash cleared, pending events
   `revoked` with payload cleared; sockets close afterwards. Turning hold off does the
   same with `hold_disabled`.
@@ -824,9 +859,15 @@ Phase 1 needs 1 to 3 only; the rest can wait.
    are allowed at all.
 7. **Control surface (Phase 3):** Hub HTTP only (here) or also adapter-emitted
    commands such as a comment asking Pie to stop?
-8. **Subscriptions (Phase 2):** a `kind`-tagged union with one `event` kind and
-   source-agnostic attribute matching (section 4), rather than source-specific
-   subscription fields?
+8. **Subscriptions (Phase 2):** a trigger-only `{ id, source, where }` with
+   source-declared, single-valued attributes and per-source required ones (section 4),
+   rather than source-specific subscription fields?
+9. **Filter (Phase 3):** evaluated by the daemon before any run (recommended) with
+   literal and glob matching, or also regular expressions (untrusted input, backtracking
+   cost)? Or leave it to the agent after it starts (a model run per event)?
+10. **Content handoff (Phase 3):** a temporary owner-only file the agent reads
+    (recommended; a host write needing your approval) or the content inlined in the
+    prompt?
 
 Until confirmed, these remain alternatives under review, not settled ADRs or approved
 host writes. The implemented Environment identity and RPC isolation invariants, the
