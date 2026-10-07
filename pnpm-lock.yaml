@@ -734,6 +734,16 @@ importers:
         version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@5.0.2)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.2)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))
 
   packages/hub:
+    dependencies:
+      '@getpie/contract':
+        specifier: workspace:*
+        version: link:../contract
+      effect:
+        specifier: 4.0.1
+        version: 4.0.1
+      ws:
+        specifier: 'catalog:'
+        version: 8.22.0
     devDependencies:
       '@getpie/typescript':
         specifier: workspace:*
@@ -741,6 +751,12 @@ importers:
       '@types/node':
         specifier: ^24.19.0
         version: 24.19.1
+      '@types/ws':
+        specifier: 'catalog:'
+        version: 8.18.2
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.22.14(oxc-resolver@11.24.2)(publint@0.3.24)(typescript@7.0.2)(unrun@0.3.1)
       vitest:
         specifier: 5.0.2
         version: 5.0.2(@opentelemetry/api@1.9.1)(@types/node@24.19.1)(@vitest/browser-playwright@5.0.2)(@vitest/browser-preview@4.1.10)(@vitest/ui@5.0.2)(jsdom@26.1.0(supports-color@10.2.2))(vite@8.3.3(@types/node@24.19.1)(esbuild@0.28.1)(jiti@2.7.0)(yaml@2.9.0))
