@@ -168,21 +168,23 @@ const LegacyHost = Schema.Struct({
   port: Schema.optionalKey(Schema.NullOr(Schema.Int)),
 });
 
-const adoptLegacyHosts = (file: { readonly environments: readonly unknown[] }) => ({
-  environments: file.environments.flatMap((raw) => {
+const adoptLegacyHosts = (file: { readonly environments: readonly unknown[] }) => {
+  const environments = [];
+  for (const raw of file.environments) {
     const decoded = Schema.decodeUnknownExit(LegacyHost)(raw);
-    if (Exit.isFailure(decoded)) return [];
-    return [
-      {
-        id: decoded.value.id,
-        alias: decoded.value.alias,
-        hostname: decoded.value.hostname,
-        username: decoded.value.username ?? null,
-        port: decoded.value.port ?? null,
-      },
-    ];
-  }),
-});
+    if (Exit.isFailure(decoded)) {
+      throw new Error("legacy SSH host entry failed validation");
+    }
+    environments.push({
+      id: decoded.value.id,
+      alias: decoded.value.alias,
+      hostname: decoded.value.hostname,
+      username: decoded.value.username ?? null,
+      port: decoded.value.port ?? null,
+    });
+  }
+  return { environments };
+};
 
 const unavailableError = () => new SshPersistError({ message: SAVED_HOSTS_UNAVAILABLE });
 

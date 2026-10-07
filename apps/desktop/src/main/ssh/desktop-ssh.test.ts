@@ -160,6 +160,44 @@ describe("DesktopSsh saved hosts", () => {
     expect(error.mode).toBe(0o600);
   });
 
+  it("does not adopt a pre-envelope file when any entry is invalid", async () => {
+    const fileText = JSON.stringify({
+      version: 1,
+      activeId: "abc123abc123abcd",
+      environments: [
+        {
+          id: "abc123abc123abcd",
+          alias: "myserver",
+          hostname: "example.com",
+          username: "alice",
+          port: 22,
+        },
+        { id: "", alias: "bad" },
+      ],
+    });
+    const result = await withSsh((dir) =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const file = path.join(dir, "ssh-environments.json");
+        yield* fs.writeFileString(file, fileText);
+        const ssh = yield* makeDesktopSsh({ persistPath: file });
+        const listed = yield* ssh.listSaved;
+        const connect = yield* ssh.connect("alice@example.com").pipe(Effect.flip);
+        return {
+          listed,
+          connect,
+          raw: yield* fs.readFileString(file),
+          message: ssh.savedHostsMessage,
+        };
+      }),
+    );
+
+    expect(result.listed).toEqual([]);
+    expect(result.connect.message).toBe(SAVED_HOSTS_UNAVAILABLE);
+    expect(result.message).toBe(SAVED_HOSTS_UNAVAILABLE);
+    expect(result.raw).toBe(fileText);
+  });
+
   it("remove deletes a saved host from disk", async () => {
     const remaining = await withSsh((dir) =>
       Effect.gen(function* () {
