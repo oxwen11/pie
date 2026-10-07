@@ -1,6 +1,9 @@
 import type { PiTools } from "@getpie/contract";
+import { CodeBlock } from "@getpie/ui/ai-elements/code-block";
+import { Tool, ToolContent, ToolHeader } from "@getpie/ui/ai-elements/tool";
 import type { DynamicToolUIPart, ToolUIPart } from "ai";
 import {
+  BracesIcon,
   FilePenIcon,
   FilePlusIcon,
   FileSearchIcon,
@@ -56,6 +59,17 @@ function ToolPartContent({ part }: { part: AnyToolPart }) {
       return toolLine(FileSearchIcon, "find", part.input?.pattern);
     case "tool-ls":
       return toolLine(FolderIcon, "ls", part.input?.path);
+    // The script is the whole payload: a collapsible card with the code as a
+    // JS block, not the generic JSON dump extension tools get.
+    case "tool-codemode":
+      return (
+        <Tool>
+          <ToolHeader icon={BracesIcon}>codemode</ToolHeader>
+          <ToolContent>
+            {part.input?.code != null && <CodeBlock code={part.input.code} language="javascript" />}
+          </ToolContent>
+        </Tool>
+      );
     // Extension / custom tools
     default:
       return <DynamicToolPart part={part} name={part.toolName} />;
