@@ -428,33 +428,34 @@ the same directory is unsupported (an exclusive lock file refuses it). Tradeoff 
 owns uptime; in exchange the deployment needs no vendor account, quotas or hibernation
 semantics, and the whole thing runs locally under the ordinary test and verify tools.
 
-**Storage: JSONL first, SQLite later (Developer, revision 7).** V1 keeps Hub state in
-`$HUB_HOME` as small JSON documents (`config`, `relationships`, `enrollment_tokens`,
-through `@getpie/effect-json-store`) plus one append-only **JSONL journal** for events.
-Each line is a record: `event` (normalized event, source delivery id, body SHA-256),
-`state` (routing outcome, delivery attempt, ack) or `drop` (expiry or opt-out). Startup
-replays the journal into in-memory indexes (dedupe by source delivery id, pending by
-relationship), so duplicate detection and oldest-first hold need no query engine. This
-fits the section 6 caps (1000 events, 50 MiB, 100 per key) and tens of Environments.
-Rules that make it safe:
+**Storage: SQLite (Developer, revision 7).** Hub state is one SQLite file,
+`$HUB_HOME/hub.sqlite`, opened by the single process (directory `0700`, file `0600`,
+WAL, `synchronous=FULL`, `foreign_keys=ON`). Tables are those in section 9: `config`,
+`relationships`, `enrollment_tokens`, `events` (later `conversation_routes`).
+Why SQLite rather than files: dedupe, hold, claim and ack are small transactions
+(`INSERT OR IGNORE` on the source delivery id, an attempt counter, oldest-first with
+caps by query), the same shapes the Phase 0 prototype ran inside a Durable Object's
+SQLite, so the schema and queries carry over to a Cloudflare host unchanged, and the
+closest open-source precedent (`nikuscs/orbs`, section 8) takes the same route. Rules:
 
-- One writer serializes appends; a record is appended and fsynced **before** the
-  webhook 2xx or the delivery ack is sent. A torn last line from a crash is truncated
-  on startup; a bad line elsewhere refuses to start and is never silently skipped.
-- Lines carry a schema version; unknown newer versions refuse to load (no downgrade
-  guessing).
-- Compaction (drop expired and acked-and-past-dedupe-window records) rewrites to a temp
-  file and renames; it runs on the sweep interval and at startup, and the dedupe record
-  must outlive the hold TTL (section 6).
-- The store is behind the same Effect seam as the host, with an in-memory test layer, so
-  moving to SQLite (when caps grow, queries are needed, or multi-process is wanted) is a
-  new Layer plus a one-shot importer from the journal, not a core rewrite. Trigger for
-  the move: compaction time or startup replay becomes noticeable, or a query the
-  indexes cannot answer is needed.
+- One process, one writer: an exclusive lock file refuses a second Hub on the same
+  directory. A row is committed **before** the webhook 2xx or the delivery ack is sent.
+- Schema version in `PRAGMA user_version` with ordered migrations run at startup in a
+  transaction; a database newer than the code refuses to start (no downgrade guessing).
+- The sweep interval deletes expired events and past-window dedupe rows in batches;
+  dedupe rows must outlive the hold TTL (section 6). Corruption (`integrity_check`
+  failure) refuses to start and is never repaired by clearing data.
+- Binding: prefer built-in `node:sqlite` (Node 24) behind a small synchronous store
+  seam; verify it under Bun in Phase 1 and, only if Bun lacks it, add a `bun:sqlite`
+  adapter behind the same seam. No ORM or native add-on in V1. Tests use an in-memory
+  database through the same seam.
+- Backup is the operator's job: copy with `VACUUM INTO` or SQLite's backup API, not a
+  raw copy of a live WAL file; the Dokploy volume backup alone is not safe unless Hub is
+  stopped or the copy goes through SQLite.
 
 Host choice still to settle in the Phase 1 slice, not here: the TLS/reverse-proxy recipe (Hub speaks plain HTTP behind the operator's
-proxy; it never terminates TLS itself). Runtime: Node 24 and Bun both need only
-`node:fs` and `node:http`/`ws`-class APIs, so no database binding is chosen. A single process has no hibernation, so
+proxy; it never terminates TLS itself). Runtime: Node 24 and Bun both provide
+HTTP, WebSocket and a built-in synchronous SQLite. A single process has no hibernation, so
 heartbeat is an ordinary timer and the hold sweep is an interval, not an alarm.
 
 **Cloudflare later.** The earlier design (Worker + one SQLite Durable Object) stays a
@@ -478,13 +479,14 @@ limits are 100,000 rows written and 5 million read per day.
 
 No project does what Hub does end to end; these are the closest, read from clones.
 
-| Project                                       | Relevance                                                                                                                                                                                                   | Take                                                                                                                                                        |
-| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Liplus-Project/github-webhook-mcp` (MIT)     | Closest: GitHub App webhook, per-tenant SQLite DO with the Hibernation WebSocket API, a Node client authenticating with `ws` and an `Authorization` header, HMAC check, retention alarm                     | Worker authenticates, then forwards the original request to the DO (`stub.fetch(request)`), and the DO trusts the Worker; strict HMAC length check          |
-| `cloudflare/agents` (MIT)                     | Official DO framework: `acceptWebSocket` with tags, `serializeAttachment`, `routeAgentRequest` with an `onBeforeConnect` hook that can reject or mutate before forwarding, an alarm-driven SQLite job queue | Authenticate and authorize before the DO sees the socket; per-connection identity in attachments; one alarm drives retries                                  |
-| `loncoeng/durable-webhook` (MIT, Worker + KV) | HTTP relay with retry and dead letters; no Durable Object despite the name                                                                                                                                  | "Accepting is not delivering"; dedupe key from the delivery id; tiered TTLs; backoff table; replayable dead letters; admin auth checked before any 404      |
-| `peter-leonov/webhooks-proxy-tunnel` (MIT)    | Worker + DO tunnel to a local Node client over WebSocket; no hibernation, no persistence                                                                                                                    | A new connection closes the old one with a dedicated code (4101), a precedent for the replaced-socket rule; `timingSafeEqual`; do not copy its token scheme |
-| `probot/smee.io`, `NuovarDev/HookHQ`          | Live-fanout baseline (no persistence, no ack); an outbound-webhook SaaS, the wrong direction                                                                                                                | Cite only; HookHQ's backoff and jitter code                                                                                                                 |
+| Project                                       | Relevance                                                                                                                                                                                                                                                                                                                                                                                                          | Take                                                                                                                                                                      |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Liplus-Project/github-webhook-mcp` (MIT)     | Closest: GitHub App webhook, per-tenant SQLite DO with the Hibernation WebSocket API, a Node client authenticating with `ws` and an `Authorization` header, HMAC check, retention alarm                                                                                                                                                                                                                            | Worker authenticates, then forwards the original request to the DO (`stub.fetch(request)`), and the DO trusts the Worker; strict HMAC length check                        |
+| `cloudflare/agents` (MIT)                     | Official DO framework: `acceptWebSocket` with tags, `serializeAttachment`, `routeAgentRequest` with an `onBeforeConnect` hook that can reject or mutate before forwarding, an alarm-driven SQLite job queue                                                                                                                                                                                                        | Authenticate and authorize before the DO sees the socket; per-connection identity in attachments; one alarm drives retries                                                |
+| `loncoeng/durable-webhook` (MIT, Worker + KV) | HTTP relay with retry and dead letters; no Durable Object despite the name                                                                                                                                                                                                                                                                                                                                         | "Accepting is not delivering"; dedupe key from the delivery id; tiered TTLs; backoff table; replayable dead letters; admin auth checked before any 404                    |
+| `nikuscs/orbs` (MIT, Bun + Pi)                | Closest architecture: daemon dials out with an organization API key to `/ws/daemon`; the same app runs on Cloudflare (Worker, D1, R2, one Durable Object per organization) or as one Bun process (`bun:sqlite`, disk); the native `TenantRuntime` re-creates DO semantics (serial queue, alarm with backoff, tagged sockets, `replaced`/`revoked` close codes); services built from injected deps with `overrides` | Two hosts from one core is feasible and the native emulation is small (about 350 lines); no per-event ack or redelivery in the part read, so ack-after-persist stays ours |
+| `peter-leonov/webhooks-proxy-tunnel` (MIT)    | Worker + DO tunnel to a local Node client over WebSocket; no hibernation, no persistence                                                                                                                                                                                                                                                                                                                           | A new connection closes the old one with a dedicated code (4101), a precedent for the replaced-socket rule; `timingSafeEqual`; do not copy its token scheme               |
+| `probot/smee.io`, `NuovarDev/HookHQ`          | Live-fanout baseline (no persistence, no ack); an outbound-webhook SaaS, the wrong direction                                                                                                                                                                                                                                                                                                                       | Cite only; HookHQ's backoff and jitter code                                                                                                                               |
 
 Gaps in the closest project that Hub must not inherit: `INSERT OR REPLACE` on a
 redelivered event resets its processed flag (use `INSERT OR IGNORE`); delivery is
@@ -567,10 +569,10 @@ persist step ourselves; none of them models it.
 
 Only the Node layer is built in V1. The Cloudflare layer would supply the same seams
 from Durable Object storage and WebSocket hibernation; the prototype above is the
-feasibility evidence, not a commitment. Keep `node:fs`-style access out of the core
-so that layer stays an adapter and not a rewrite. Whether to reuse
-`@getpie/effect-json-store` is a Phase 1 decision; the event store needs SQL, so it
-likely does not apply.
+feasibility evidence, not a commitment. Keep platform access out of the core
+so that layer stays an adapter and not a rewrite. The store seam is SQL-shaped
+(synchronous, transactional), which is also what a Durable Object's SQLite offers, so the
+two hosts differ in connection handling and scheduling, not in queries.
 
 ## 9. Persistence approval worksheet — not shipped inventory
 
@@ -580,10 +582,10 @@ after approval update [host-persistence.md](../host-persistence.md) in each slic
 
 | Location / owner                                                                 | Data, scope and lifecycle                                                                                                                                            |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hub `config.json`                                                                | Non-empty actor allowlist and default mention/label, operator-supplied; no empty seed. Operator bearer and GitHub secret come from the process environment, not rows |
-| Hub `relationships.json`                                                         | Relationship id, Environment UUID, label, credential hash, hold flag, state, timestamps, last cached subscriptions (no paths, prompts or credentials)                |
-| Hub `enrollment_tokens.json`                                                     | Token hash and expiry, at most ten pending; swept by the hold interval                                                                                               |
-| Hub `events.jsonl` journal                                                       | Event id, source delivery id and raw-body SHA-256, normalized event, routing outcome, delivery state, attempts, `expiresAt`; no raw body or headers                  |
+| Hub SQLite `config`                                                              | Non-empty actor allowlist and default mention/label, operator-supplied; no empty seed. Operator bearer and GitHub secret come from the process environment, not rows |
+| Hub SQLite `relationships`                                                       | Relationship id, Environment UUID, label, credential hash, hold flag, state, timestamps, last cached subscriptions (no paths, prompts or credentials)                |
+| Hub SQLite `enrollment_tokens`                                                   | Token hash and expiry, at most ten pending; swept by the hold interval                                                                                               |
+| Hub SQLite `events`                                                              | Event id, source delivery id and raw-body SHA-256, normalized event, routing outcome, delivery state, attempts, `expiresAt`; no raw body or headers                  |
 | Hub `conversation_routes` (later)                                                | Conversation key to relationship id only                                                                                                                             |
 | Daemon `$PIE_HOME/hub/relationship.json`, target daemon writer only              | Origin, Environment UUID, relationship id, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                       |
 | Daemon `$PIE_HOME/hub/subscriptions.json`                                        | Subscriptions naming a relationship; no prompt, path or credential                                                                                                   |
@@ -605,8 +607,8 @@ Candidate rules needing explicit approval:
 - A Schedule run with `provider`/`modelId` persists Pi's shared default outside
   `$PIE_HOME`; do not claim Environment isolation for it, serialize proof that uses
   one, and never guess-restore the previous default.
-- Atomic rename covers process failure, not power loss. Hub's journal append is fsynced
-  before any response or ack; daemon JSON does not claim power-loss
+- Atomic rename covers process failure, not power loss. Hub's SQLite commit (WAL,
+  `synchronous=FULL`) precedes any response or ack; daemon JSON does not claim power-loss
   durability. If that is required, decide fsync or a database first.
 - No automatic receipt pruning on either side: deleting receipts reopens duplicate
   execution. Cap 100,000 per side; at the cap refuse new admissions but keep duplicate
@@ -633,7 +635,7 @@ only if Cloudflare is proposed.
 
 ### Phase 1: connection, events and hold
 
-Contract; secure storage capability; Hub host (Node process, JSONL journal and JSON documents, config, schema);
+Contract; secure storage capability; Hub host (Node process, SQLite store, config, schema);
 enrollment and revocation; daemon relationship and administration RPC; event
 delivery with ack and receipts; `POST /operator/events`; opt-in hold; CLI
 administration. Hello carries no subscriptions yet and the daemon has no effect
@@ -687,7 +689,7 @@ screenshots and video. This documentation revision claims none of these gates.
 Phase 1 needs 1 to 3 only; the rest can wait.
 
 1. **Host:** settled in revision 7: Node/Bun self-hosted first, Cloudflare later
-   behind the Effect seam. Storage: JSONL journal first, SQLite later. Still open for Phase 1: TLS/proxy recipe.
+   behind the Effect seam. Storage: SQLite via `node:sqlite`, checked under Bun. Still open for Phase 1: TLS/proxy recipe.
    Deployment itself needs separate consent.
 2. **Hold defaults:** per-relationship opt-in, 24-hour TTL, the section 6 caps,
    verified normalized events only?
