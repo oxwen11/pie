@@ -71,8 +71,7 @@ Hub is an event **broker**, not a second daemon, a proxy for daemon traffic, or 
 workflow engine. Its stages:
 
 1. **Source adapter** verifies a source's request and wraps it in an **event** (id,
-   source, the vendor's own event name and action as `type`, optional conversation
-   key, `receivedAt`, `expiresAt`, the vendor's payload).
+   source, the vendor's own event name and action as `type`, `receivedAt`, `expiresAt`, the vendor's payload).
 2. **Webhook** is the trigger: the URL the event arrived on is bound to one
    Environment, which is where the event goes.
 3. **Delivery** sends the event over that Environment's socket, requires an ack,
@@ -221,11 +220,10 @@ type HubEvent = {
   eventId: string;
   source: string; // adapter name: "hub", "github"; later "webhook", "slack", "sentry", "linear"
   type: string; // the vendor's event name, plus its action when it has one: "issue_comment.created"
-  key?: string; // opaque conversation key, <= 200 chars, e.g. "github:owner/repo#123"
   webhookId?: string; // the webhook it arrived on; absent for `hub` events
   receivedAt: string; // timezone-aware ISO, set by Hub
   expiresAt: string; // receivedAt + hold TTL, or + 60 s when not held
-  payload: unknown; // the vendor's JSON, unchanged, <= 64 KiB serialized
+  payload: unknown; // the vendor's JSON, unchanged and stored in full
 };
 ```
 
@@ -286,15 +284,14 @@ Each source is one adapter with the same three duties:
    raw body in constant time, with a replay window where the vendor supplies a
    timestamp. Any handshake the vendor requires (for example a challenge when a
    webhook is registered) is answered inside the adapter and records no event.
-2. **Identify.** Read the vendor's event name and action into `type`, derive an
-   optional conversation `key` (`<source>:...`, Phase 3) from the vendor's ids, and keep
-   the vendor's JSON as `payload`, unchanged and at most 64 KiB; a larger one is a
-   terminal `payload_too_large` receipt, never truncated. The `eventId` is `<source>:<vendor delivery
-id>`; when a vendor supplies none, the SHA-256 of the raw body.
+2. **Identify.** Read the vendor's event name and action into `type` and keep the
+   vendor's JSON as `payload`, unchanged and stored in full, never truncated or
+   reshaped. The `eventId` is `<source>:<vendor delivery id>`; when a vendor supplies
+   none, the SHA-256 of the raw body.
 3. **Drop what is not wanted.** An unsupported action or event is `204` with no record.
 
 Common HTTP: bad signature or unauthorized actor 403; malformed 400; oversized 413
-(1 MiB); a verified delivery gets 202 only after its event and routing outcome are
+(over the event size limit, default 1 MiB, raised only when real payloads need it); a verified delivery gets 202 only after its event and routing outcome are
 durably stored; a duplicate delivery gets 200 with the existing safe receipt (Hub does
 not compare bodies); storage failure 503. The response never waits for a consumer.
 
@@ -334,8 +331,8 @@ One socket per Environment. Frames are Effect Schemas in `packages/contract`:
 - `hub.ping`/`hub.pong`: 30-second heartbeat; two missed close the socket.
 
 Validate UUIDs, field lengths and discriminants at both receivers. No raw error
-strings, `workspace` or `SessionRef` cross to Hub. Limits: WS frame 64 KiB, hello
-64 KiB, 10-second header/body deadlines; five Hub-token or enrollment failures
+strings, `workspace` or `SessionRef` cross to Hub. Limits: WS event frame up to the event
+size limit plus its envelope, hello 64 KiB, 10-second header/body deadlines; five Hub-token or enrollment failures
 per minute per source; at most 32 pending unauthenticated upgrades; bounded
 concurrent webhook handling with 429 beyond it. Untrusted requests never write
 arbitrary ids as paths or log bodies, secrets, argv or unsanitized peer errors.
@@ -358,8 +355,8 @@ at enrollment or later):
   receipt) or Environment revocation. Hub stores the **verified event**
   (the vendor's JSON and its event name), never any header or the signature. On reconnect Hub delivers oldest
   first, per Environment, in order; a conflict or reject ack ends that event.
-- Caps: 1,000 held events per Environment (each payload is at most 64 KiB, which
-  bounds storage); at the cap
+- Caps: 1,000 held events and 100 MiB of stored payload per Environment (the sum of
+  payload bytes of its pending rows, counted in the insert transaction); at a cap
   new events are terminal `inbox_full` while already-held events still deliver.
   Turning hold off deletes held events.
 - Time: Hub sets `receivedAt` and never trusts a sender timestamp. A later phase's
@@ -436,7 +433,7 @@ consumer's and arrive with Phase 3.
   for, not assume away.
 - **Not the agent:** deciding by starting the agent costs a model run per event and
   hands untrusted text to it first.
-- **Content handoff:** the daemon writes the event to a file and the
+- **Content handoff:** the daemon writes the stored event as received to a file and the
   prompt carries only a short instruction and the path, so the agent reads the content
   itself after it starts. This keeps untrusted text out of the instruction text and
   bounds its size; it is not a security boundary, since the agent is unsandboxed and
@@ -446,16 +443,16 @@ consumer's and arrive with Phase 3.
 
 ### Conversations
 
-A **conversation** is an external thread's continuity. The daemon owns
-`{ key } -> { scheduleId, SessionRef, state }`; Hub sends the
-opaque key (the event's `key`) and never a `SessionRef`. With no conversation, the
-daemon fires the Schedule's session policy (start) and records the key before the
-prompt; with one, it prompts that Session (continue) with only the new bounded
-untrusted context. A running Session is `busy` (decision 5), an archived one
+A **conversation** is an external thread's continuity, and only the daemon knows it.
+The daemon computes a thread identity itself from the vendor's own payload fields by a
+fixed rule per vendor event (for GitHub, the repository's full name and the issue or
+pull request number) and owns `{ thread } -> { scheduleId, SessionRef, state }`. With no
+conversation, the daemon fires the Schedule's session policy (start) and records the
+thread before the prompt; with one, it prompts that Session (continue) with only the
+new event's file (below). A running Session is `busy` (decision 5), an archived one
 `session_archived`, a missing checkout `session_unavailable`; none starts a new
-Session implicitly. Hub keeps one routing fact, `key -> environmentId`, so
-follow-ups reach the Environment that started the thread; it holds no Session
-information and losing it only makes the next event start a new thread.
+Session implicitly. Hub holds no thread, Session or conversation information: the
+webhook already fixes which Environment receives every event of a thread.
 
 `hub.event.control` with `interrupt | archive | restore` acts on one owned
 conversation through `interrupt`, `archive` and `restoreWorktree`, reached only from
@@ -500,7 +497,7 @@ semantics, and the whole thing runs locally under the ordinary test and verify t
 **Storage: SQLite (Developer, revision 7).** Hub state is one SQLite file,
 `$HUB_HOME/hub.sqlite`, opened by the single process (directory `0700`, file `0600`,
 WAL, `synchronous=FULL`, `foreign_keys=ON`). Tables are those in section 9: `environments`,
-`enrollment_tokens`, `events` (later `webhooks`, `conversation_routes`).
+`enrollment_tokens`, `events` (later `webhooks`).
 Why SQLite rather than files: dedupe, hold, claim and ack are small transactions
 (`INSERT OR IGNORE` on the source delivery id, an attempt counter, oldest-first with
 caps by query), the same shapes the Phase 0 prototype ran inside a Durable Object's
@@ -655,7 +652,6 @@ after approval update [host-persistence.md](../host-persistence.md) in each slic
 | Hub SQLite `environments`                                         | Environment UUID, credential hash, hold flag, state, creation time                                                                                                                                                    |
 | Hub SQLite `enrollment_tokens`                                    | Token hash, expiry and used flag, at most ten unused; swept by the hold interval                                                                                                                                      |
 | Hub SQLite `events`                                               | Event id (carries source and delivery id), the event's JSON, routing outcome, attempts, `expiresAt`; no headers or signature; payload cleared at a terminal outcome                                                   |
-| Hub `conversation_routes` (later)                                 | Conversation key to Environment UUID only                                                                                                                                                                             |
 | Daemon `$PIE_HOME/hub/enrollment.json`, target daemon writer only | Origin, Environment UUID, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                                                                                         |
 | Daemon `$PIE_HOME/hub/webhooks.json` (Phase 3)                    | `webhookId` to Schedule mapping, filter and `reply` opt-in; no prompt, path or credential                                                                                                                             |
 | Daemon `$PIE_HOME/hub/events/<eventId>.json`                      | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                                                                       |
@@ -669,7 +665,7 @@ Strict tables with constraints, minimal fields, no ORM; hand-written SQL in one 
 module, one function and transaction per operation. Times are Unix milliseconds set
 by Hub. `PRAGMA journal_mode=WAL`, `synchronous=FULL`, `foreign_keys=ON`; migrations
 are an ordered SQL list keyed by `PRAGMA user_version`. Later phases add tables
-(`webhooks` in Phase 2, `conversation_routes` in Phase 3) without changing these.
+(`webhooks` in Phase 2) without changing these.
 
 ```sql
 CREATE TABLE environments (
@@ -691,11 +687,10 @@ CREATE TABLE events (
   event_id        TEXT PRIMARY KEY,
   environment_id  TEXT REFERENCES environments (environment_id),
   type            TEXT NOT NULL,
-  key             TEXT CHECK (length(key) <= 200),
   payload         TEXT CHECK (payload IS NULL OR json_valid(payload)),
   received_at     INTEGER NOT NULL,
   expires_at      INTEGER NOT NULL,
-  outcome         TEXT CHECK (outcome IN ('accepted', 'duplicate', 'rejected', 'expired', 'payload_too_large',
+  outcome         TEXT CHECK (outcome IN ('accepted', 'duplicate', 'rejected', 'expired',
                     'daemon_not_connected', 'inbox_full', 'revoked', 'hold_disabled')),
   attempts        INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   CHECK (outcome IS NULL OR payload IS NULL)
@@ -798,8 +793,7 @@ Turbo tests. Focus on public seams:
   Environment's webhook never reaches another Environment.
 - Malformed or oversized frames and bodies, bad signatures, unauthorized actors,
   rate limits and secret canaries exercise the actual boundaries.
-- Phase 3 adds: a conversation key from another Environment, or one that maps to a
-  Session a person created, is refused; control and continue never reach outside the
+- Phase 3 adds: a thread that maps to a Session a person created is refused; control and continue never reach outside the
   table; pause racing admission; busy, archived and missing-worktree Sessions.
 
 Runtime proof is separate and per phase. Phase 1: isolated Hub process (local, temporary data directory and port)

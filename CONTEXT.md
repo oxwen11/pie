@@ -124,7 +124,7 @@ The trigger: a Hub URL for one source, bound to one Environment, with the event 
 _Avoid_: a Hub-defined event vocabulary, Hub-side matching on event content, fan-out to several Environments, treating a new Hub enrollment as automatic authorization for old Schedules
 
 **Conversation**:
-The continuity of one external thread (for example a GitHub issue), recorded by the target daemon as `conversationKey -> Session`. Hub names it only by an opaque key and never sends or receives a `SessionRef`; a Session a person created is not part of any conversation.
+The continuity of one external thread (for example a GitHub issue), recorded by the target daemon as `thread -> Session`, with the thread identity computed by the daemon from the vendor's own payload fields. Hub knows nothing of conversations and never sends or receives a `SessionRef`; a Session a person created is not part of any conversation.
 _Avoid_: Hub-held session mapping, addressing a Session by id from Hub
 
 ## Environments
