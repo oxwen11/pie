@@ -60,6 +60,11 @@ export interface JsonDocumentOptions<
   readonly legacy?: MigrationStep<Legacy>;
   /** Seed value written when the file does not exist yet. Treated as immutable. */
   readonly defaults: Latest["Type"];
+  /**
+   * When false, a missing file stays missing and `defaults` live only in memory
+   * until `set` or `update`. Defaults to true.
+   */
+  readonly seedMissing?: boolean;
 }
 
 /**
@@ -105,7 +110,9 @@ export const makeJsonDocument = <
       .pipe(
         Effect.flatMap((value) =>
           value === undefined
-            ? codec.save(file, defaults).pipe(Effect.as(defaults))
+            ? options.seedMissing === false
+              ? Effect.succeed(defaults)
+              : codec.save(file, defaults).pipe(Effect.as(defaults))
             : isDocumentValue<A>(value)
               ? Effect.succeed(value)
               : Effect.die(new TypeError("json document codec returned an invalid value")),

@@ -121,17 +121,17 @@ Renderer `localStorage pie:theme` remains a FOUC cache of `appearance.theme` (se
 
 ### Saved SSH hosts
 
-| Property      | Current contract                                                                                                                           |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| Path          | `$PIE_HOME/storage/ssh-environments.json`                                                                                                  |
-| Owner         | Desktop `DesktopSsh`. The path is declared in `paths.ts`; the CLI does not read or write it.                                               |
-| Data          | Version 1 `{ environments: [{ id, alias, hostname, username, port }] }`. Saved targets only. No token, no live tunnel.                     |
-| Write points  | First open seeds `[]`. Connect and remove rewrite the array.                                                                               |
-| Compatibility | Current `{ version, data }` envelope only. A pre-envelope file, corrupt JSON, invalid entry, or newer version fails and is left untouched. |
-| Extension     | Stay on version 1 until a field change requires an explicit migration.                                                                     |
-| Retention     | Retained with `$PIE_HOME`. Remove deletes one array entry. No uninstall cleanup.                                                           |
-| Permissions   | `0600`, pinned after open and after each save.                                                                                             |
-| Atomicity     | `makeJsonDocument`: sibling temp file, then rename. Process-local write lock.                                                              |
+| Property      | Current contract                                                                                                                                                                                                                                                                |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PIE_HOME/storage/ssh-environments.json`                                                                                                                                                                                                                                       |
+| Owner         | Desktop `DesktopSsh`. The path is declared in `paths.ts`; the CLI does not read or write it.                                                                                                                                                                                    |
+| Data          | Version 1 `{ environments: [{ id, alias, hostname, username, port }] }`. Saved targets only. No token, no live tunnel.                                                                                                                                                          |
+| Write points  | Missing file is not created at startup. Connect and remove write the array. A pre-envelope file is rewritten as version 1 on first read.                                                                                                                                        |
+| Compatibility | Pre-envelope `{ version, activeId, environments }` is adopted. Valid hosts are kept; `activeId` is dropped. Corrupt JSON, a version-1 file that fails the schema, or a newer version is left untouched. Desktop still starts; SSH hosts are unavailable and show a fixed error. |
+| Extension     | Stay on version 1 until a field change requires an explicit migration.                                                                                                                                                                                                          |
+| Retention     | Retained with `$PIE_HOME`. Remove deletes one array entry. No uninstall cleanup.                                                                                                                                                                                                |
+| Permissions   | `0600` after a write (adoption or mutation). A read of the current envelope does not change the file.                                                                                                                                                                           |
+| Atomicity     | `makeJsonDocument`: sibling temp file, then rename. Process-local write lock. Missing files are not seeded.                                                                                                                                                                     |
 
 ### Allocated project folders
 

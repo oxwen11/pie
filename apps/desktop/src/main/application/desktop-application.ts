@@ -69,11 +69,12 @@ export type DesktopApplicationDependencies = {
   readonly scope: Scope.Scope;
 };
 
-function emptySnapshot(): EnvironmentSnapshot {
+function emptySnapshot(hostsError?: string): EnvironmentSnapshot {
   return {
     revision: 0,
     connecting: [],
     remotes: [],
+    ...(hostsError === undefined ? undefined : { hostsError }),
   };
 }
 
@@ -85,7 +86,7 @@ export function makeDesktopApplication({
   scope,
 }: DesktopApplicationDependencies): DesktopApplication["Service"] {
   const environmentsRef = Effect.runSync(
-    SubscriptionRef.make<EnvironmentSnapshot>(emptySnapshot()),
+    SubscriptionRef.make<EnvironmentSnapshot>(emptySnapshot(ssh.savedHostsMessage)),
   );
   const visible = Effect.runSync(SubscriptionRef.make(false));
 
@@ -93,6 +94,7 @@ export function makeDesktopApplication({
     updater: (current: EnvironmentSnapshot) => Omit<EnvironmentSnapshot, "revision">,
   ): Effect.Effect<EnvironmentSnapshot> =>
     SubscriptionRef.updateAndGet(environmentsRef, (current) => ({
+      hostsError: current.hostsError,
       ...updater(current),
       revision: current.revision + 1,
     }));
@@ -104,7 +106,7 @@ export function makeDesktopApplication({
         return current;
       }
       return {
-        connecting: current.connecting,
+        ...current,
         remotes: current.remotes.filter((entry) => entry.id !== remote.id),
         revision: current.revision + 1,
       };

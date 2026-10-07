@@ -18,7 +18,18 @@ import {
   type SshHostDiscoveryError,
   type SshTarget,
 } from "@getpie/ssh";
-import { Context, Data, Effect, FileSystem, Layer, Ref, Schema, Scope, Semaphore } from "effect";
+import {
+  Context,
+  Data,
+  Effect,
+  Exit,
+  FileSystem,
+  Layer,
+  Ref,
+  Schema,
+  Scope,
+  Semaphore,
+} from "effect";
 import { ChildProcessSpawner } from "effect/unstable/process";
 
 import { LoginShellEnvironment } from "../server/login-shell-environment";
@@ -38,6 +49,9 @@ export type {
 
 const SAVED_FILE_MODE = 0o600;
 const ENVIRONMENT_ID_TIMEOUT_MS = 8_000;
+
+export const SAVED_HOSTS_UNAVAILABLE =
+  "Saved SSH hosts could not be read. The file was left unchanged.";
 
 export class SshPersistError extends Data.TaggedError("SshPersistError")<{
   readonly message: string;
@@ -75,6 +89,8 @@ type SshConnection = DesktopSshConnectResult["connection"];
 export type DesktopSshShape = {
   readonly client: SshClientAvailability;
   readonly listSaved: Effect.Effect<readonly SavedSshEnvironment[]>;
+  /** Set when the hosts file cannot be read. Desktop still starts. */
+  readonly savedHostsMessage?: string;
   readonly connect: (
     raw: string,
   ) => Effect.Effect<DesktopSshConnectResult, SshEnvironmentError | SshPersistError>;
@@ -139,6 +155,41 @@ const SavedEnvironmentRecord = Schema.Struct({
 const SavedEnvironmentsSchema = Schema.Struct({
   environments: Schema.Array(SavedEnvironmentRecord),
 });
+const LegacySavedFile = Schema.Struct({
+  version: Schema.optionalKey(Schema.Int),
+  activeId: Schema.optionalKey(Schema.String),
+  environments: Schema.Array(Schema.Unknown),
+});
+const LegacyHost = Schema.Struct({
+  id: Schema.NonEmptyString,
+  alias: Schema.NonEmptyString,
+  hostname: Schema.NonEmptyString,
+  username: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  port: Schema.optionalKey(Schema.NullOr(Schema.Int)),
+});
+
+const adoptLegacyHosts = (file: { readonly environments: readonly unknown[] }) => ({
+  environments: file.environments.flatMap((raw) => {
+    const decoded = Schema.decodeUnknownExit(LegacyHost)(raw);
+    if (Exit.isFailure(decoded)) return [];
+    return [
+      {
+        id: decoded.value.id,
+        alias: decoded.value.alias,
+        hostname: decoded.value.hostname,
+        username: decoded.value.username ?? null,
+        port: decoded.value.port ?? null,
+      },
+    ];
+  }),
+});
+
+const currentEnvelope = Schema.Struct({
+  version: Schema.Literal(1),
+  data: SavedEnvironmentsSchema,
+});
+
+const unavailableError = () => new SshPersistError({ message: SAVED_HOSTS_UNAVAILABLE });
 
 const toSaved = (record: typeof SavedEnvironmentRecord.Type): SavedSshEnvironment => ({
   id: record.id,
@@ -176,7 +227,7 @@ export function makeDesktopSsh(input: {
   ) => Effect.Effect<string, SshReadinessError>;
 }): Effect.Effect<
   DesktopSsh["Service"],
-  SshPersistError,
+  never,
   Scope.Scope | FileSystem.FileSystem | ChildProcessSpawner.ChildProcessSpawner
 > {
   return Effect.gen(function* () {
@@ -186,39 +237,66 @@ export function makeDesktopSsh(input: {
     >();
     const filePath = input.persistPath;
     const fs = yield* FileSystem.FileSystem;
-    const saved = yield* makeJsonDocument({
+    const documentOptions = {
       path: filePath,
       schema: SavedEnvironmentsSchema,
       defaults: { environments: [] },
-    }).pipe(Effect.mapError((cause) => persistError(filePath, cause)));
-    // ponytail: library write does not take a mode; pin 0600 after open and each save.
-    const pinMode = fs
-      .chmod(filePath, SAVED_FILE_MODE)
-      .pipe(Effect.mapError((cause) => persistError(filePath, cause)));
-    yield* pinMode;
+      seedMissing: false,
+      legacy: { schema: LegacySavedFile, migrate: adoptLegacyHosts },
+    } as const;
+    const exists = yield* fs.exists(filePath).pipe(Effect.orElseSucceed(() => false));
+    const opened = exists ? yield* Effect.exit(makeJsonDocument(documentOptions)) : undefined;
+    let saved = opened !== undefined && opened._tag === "Success" ? opened.value : undefined;
+    const unavailable = opened !== undefined && opened._tag === "Failure";
+    if (saved !== undefined) {
+      const raw = yield* fs.readFileString(filePath).pipe(Effect.orElseSucceed(() => ""));
+      let current = false;
+      try {
+        const parsed: unknown = JSON.parse(raw);
+        current = Exit.isSuccess(Schema.decodeUnknownExit(currentEnvelope)(parsed));
+      } catch {
+        current = false;
+      }
+      if (!current) yield* fs.chmod(filePath, SAVED_FILE_MODE).pipe(Effect.ignore);
+    }
     const liveRef = yield* Ref.make(new Map<string, LiveSshSession>());
     const persistGate = yield* Semaphore.make(1);
     const cli = { env: input.env };
     const client = yield* probeSshClient(cli);
     const loadEnvironmentId = input.loadEnvironmentId ?? fetchEnvironmentId;
+    const pinMode = fs.chmod(filePath, SAVED_FILE_MODE).pipe(Effect.ignore);
+    const hosts = saved === undefined ? [] : (yield* saved.get).environments.map(toSaved);
+
+    const requireSaved = Effect.gen(function* () {
+      if (unavailable) return yield* unavailableError();
+      if (saved !== undefined) return saved;
+      const created = yield* makeJsonDocument(documentOptions).pipe(
+        Effect.mapError((cause) => persistError(filePath, cause)),
+      );
+      saved = created;
+      return created;
+    });
 
     const modifySaved = (
       mutate: (environments: readonly SavedSshEnvironment[]) => readonly SavedSshEnvironment[],
     ) =>
       persistGate.withPermit(
-        saved
-          .update((current) => ({
-            environments: mutate(current.environments.map(toSaved)).map(fromSaved),
-          }))
-          .pipe(
-            Effect.tapError(() =>
-              Effect.logError("ssh.environments.persist.failed").pipe(
-                Effect.annotateLogs({ path: filePath }),
+        Effect.gen(function* () {
+          const document = yield* requireSaved;
+          yield* document
+            .update((current) => ({
+              environments: mutate(current.environments.map(toSaved)).map(fromSaved),
+            }))
+            .pipe(
+              Effect.tapError(() =>
+                Effect.logError("ssh.environments.persist.failed").pipe(
+                  Effect.annotateLogs({ path: filePath }),
+                ),
               ),
-            ),
-            Effect.andThen(pinMode),
-            Effect.mapError((cause) => persistError(filePath, cause)),
-          ),
+              Effect.andThen(pinMode),
+              Effect.mapError((cause) => persistError(filePath, cause)),
+            );
+        }),
       );
 
     const resultFromLive = (live: LiveSshSession): DesktopSshConnectResult => ({
@@ -263,9 +341,14 @@ export function makeDesktopSsh(input: {
 
     return DesktopSsh.of({
       client,
-      listSaved: saved.get.pipe(Effect.map((state) => state.environments.map(toSaved))),
+      savedHostsMessage: unavailable ? SAVED_HOSTS_UNAVAILABLE : undefined,
+      listSaved: Effect.gen(function* () {
+        if (saved === undefined) return hosts;
+        return (yield* saved.get).environments.map(toSaved);
+      }),
       connect: (raw) =>
         Effect.gen(function* () {
+          if (unavailable) return yield* unavailableError();
           const missingMessage = client.available ? undefined : client.message;
           if (missingMessage !== undefined && input.connectEnvironment === undefined) {
             return yield* new SshClientMissingError({
@@ -308,7 +391,8 @@ export function makeDesktopSsh(input: {
                   );
                   return resultFromLive(live);
                 }
-                yield* saved
+                const document = yield* requireSaved;
+                yield* document
                   .update((current) => ({
                     environments: [
                       ...current.environments.filter((entry) => entry.id !== id),
