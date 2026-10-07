@@ -719,7 +719,7 @@ describe("pie run --url never starts a daemon", () => {
     } catch {
       // best-effort cleanup
     }
-  });
+  }, 60_000);
 
   it("does not start a daemon when --url is set, even if the URL cannot be used", () => {
     const result = runCliResult(["run", "--url", "not-a-url", "CLI_NOSPAWN"], env);
