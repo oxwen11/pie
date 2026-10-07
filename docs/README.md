@@ -24,7 +24,7 @@ Keep decisions and open work, not a permanent record of the work that produced t
 ## RFCs and open work
 
 - [CLI](rfc/pie-cli.md) — remaining session/project, Schedule, Hub, and terminal command proposals; current commands use CLI help.
-- [Hub](rfc/pie-hub.md) — proposed external-event ingress; not another daemon or Schedule store.
+- [Hub](rfc/pie-hub.md) — proposed single-deployment event broker for many Environments; not another daemon or Schedule store.
 - [Resource monitoring](rfc/resource-monitoring.md) — one contract covering implementation differences, host-write approval, runtime acceptance, and essential source references.
 - [Oversized PR diffs](rfc/pr-diff-oversized-files.md) — fallback beyond the current truncated preview.
 - [Multi-client Session sync](rfc/session-sync.md) — shared client sync, epoch-stamped events, in-memory timeline projection, cold reads, command dedup, and restart settlement on existing JSON/JSONL storage.

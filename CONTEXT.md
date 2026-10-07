@@ -28,7 +28,7 @@ _Avoid_: attach for the cold pre-flight (its former name) or for taking a Chat i
 The server-owned recovery record for a session: which Project, which Pi agent session id (`agentSessionId`), whether the session is archived, and for a worktree session `worktree: { branch }` plus the checkout `cwd`. Distinct from conversation history, which stays in Pi's native storage.
 
 **Schedule**:
-An application-level job stored under `$PIE_HOME/storage/schedules/`. Independent of any live session and of `@getpie/pi-loop`. The server daemon is the clock: on start it marks leftover `running` runs `interrupted`, then sleeps until the next due time (1–60s). When a Schedule is due it snapshots the current prompt, starts or reuses a Session, and settles the run to `succeeded` / `failed`. The session file is an ordinary session record — origin is not stored there. The schedule keeps the session ids it created (`lastSessionId`, `session.sessionId` when bound, `runs[].sessionId`). Specs are `cron` (5-field, optional IANA timezone), `every` (fixed interval), `once` (timezone-aware ISO), or `manual` (run now only). Hub-triggered runs are proposed in `docs/rfc/pie-hub.md`, not implemented Schedule behavior. Optional `expiresAt`, `maxRuns` (pauses with `max_runs` after that many fired runs; `firedCount` is the durable counter, `missed`/`skipped` do not count), `session` (`{ policy: "isolated" }` | `{ policy: "owned", sessionId? }` | `{ policy: "existing", sessionId }`), and a failure circuit after three consecutive settle failures. Create may pass `runNow` to fire immediately; it is not stored. Operator signal is structured `event=schedule.*` lines in `$PIE_HOME/logs/pie.log`; the Schedule page keeps the last 20 runs and refreshes while that route is open. There is no EventBus collection event for schedules in v1.
+An application-level job stored under `$PIE_HOME/storage/schedules/`. Independent of any live session and of `@getpie/pi-loop`. The server daemon is the clock: on start it marks leftover `running` runs `interrupted`, then sleeps until the next due time (1–60s). When a Schedule is due it snapshots the current prompt, starts or reuses a Session, and settles the run to `succeeded` / `failed`. The session file is an ordinary session record — origin is not stored there. The schedule keeps the session ids it created (`lastSessionId`, `session.sessionId` when bound, `runs[].sessionId`). Specs are `cron` (5-field, optional IANA timezone), `every` (fixed interval), `once` (timezone-aware ISO), or `manual` (run now only). Hub-fired runs are proposed in `docs/rfc/pie-hub.md`, not implemented Schedule behavior. Optional `expiresAt`, `maxRuns` (pauses with `max_runs` after that many fired runs; `firedCount` is the durable counter, `missed`/`skipped` do not count), `session` (`{ policy: "isolated" }` | `{ policy: "owned", sessionId? }` | `{ policy: "existing", sessionId }`), and a failure circuit after three consecutive settle failures. Create may pass `runNow` to fire immediately; it is not stored. Operator signal is structured `event=schedule.*` lines in `$PIE_HOME/logs/pie.log`; the Schedule page keeps the last 20 runs and refreshes while that route is open. There is no EventBus collection event for schedules in v1.
 _Avoid_: loop (session-scoped `/loop` in `@getpie/pi-loop`), routine, cron (as the domain noun — it is one spec kind), automation / automations (the old domain name), outputMode / sessionMode / independent / merged / session.type (session policy is `isolated` | `owned` | `existing`), a second schedule store on Hub. The product and code noun is **Schedule** (sidebar: **Scheduled**).
 
 **Workspace path**:
@@ -112,20 +112,20 @@ _Avoid_: `{ version, data }` envelope; `ui.theme`; putting window bounds or `PIE
 These terms describe the [Hub RFC](docs/rfc/pie-hub.md), not shipped capabilities.
 
 **Hub**:
-A public event ingress that asks an enrolled Environment to run an existing Schedule. It is neither another Environment nor a transport for general daemon access.
-_Avoid_: relay, second daemon, Hub-owned Schedule store, workflow engine
+A public event broker deployed once. It verifies external events, stores them, and delivers them to the enrolled Environment whose subscription matches. It is neither another Environment nor a transport for general daemon access, and it can act only on its own conversations.
+_Avoid_: relay, second daemon, Hub-owned Schedule store, workflow engine, per-user or multi-tenant service
 
-**Relationship**:
-Revocable authority between a Hub and a specific Environment. Distinct from the Environment's identity and from a client's permission to access that Environment.
-_Avoid_: SSH connection, browser pairing, UI bearer token, using a URL or hostname as the Environment identity
+**Hub event**:
+One verified, normalized external occurrence, identified by `eventId` derived from the source delivery id. Delivery is at-least-once with a receipt on the daemon; a retry is the same event, and an uncertain outcome is not permission to repeat its effects. An offline Environment may have events held (opt-in, bounded, 24 hours).
+_Avoid_: eventId as sessionId, bare SessionRef across Environments, exactly-once agent effects, raw webhook request
 
-**Hub execution**:
-One external dispatch, identified by `executionId`, targeting a Schedule in a specific Environment. Its run and optional SessionRef belong to that Environment. A retry is the same execution, not new work; an uncertain outcome is not permission to repeat its effects.
-_Avoid_: executionId as sessionId, bare SessionRef across Environments, exactly-once agent effects
+**Hub subscription**:
+A consumer-declared rule (a `kind`; for the `event` kind, a source plus attribute conditions such as repository, type or mention) stored on the daemon and advertised to Hub in hello. Hub routes an event only to exactly one matching subscription. A later phase may attach a manual Schedule; the Schedule file is unchanged.
+_Avoid_: a Schedule `trigger` field, a second job definition, treating a new Hub enrollment as automatic authorization for old Schedules
 
-**Schedule trigger**:
-The proposed authority and event source allowed to start a Schedule run. GitHub supplies context; the Schedule still owns its prompt, Project and session policy.
-_Avoid_: a second job definition, treating a new Hub relationship as automatic authorization for old Schedules
+**Conversation**:
+The continuity of one external thread (for example a GitHub issue), recorded by the target daemon as `conversationKey -> Session`. Hub names it only by an opaque key and never sends or receives a `SessionRef`; a Session a person created is not part of any conversation.
+_Avoid_: Hub-held session mapping, addressing a Session by id from Hub
 
 ## Environments
 
