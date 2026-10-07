@@ -24,7 +24,7 @@ Keep decisions and open work, not a permanent record of the work that produced t
 ## RFCs and open work
 
 - [CLI](rfc/pie-cli.md) — remaining session/project, Schedule, Hub, and terminal command proposals; current commands use CLI help.
-- [Hub](rfc/pie-hub.md) — proposed single-deployment event broker for many Environments; not another daemon or Schedule store.
+- [Hub](rfc/pie-hub.md) — proposed single-deployment event broker for many Daemons; not another daemon or Schedule store.
 - [Resource monitoring](rfc/resource-monitoring.md) — one contract covering implementation differences, host-write approval, runtime acceptance, and essential source references.
 - [Oversized PR diffs](rfc/pr-diff-oversized-files.md) — fallback beyond the current truncated preview.
 - [Session event log](rfc/session-event-log.md) — proposed Pie-owned event log, command receipts, and restart settlement; would supersede parts of ADR 0002/0009.

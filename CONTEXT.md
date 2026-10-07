@@ -112,23 +112,19 @@ _Avoid_: `{ version, data }` envelope; `ui.theme`; putting window bounds or `PIE
 These terms describe the [Hub RFC](docs/rfc/pie-hub.md), not shipped capabilities.
 
 **Hub**:
-A public event broker deployed once. It verifies external events, stores them, and delivers them to the enrolled Environment whose subscription matches. It is neither another Environment nor a transport for general daemon access, and it can act only on its own conversations.
-_Avoid_: relay, second daemon, Hub-owned Schedule store, workflow engine, per-user or multi-tenant service
-
-**Relationship**:
-Revocable authority between a Hub and one Environment; a Hub has one per enrolled Environment. Distinct from the Environment's identity and from a client's permission to access that Environment.
-_Avoid_: SSH connection, browser pairing, UI bearer token, using a URL or hostname as the Environment identity
+A public event broker deployed once. It verifies external events, stores them, and delivers them to the enrolled Daemon whose subscription matches. It is neither another Daemon nor a transport for general Daemon access, and it can act only on its own conversations.
+_Avoid_: relay, second Daemon, Hub-owned Schedule store, workflow engine, per-user or multi-tenant service
 
 **Hub event**:
-One verified, normalized external occurrence, identified by `eventId` derived from the source delivery id. Delivery is at-least-once with a receipt on the daemon; a retry is the same event, and an uncertain outcome is not permission to repeat its effects. An offline Environment may have events held (opt-in, bounded, 24 hours).
-_Avoid_: eventId as sessionId, bare SessionRef across Environments, exactly-once agent effects, raw webhook request
+One verified, normalized external occurrence, identified by `eventId` derived from the source delivery id. Delivery is at-least-once with a receipt on the Daemon; a retry is the same event, and an uncertain outcome is not permission to repeat its effects. An offline Environment may have events held (opt-in, bounded, 24 hours).
+_Avoid_: eventId as sessionId, bare SessionRef across Daemons, exactly-once agent effects, raw webhook request
 
 **Hub subscription**:
-A consumer-declared filter (source, repository, events, mention or label) stored on the daemon and advertised to Hub in hello. Hub routes an event only to exactly one matching subscription. A later phase may attach a manual Schedule; the Schedule file is unchanged.
-_Avoid_: a Schedule `trigger` field, a second job definition, treating a new Hub relationship as automatic authorization for old Schedules
+A consumer-declared filter (source, repository, events, mention or label) stored on the Daemon and advertised to Hub in hello. Hub routes an event only to exactly one matching subscription. A later phase may attach a manual Schedule; the Schedule file is unchanged.
+_Avoid_: a Schedule `trigger` field, a second job definition, treating a new Hub enrollment as automatic authorization for old Schedules
 
 **Conversation**:
-The continuity of one external thread (for example a GitHub issue), recorded by the target daemon as `{ relationshipId, conversationKey } -> Session`. Hub names it only by an opaque key and never sends or receives a `SessionRef`; a Session a person created is not part of any conversation.
+The continuity of one external thread (for example a GitHub issue), recorded by the target daemon as `conversationKey -> Session`. Hub names it only by an opaque key and never sends or receives a `SessionRef`; a Session a person created is not part of any conversation.
 _Avoid_: Hub-held session mapping, addressing a Session by id from Hub
 
 ## Environments
