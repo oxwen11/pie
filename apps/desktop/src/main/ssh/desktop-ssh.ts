@@ -169,7 +169,7 @@ const LegacyHost = Schema.Struct({
 });
 
 const adoptLegacyHosts = (file: { readonly environments: readonly unknown[] }) => {
-  const environments = [];
+  const environments: Array<typeof SavedEnvironmentRecord.Type> = [];
   for (const raw of file.environments) {
     const decoded = Schema.decodeUnknownExit(LegacyHost)(raw);
     if (Exit.isFailure(decoded)) {
