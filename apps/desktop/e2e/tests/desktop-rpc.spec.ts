@@ -132,6 +132,44 @@ test("gives a reloaded renderer document a new MessagePort", async ({ window, e2
   expect(readDaemonPid(e2ePaths.pieHome)).toBe(pid);
 });
 
+// #473: a connection request minted during render repeated on every suspended
+// retry, flooding Main with tens of thousands of calls and holding the splash.
+test("asks Main for the server connection once per renderer document", async ({
+  window,
+  e2ePaths,
+}) => {
+  await awaitDesktopReady(window, e2ePaths.pieHome);
+  await window.addInitScript(() => {
+    // Runs in the renderer; `globalThis` avoids the shadowing `window` fixture.
+    const counter = globalThis as typeof globalThis & { connectionRequests?: number };
+    counter.connectionRequests = 0;
+    // oxlint-disable-next-line typescript/unbound-method -- re-bound with `call` below
+    const post = MessagePort.prototype.postMessage;
+    const counted = function (
+      this: MessagePort,
+      message: unknown,
+      transferOrOptions?: Transferable[] | StructuredSerializeOptions,
+    ) {
+      if (typeof message === "string" && message.includes('"/server/connection"')) {
+        counter.connectionRequests = (counter.connectionRequests ?? 0) + 1;
+      }
+      // Forwarded untouched; the cast only picks one of the two DOM overloads.
+      post.call(this, message, transferOrOptions as StructuredSerializeOptions);
+    };
+    MessagePort.prototype.postMessage = counted;
+  });
+
+  await window.reload();
+  await awaitDesktopReady(window, e2ePaths.pieHome);
+  await expect(window.getByLabel("Starting Pie")).toHaveCount(0, { timeout: 30_000 });
+  const requests = await window.evaluate(
+    () => (globalThis as typeof globalThis & { connectionRequests?: number }).connectionRequests,
+  );
+  // Startup reads it once; a replayed "ready" may refresh it once more.
+  expect(requests).toBeGreaterThan(0);
+  expect(requests).toBeLessThanOrEqual(2);
+});
+
 // oxlint-disable-next-line no-empty-pattern -- required by Playwright's fixture API
 test("boots the development HTTP renderer through MessagePort", async ({}, testInfo) => {
   const rendererRoot = path.join(import.meta.dirname, "../../dist/renderer");
