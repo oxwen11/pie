@@ -61,7 +61,11 @@ describe("AssistantMessage", () => {
       // from the live node — under CI load the transition may lag and the
       // captured node can be replaced, so neither is safe to poll directly.
       await expect
-        .poll(() => document.querySelector("[data-rmiz-modal-overlay]")?.dataset.rmizModalOverlay)
+        .poll(
+          () =>
+            document.querySelector<HTMLElement>("[data-rmiz-modal-overlay]")?.dataset
+              .rmizModalOverlay,
+        )
         .toBe("visible");
       for (const animation of dialog.element().getAnimations({ subtree: true })) {
         animation.finish();
@@ -102,7 +106,10 @@ describe("AssistantMessage", () => {
     await page.getByRole("img", { name: "result.png" }).click();
     const modalEl = await page.getByRole("dialog").findElement();
     await expect
-      .poll(() => modalEl.querySelector("[data-rmiz-modal-overlay]")?.dataset.rmizModalOverlay)
+      .poll(
+        () =>
+          modalEl.querySelector<HTMLElement>("[data-rmiz-modal-overlay]")?.dataset.rmizModalOverlay,
+      )
       .toBe("visible");
     for (const animation of modalEl.getAnimations({ subtree: true })) {
       animation.finish();
