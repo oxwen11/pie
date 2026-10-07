@@ -290,7 +290,7 @@ function ScheduleFormFields({
                   }
                   onRetry={() => void models.refetch()}
                   providerId={model?.provider}
-                  retrying={models.isFetching}
+                  loading={models.isFetching}
                 />
               </PromptInputTools>
             </PromptInputToolbar>

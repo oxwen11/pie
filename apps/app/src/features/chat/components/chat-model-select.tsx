@@ -4,7 +4,7 @@ import { ModelSelectorPicker } from "@/components/model-selector/model-selector-
 import { useSessionModels } from "@/features/chat/hooks/use-session-models";
 
 export function ChatModelSelect({ sessionRef }: { sessionRef: SessionRef }) {
-  const { models, modelsError, modelsRetrying, retryModels, providerId, modelId, setModel } =
+  const { models, modelsError, modelsLoading, retryModels, providerId, modelId, setModel } =
     useSessionModels(sessionRef);
 
   return (
@@ -15,7 +15,7 @@ export function ChatModelSelect({ sessionRef }: { sessionRef: SessionRef }) {
       onChange={setModel}
       onRetry={retryModels}
       providerId={providerId}
-      retrying={modelsRetrying}
+      loading={modelsLoading}
     />
   );
 }

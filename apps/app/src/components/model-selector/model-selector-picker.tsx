@@ -35,8 +35,8 @@ export type ModelSelectorPickerProps = {
   "aria-label"?: string;
   /** Message from a model listing that failed after its retries. */
   error?: string;
-  /** A retry of the listing is in flight. */
-  retrying?: boolean;
+  /** The listing is being fetched. */
+  loading?: boolean;
   onRetry?: () => void;
 };
 
@@ -72,9 +72,14 @@ export function ModelSelectorPicker({
   onChange,
   "aria-label": ariaLabel,
   error,
-  retrying = false,
+  loading = false,
   onRetry,
 }: ModelSelectorPickerProps) {
+  // A refetch clears the query error until it settles; keep the last failure
+  // (and its focused Retry) on screen until a fetch finally succeeds.
+  const [failure, setFailure] = useState(error);
+  if (error !== undefined && error !== failure) setFailure(error);
+  if (error === undefined && !loading && failure !== undefined) setFailure(undefined);
   const filter = useComboboxFilter();
   const options = useMemo(
     () =>
@@ -124,7 +129,7 @@ export function ModelSelectorPicker({
         data-slot="model-selector-trigger"
         render={<Button size="sm" variant="ghost" />}
       >
-        {error === undefined ? null : (
+        {failure === undefined ? null : (
           <>
             <CircleAlertIcon aria-hidden className="text-destructive" />
             <span className="sr-only">Models failed to load.</span>
@@ -147,10 +152,12 @@ export function ModelSelectorPicker({
             startAddon={<SearchIcon />}
           />
         </div>
-        {error === undefined ? (
-          <ComboboxEmpty>No matching models.</ComboboxEmpty>
+        {failure === undefined ? (
+          <ComboboxEmpty>
+            {loading && models.length === 0 ? "Loading models…" : "No matching models."}
+          </ComboboxEmpty>
         ) : (
-          <ModelListError message={error} onRetry={onRetry} retrying={retrying} />
+          <ModelListError message={failure} onRetry={onRetry} retrying={loading} />
         )}
         <ComboboxList>
           {(group: ModelGroup) => (
@@ -190,8 +197,14 @@ function ModelListError({
         {message}
       </p>
       {onRetry ? (
-        <Button loading={retrying} onClick={onRetry} size="xs" variant="outline">
-          Retry
+        // Stays enabled while retrying: disabling the focused button would drop focus.
+        <Button
+          aria-busy={retrying || undefined}
+          onClick={retrying ? undefined : onRetry}
+          size="xs"
+          variant="outline"
+        >
+          {retrying ? "Retrying…" : "Retry"}
         </Button>
       ) : null}
     </div>
