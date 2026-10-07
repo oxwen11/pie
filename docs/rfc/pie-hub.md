@@ -1,10 +1,10 @@
-# Pie Hub: a single-deployment event broker for Daemons
+# Pie Hub: a single-deployment event broker for Environments
 
 Status: proposed, not implemented. Rebased against `origin/main` at `91247adf`.
 Revision 7 changes the V1 host from Cloudflare to Node/Bun (section 8).
 Revision 6 reshapes the proposal around the Developer's direction: Hub is
 **deployed once** and **receives events for many
-Daemons**. It receives, verifies, stores and delivers; what a Daemon
+Environments**. It receives, verifies, stores and delivers; what an Environment
 does with an event is that consumer's business. Decisions marked **approval
 required** are not authorization to implement host writes or to deploy.
 
@@ -12,11 +12,11 @@ required** are not authorization to implement host writes or to deploy.
 
 Settled by the Developer:
 
-- One Hub deployment; many enrolled Daemons (not one).
+- One Hub deployment; many enrolled Environments (not one).
 - Hub's job is uniform ingress and delivery. Consumption is pluggable; the first
-  and only V1 consumer is a Pie Daemon.
-- Hub authority over a Daemon is limited to its own conversations; the Daemon
-  holds the Session mapping; the Daemon writes back with local credentials.
+  and only V1 consumer is a Pie daemon.
+- Hub authority over a daemon is limited to its own conversations; the daemon
+  holds the Session mapping; the daemon writes back with local credentials.
 - GitHub is the only source adapter in V1.
 - Build the connection first; Schedules, Sessions and write-back come later.
 - Offline events may be held.
@@ -29,12 +29,12 @@ enrollment and storage choices (sections 3 and 9).
 
 ## 1. Current baseline, not proposed capabilities
 
-Re-verified against `origin/main` at `91247adf`; no Daemon, Schedule, relay or
+Re-verified against `origin/main` at `91247adf`; no daemon, Schedule, relay or
 pairing code changed since the previous revision.
 
 | Existing capability                                                                                                                                                                                                                                                         | Consequence for Hub                                                                                                                                                       |
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A Daemon has a persistent UUID in `$PIE_HOME/storage/environment-id` (plain text, 0600). `GET /api/environment` returns only `{id}` and needs the bearer when a token is set                                                                                                | Reuse that identity; never mint a second machine id. There is no version/capability endpoint, so Hub brings its own handshake. `/api/health` is the only anonymous probe  |
+| A daemon has a persistent UUID in `$PIE_HOME/storage/environment-id` (plain text, 0600). `GET /api/environment` returns only `{id}` and needs the bearer when a token is set                                                                                                | Reuse that identity; never mint a second machine id. There is no version/capability endpoint, so Hub brings its own handshake. `/api/health` is the only anonymous probe  |
 | One daemon/writer per `$PIE_HOME`; lifecycle files are under `daemon/` (`daemon.pid` holds the token, 0600)                                                                                                                                                                 | Enrollment belongs to the target daemon home, not Desktop or the CLI's home                                                                                               |
 | Installed home is `~/.pie`; checkout home is branch-derived                                                                                                                                                                                                                 | Use `Paths`; neither `NODE_ENV` nor the removed `PIE_DAEMON_DIR` selects daemon identity                                                                                  |
 | `EnvironmentRpc.for(environmentId)` binds every call and cache key; local is pinned                                                                                                                                                                                         | Hub administration and session navigation must use the same Environment                                                                                                   |
@@ -52,44 +52,45 @@ this baseline. Neither `CONTEXT.md` nor this proposal is implementation proof.
 
 ```text
 GitHub --signed webhook--> Hub (deployed once, public HTTPS)
-Hub token --bearer-------> Hub        verify -> normalize -> store -> route
+Hub token --bearer-----> Hub        verify -> normalize -> store -> route
                              ^
-                             | authenticated outbound WSS, one per Daemon
+                             | authenticated outbound WSS, one per Environment
         +--------------------+--------------------+
         |                    |                    |
-     Daemon A             Daemon B             Daemon C
-     (consumer)           (consumer)           (consumer)
+   Environment A        Environment B        Environment C
+   Node daemon          Node daemon          Node daemon
+   (consumer)           (consumer)           (consumer)
         ^
         | existing authenticated RPC
         |
    Desktop / web / CLI (independent of Hub)
 ```
 
-Hub is an event **broker**, not a second Daemon, a proxy for Daemon traffic, or a
+Hub is an event **broker**, not a second daemon, a proxy for daemon traffic, or a
 workflow engine. Its stages:
 
 1. **Source adapter** verifies a source's request and normalizes it into an
    **event** (id, source, type, optional conversation key, `receivedAt`,
    `expiresAt`, bounded payload).
-2. **Router** finds the Daemon whose advertised **subscription** matches.
-3. **Delivery** sends the event over that Daemon's socket, requires an ack,
-   retries, and optionally holds it while the Daemon is offline.
+2. **Router** finds the Environment whose advertised **subscription** matches.
+3. **Delivery** sends the event over that Environment's socket, requires an ack,
+   retries, and optionally holds it while the Environment is offline.
 
-Consumers are pluggable in principle; V1 has one, a Pie Daemon. Nothing else is
+Consumers are pluggable in principle; V1 has one, a Pie daemon. Nothing else is
 built (no HTTP callback consumer, no polling API, no `tail` command) until there is
 a concrete need. The seam is the event envelope plus ack.
 
-One deployment serves all of its Daemons. There is no account
+One deployment serves all of its Environments. There is no account
 system, tenant isolation, or per-user configuration. A Desktop may still connect to
-other Daemons that are not enrolled. Multi-tenant hosting is out of scope and
+other Environments that are not enrolled. Multi-tenant hosting is out of scope and
 would be a separate design.
 
-| Owner                                            | Responsibility                                                         | Forbidden                                                          |
-| ------------------------------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `packages/hub` (`@getpie/hub`), Node/Bun process | Public webhook, enrollment, Daemon sockets, event store, routing, hold | Pi, workspace access, Daemon RPC proxy, SPA, imports of server/CLI |
-| `packages/server/src/hub/`                       | Target-local enrollment, connector, receipts, subscriptions            | Starting Hub, selecting another Daemon, exposing a public webhook  |
-| `packages/pie`                                   | Project Hub administration contract onto CLI                           | Writing enrollment files or choosing a focused Desktop Daemon      |
-| `packages/contract`                              | Validated Hub frames and Daemon administration contract                | Runtime implementation imports                                     |
+| Owner                                            | Responsibility                                                              | Forbidden                                                              |
+| ------------------------------------------------ | --------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `packages/hub` (`@getpie/hub`), Node/Bun process | Public webhook, enrollment, Environment sockets, event store, routing, hold | Pi, workspace access, daemon RPC proxy, SPA, imports of server/CLI     |
+| `packages/server/src/hub/`                       | Target-local enrollment, connector, receipts, subscriptions                 | Starting Hub, selecting another Environment, exposing a public webhook |
+| `packages/pie`                                   | Project Hub administration contract onto CLI                                | Writing enrollment files or choosing a focused Desktop Environment     |
+| `packages/contract`                              | Validated Hub frames and daemon administration contract                     | Runtime implementation imports                                         |
 
 Hub depends only on the contract leaf, Effect, and the Node/Bun platform; its core
 uses Web-standard APIs where possible so a Cloudflare host stays possible (section 8).
@@ -102,7 +103,7 @@ Checked t3code `main` at `9bd1d8009` and paseo `main` at `a7f7405c` (both
 
 | Concern       | t3code                                                                                                       | paseo                                                                                                 | Pie decision                                                                 |
 | ------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Identity      | Server-owned id, independent of route; client keeps ordered routes, checks the descriptor before credentials | `srv_` id per home; host profile with several connections                                             | Already shipped: Daemon UUID + `EnvironmentRpc`; reuse                       |
+| Identity      | Server-owned id, independent of route; client keeps ordered routes, checks the descriptor before credentials | `srv_` id per home; host profile with several connections                                             | Already shipped: Environment UUID + `EnvironmentRpc`; reuse                  |
 | Ingress       | `webhook` trigger on a task; token in path, optional HMAC, verified on the daemon, via the tunnel            | Daemon dials Hub with an enrollment token; GitHub/Slack triggers live in a closed service             | paseo's shape; GitHub HMAC verified on Hub                                   |
 | Direction     | relay pushes to the environment and infers liveness from status codes                                        | daemon dials out                                                                                      | Daemon dials out; delivery uses explicit ack/nack, not status-code inference |
 | Authority     | Per-RPC scopes                                                                                               | `hub.execute`, then ordinary daemon-wide agent RPCs                                                   | Narrow frames; later, only Hub-owned conversations                           |
@@ -117,46 +118,47 @@ outlives the hold TTL and is released only on retryable outcomes; the Durable Ob
 plus SQLite plus alarm hold with TTL and caps; an opt-in hold that deletes on opt-out.
 
 Not copied: a token in the URL path (GitHub signs deliveries); plaintext secrets;
-holding raw requests; Daemon-wide authority; a webhook route on Daemon HTTP or the
+holding raw requests; daemon-wide authority; a webhook route on daemon HTTP or the
 existing relay; a template language or second job store; a docs/code split (keep
 ADR 0005 and this RFC aligned with the code).
 
-## 3. Identities, authority, and Daemon lifecycle
+## 3. Identities, authority, and Environment lifecycle
 
 These identities stay distinct:
 
-- `environmentId`: the Daemon's existing UUID; the execution location, not a
-  hostname, URL, credential or proof of ownership. Hub keys an enrolled Daemon by it.
+- `environmentId`: the existing UUID of an Environment (one machine, served by its
+  daemon); the execution location, not a hostname, URL, credential or proof of
+  ownership. Hub keys an enrolled Environment by it.
 - `eventId`: Hub event identity, derived from the source delivery id so a restart
   reproduces it; never a Session id.
-- `SessionRef`: unchanged Daemon wire identity `{ projectId, sessionId }`. Outside
-  that Daemon use `{ environmentId, ref }`, matching the app's
+- `SessionRef`: unchanged daemon wire identity `{ projectId, sessionId }`. Outside
+  that daemon use `{ environmentId, ref }`, matching the app's
   `EnvironmentSessionRef`. Hub never sees a `SessionRef`.
 
 Enrollment pins `environmentId`. Socket identity comes from the authenticated
-Daemon credential; a hello cannot switch it. In V1 a Daemon has one Hub. The Daemon compares its own UUID with the
+Environment credential; a hello cannot switch it. In V1 an Environment has one Hub. The daemon compares its own UUID with the
 enrollment and delivery targets; the serve composition passes the UUID already
 loaded by `loadOrCreateEnvironmentId` into Hub administration and the connector. A
 mismatch fails closed.
 
-URL/token rotation on a UI connection does not reenroll the Daemon; removing an
-Daemon from Desktop removes its RPC link, not its Hub enrollment.
+URL/token rotation on a UI connection does not reenroll the daemon; removing an
+Environment from Desktop removes its RPC link, not its Hub enrollment.
 `pie hub disconnect` stops future Hub delivery, not started work or other access. A
-second live socket for a Daemon is rejected until the old one closes. An
+second live socket for an Environment is rejected until the old one closes. An
 independently cloned `$PIE_HOME` copies identity and secrets; running both is
-unsupported and is never treated as two Daemons.
+unsupported and is never treated as two Environments.
 
 ### Administrative access is not Hub access
 
-Browser pairing grants Daemon RPC; relay transports Daemon traffic. Neither is a
+Browser pairing grants daemon RPC; relay transports daemon traffic. Neither is a
 restricted Hub credential: reuse their access paths to administer a target, never
 their tokens on the Hub socket. The Hub socket may deliver events, receive acks,
 status and (later) conversation state. It may not read Sessions, transcripts, files,
 settings, credentials or terminals, or manage its own enrollment.
 
-Proposed Daemon RPCs: `hub.connect`, `hub.status`, `hub.refresh`, `hub.disconnect`.
+Proposed daemon RPCs: `hub.connect`, `hub.status`, `hub.refresh`, `hub.disconnect`.
 Every mutation carries `expectedEnvironmentId` and is checked against the actual
-Daemon. They require authenticated Daemon access; tokenless `pie serve` rejects
+daemon. They require authenticated daemon access; tokenless `pie serve` rejects
 them. Responses never expose a credential or enrollment token. CLI uses
 `packages/pie/src/node/connect.ts` (`--url` / `PIE_URL` is connect-only); no flag
 guesses a URL from an id. Desktop calls `environmentRpc.for(environmentId).hub.*`.
@@ -164,25 +166,25 @@ guesses a URL from an id. Desktop calls `environmentRpc.for(environmentId).hub.*
 ### Enrollment — approval required
 
 A **Hub token**, supplied to Hub as a secret, authenticates calls to Hub's own API.
-It is distinct from the webhook secret and the Daemon bearer. No password database,
+It is distinct from the webhook secret and the daemon bearer. No password database,
 CLI login file, or `login/logout`.
 
 1. `POST /enrollment-tokens` (Hub token) with an optional label
    mints a 256-bit token, valid ten minutes, at most ten pending; Hub stores only its
    hash and expiry.
 2. On the target, `pie hub connect` takes the Hub origin, `--token-stdin` and an
-   optional Daemon `--url`, and sends the token through authenticated target RPC. No
+   optional daemon `--url`, and sends the token through authenticated target RPC. No
    secret in argv, URLs, stdout or logs.
-3. The Daemon generates a 256-bit credential, persists a **pending** enrollment,
-   then calls `POST /enroll` with it, its `environmentId` and the token. In one serialized step Hub consumes the token, **pins the
+3. The daemon generates a 256-bit credential, persists a **pending** enrollment,
+   then calls `POST /enroll` with it, its Environment UUID and the token. In one serialized step Hub consumes the token, **pins the
    presented UUID** (whoever holds the token is trusted to enroll) and stores the credential
    hash. A UUID already enrolled and active is a conflict; a revoked one re-enrolls with the
    new credential.
-4. The Daemon authenticates the WSS with the credential; an acknowledged handshake
+4. The daemon authenticates the WSS with the credential; an acknowledged handshake
    promotes pending to active. If the `/enroll` ack was lost, retry authentication
    with the same pending credential, never re-enroll with a new secret. If the token
    expired, report enrollment incomplete and require a fresh token.
-5. `hub.status` returns the Daemon UUID, origin,
+5. `hub.status` returns the Environment UUID, origin,
    pending/active/disconnected/revoked, connectivity, held/last event counts and a
    safe error code.
 
@@ -193,15 +195,15 @@ and optional feature flags; later additions are optional-only and used only if
 negotiated. No shipped older peer exists, so no dated shims in V1.
 
 Reconnect uses exponential backoff with jitter capped at 30 seconds. Hub closes a
-rejected or revoked Daemon with application close code `4403`; the Daemon
+rejected or revoked Environment with application close code `4403`; the daemon
 marks it revoked, deletes the raw credential and stops reconnecting, keeping id,
 origin and a safe reason. Any other close reconnects.
 
 Disconnect disables local delivery first and attempts credential-authenticated
 revocation; if Hub is unreachable the local record stays disabled and revocation
-unconfirmed. A Hub token holder can `DELETE /daemons/<id>`; revoke persists
+unconfirmed. A Hub token holder can `DELETE /environments/<id>`; revoke persists
 before sockets close. Neither deletes receipts or cancels started work. Re-enrollment
-gets a new id. CLI disconnect needs `--expected-environment-id` and `--yes`.
+needs a fresh token. CLI disconnect needs `--expected-environment-id` and `--yes`.
 
 ## 4. Events, subscriptions, and routing
 
@@ -222,14 +224,14 @@ type HubEvent = {
 
 `hub` events come from `POST /events` and give a source-agnostic way
 to test and operate Hub without GitHub. `payload` is validated per `source`/`type`
-at Hub and again at the Daemon; a receiver rejects unknown sources rather than
+at Hub and again at the daemon; a receiver rejects unknown sources rather than
 guessing.
 
 ### Subscriptions
 
-A consumer declares what it wants. The Daemon sends its full subscription list in
+A consumer declares what it wants. The daemon sends its full subscription list in
 `hub.hello`, replacing the previous list atomically; Hub caches the last list per
-Daemon so it can route to (and hold for) a Daemon that is offline.
+Environment so it can route to (and hold for) an Environment that is offline.
 
 ```ts
 type HubSubscription = {
@@ -243,9 +245,9 @@ type HubSubscription = {
 };
 ```
 
-Subscriptions live in the Daemon's `$PIE_HOME/hub/subscriptions.json`, written by
+Subscriptions live in the daemon's `$PIE_HOME/hub/subscriptions.json`, written by
 `hub.subscribe` / `hub.unsubscribe` (with `expectedEnvironmentId`), and are cleared when the
-Daemon disconnects or re-enrolls, so a newly enrolled Hub inherits nothing. Hello contains no
+daemon disconnects or re-enrolls, so a newly enrolled Hub inherits nothing. Hello contains no
 Project paths, prompts, credentials or Session lists. Repository identity is
 lowercased `{ host, owner, repository }` with one `.git` removed; accept HTTPS,
 `git@github.com:` and `ssh://git@github.com/`; reject other hosts, local paths, URL
@@ -253,17 +255,17 @@ credentials and malformed segments; no SSH alias or Enterprise resolution.
 
 ### Routing
 
-For an event, Hub considers every enrolled Daemon's cached subscriptions:
+For an event, Hub considers every enrolled Environment's cached subscriptions:
 
-- Exactly one matching Daemon and subscription: route to it.
-- None: `no_route`. More than one (two Daemons, or two subscriptions in one):
+- Exactly one matching Environment and subscription: route to it.
+- None: `no_route`. More than one (two Environments, or two subscriptions in one):
   `ambiguous_route`. Neither is delivered or retried; both are terminal receipts.
 - Never choose by arrival order, load, "first online", fan-out or failover. Two
   machines handling one repository needs an explicit target, which is not
   part of V1.
 
-A stale cache may route legitimately to the wrong Daemon or reject a valid
-event; the Daemon re-validates before any effect (section 7). Hello is resent after
+A stale cache may route legitimately to the wrong Environment or reject a valid
+event; the daemon re-validates before any effect (section 7). Hello is resent after
 any committed subscription change and on reconnect; a bounded 60-second refresh
 discovers external `git remote set-url` changes.
 
@@ -287,12 +289,12 @@ Hub does not compare bodies); storage failure is 503. The response never waits f
 
 ## 5. Wire contract
 
-One socket per Daemon. Frames are Effect Schemas in `packages/contract`:
+One socket per Environment. Frames are Effect Schemas in `packages/contract`:
 
-- `hub.hello` (Daemon to Hub): protocol version, the Daemon's `environmentId`,
+- `hub.hello` (daemon to Hub): protocol version, the Environment UUID,
   subscriptions, optional features.
-- `hub.event.deliver` (Hub to Daemon): a `HubEvent` plus `deliveryAttempt`.
-- `hub.event.ack` (Daemon to Hub): `{ eventId, status }` with `status` one of
+- `hub.event.deliver` (Hub to daemon): a `HubEvent` plus `deliveryAttempt`.
+- `hub.event.ack` (daemon to Hub): `{ eventId, status }` with `status` one of
   `accepted | rejected | duplicate`, a stable `code` on rejection, and nothing else.
   Phase 1's handler records a receipt and acks `accepted`.
 - `hub.ping`/`hub.pong`: 30-second heartbeat; two missed close the socket.
@@ -306,23 +308,23 @@ arbitrary ids as paths or log bodies, secrets, argv or unsanitized peer errors.
 
 ## 6. Delivery and offline hold
 
-Guarantee: **at-least-once delivery to the Daemon, idempotent handling by receipt**.
-Hub retries a delivery until acked, expired or the Daemon is revoked; the
-Daemon records a receipt keyed by `eventId` before acking, so a
+Guarantee: **at-least-once delivery to the daemon, idempotent handling by receipt**.
+Hub retries a delivery until acked, expired or the Environment is revoked; the
+daemon records a receipt keyed by `eventId` before acking, so a
 retry of a handled event returns `duplicate`. The same `eventId` with a different
 payload hash is `execution_conflict`. Effects, which come later, add the stricter
 at-most-once rule of section 7.
 
-**Hold** is per Daemon and **off by default** (`hold: true` set
+**Hold** is per Environment and **off by default** (`hold: true` set
 at enrollment or later):
 
-- Not held: if the Daemon is not connected when an event is routed, the event
+- Not held: if the Environment is not connected when an event is routed, the event
   is a terminal `daemon_not_connected` receipt. No queue, no replay.
 - Held: the event stays `pending` until delivered, `expiresAt` (24 hours after
-  receipt) or Daemon revocation. Hub stores the **verified, normalized
+  receipt) or Environment revocation. Hub stores the **verified, normalized
   event**, never the raw request or any header. On reconnect Hub delivers oldest
-  first, per Daemon, in order; a conflict or reject ack ends that event.
-- Caps: 1,000 held events per Daemon (each payload is at most 64 KiB, which
+  first, per Environment, in order; a conflict or reject ack ends that event.
+- Caps: 1,000 held events per Environment (each payload is at most 64 KiB, which
   bounds storage); at the cap
   new events are terminal `inbox_full` while already-held events still deliver.
   Turning hold off deletes held events.
@@ -335,7 +337,7 @@ at enrollment or later):
 A receipt or terminal outcome, not a log line, tells what happened to
 an event; `GET /events` lists safe outcomes. Hub stores no model output.
 
-## 7. Later phases: effects in the Daemon
+## 7. Later phases: effects in the daemon
 
 These phases add behavior on the consumer and reuse Phase 1's envelope, ack and
 receipts unchanged. They need their own approval before implementation.
@@ -348,7 +350,7 @@ retained**; in an uncertain crash window prefer `outcome_unknown` over a duplica
 prompt. It does not give exactly-once tools or external writes, power-loss recovery,
 or recovery after receipt files are deleted.
 
-On `hub.event.deliver` the Daemon: authenticates the Hub credential and its `environmentId`,
+On `hub.event.deliver` the daemon: authenticates the Hub credential and its Environment UUID,
 looks up the receipt **first** (a known event stays deduplicated after expiry or
 Schedule deletion); otherwise validates `expiresAt`, subscription, repository and
 policy; persists `claimed` (or a rejection) **before** creating a Session or
@@ -375,15 +377,15 @@ records at hello and again at admission, never cached as authority.
 
 ### Conversations
 
-A **conversation** is an external thread's continuity. The Daemon owns
+A **conversation** is an external thread's continuity. The daemon owns
 `{ key } -> { scheduleId, SessionRef, state }`; Hub sends the
 opaque key (the event's `key`) and never a `SessionRef`. With no conversation, the
-Daemon fires the Schedule's session policy (start) and records the key before the
+daemon fires the Schedule's session policy (start) and records the key before the
 prompt; with one, it prompts that Session (continue) with only the new bounded
 untrusted context. A running Session is `busy` (decision 5), an archived one
 `session_archived`, a missing checkout `session_unavailable`; none starts a new
 Session implicitly. Hub keeps one routing fact, `key -> environmentId`, so
-follow-ups reach the Daemon that started the thread; it holds no Session
+follow-ups reach the Environment that started the thread; it holds no Session
 information and losing it only makes the next event start a new thread.
 
 `hub.event.control` with `interrupt | archive | restore` acts on one owned
@@ -394,7 +396,7 @@ new starts while continue, control and status keep working.
 
 ### Write-back
 
-The **Daemon replies with the host's own `gh`** (ADR 0010: no stored second
+The **daemon replies with the host's own `gh`** (ADR 0010: no stored second
 credential); Hub holds no GitHub credentials, so offline, unrouted or ambiguous
 outcomes are receipts only. Opt-in per subscription (`reply: true`); the target is
 derived from the validated event, never a caller URL. After settlement, post one
@@ -405,13 +407,13 @@ rules and amend that ADR. Security gate: posted text is agent output that inject
 could shape, and a comment on a public repository is public, hence opt-in, a size
 bound and only the settled assistant message; its source needs confirmation
 (decision 6). Delimiters are not a sandbox: enrollment authorizes agent execution
-with the Daemon's privileges.
+with the Environment's privileges.
 
 ### Observation
 
-Schedules and Sessions stay visible in their own Daemon through existing
+Schedules and Sessions stay visible in their own Environment through existing
 catalog hydration; navigation carries `environmentId`, `projectId`, `sessionId`; an
-unavailable Daemon is shown as unavailable, never as local. A Session badge is
+unavailable Environment is shown as unavailable, never as local. A Session badge is
 deferred; origin is learned by joining the receipt, and absence of `source` never
 proves a human created a Session.
 
@@ -420,7 +422,7 @@ proves a human created a Session.
 **V1 host: one long-lived Node (24) process**, also runnable under Bun, that is
 deployed once on any machine with a public HTTPS endpoint (a VPS, a container
 platform, or a tailnet/Funnel address). It serves `/webhook/github`, `/enroll`,
-`/enrollment-tokens`, `/events`, `/daemons` and `/daemon` (WebSocket). One process owning one data directory
+`/enrollment-tokens`, `/events`, `/environments` and `/daemon` (WebSocket). One process owning one data directory
 is the transaction domain, which replaces a distributed lock; a second Hub process on
 the same directory is unsupported (an exclusive lock file refuses it). Tradeoff accepted: whoever hosts it runs and patches a server and
 owns uptime; in exchange the deployment needs no vendor account, quotas or hibernation
@@ -429,7 +431,7 @@ semantics, and the whole thing runs locally under the ordinary test and verify t
 **Storage: SQLite (Developer, revision 7).** Hub state is one SQLite file,
 `$HUB_HOME/hub.sqlite`, opened by the single process (directory `0700`, file `0600`,
 WAL, `synchronous=FULL`, `foreign_keys=ON`). Tables are those in section 9: `config`,
-`daemons`, `enrollment_tokens`, `events` (later `conversation_routes`).
+`environments`, `enrollment_tokens`, `events` (later `conversation_routes`).
 Why SQLite rather than files: dedupe, hold, claim and ack are small transactions
 (`INSERT OR IGNORE` on the source delivery id, an attempt counter, oldest-first with
 caps by query), the same shapes the Phase 0 prototype ran inside a Durable Object's
@@ -482,7 +484,7 @@ No project does what Hub does end to end; these are the closest, read from clone
 | `Liplus-Project/github-webhook-mcp` (MIT)     | Closest: GitHub App webhook, per-tenant SQLite DO with the Hibernation WebSocket API, a Node client authenticating with `ws` and an `Authorization` header, HMAC check, retention alarm                                                                                                                                                                                                                            | Worker authenticates, then forwards the original request to the DO (`stub.fetch(request)`), and the DO trusts the Worker; strict HMAC length check                        |
 | `cloudflare/agents` (MIT)                     | Official DO framework: `acceptWebSocket` with tags, `serializeAttachment`, `routeAgentRequest` with an `onBeforeConnect` hook that can reject or mutate before forwarding, an alarm-driven SQLite job queue                                                                                                                                                                                                        | Authenticate and authorize before the DO sees the socket; per-connection identity in attachments; one alarm drives retries                                                |
 | `loncoeng/durable-webhook` (MIT, Worker + KV) | HTTP relay with retry and dead letters; no Durable Object despite the name                                                                                                                                                                                                                                                                                                                                         | "Accepting is not delivering"; dedupe key from the delivery id; tiered TTLs; backoff table; replayable dead letters; admin auth checked before any 404                    |
-| `nikuscs/orbs` (MIT, Bun + Pi)                | Closest architecture: Daemon dials out with an organization API key to `/ws/daemon`; the same app runs on Cloudflare (Worker, D1, R2, one Durable Object per organization) or as one Bun process (`bun:sqlite`, disk); the native `TenantRuntime` re-creates DO semantics (serial queue, alarm with backoff, tagged sockets, `replaced`/`revoked` close codes); services built from injected deps with `overrides` | Two hosts from one core is feasible and the native emulation is small (about 350 lines); no per-event ack or redelivery in the part read, so ack-after-persist stays ours |
+| `nikuscs/orbs` (MIT, Bun + Pi)                | Closest architecture: daemon dials out with an organization API key to `/ws/daemon`; the same app runs on Cloudflare (Worker, D1, R2, one Durable Object per organization) or as one Bun process (`bun:sqlite`, disk); the native `TenantRuntime` re-creates DO semantics (serial queue, alarm with backoff, tagged sockets, `replaced`/`revoked` close codes); services built from injected deps with `overrides` | Two hosts from one core is feasible and the native emulation is small (about 350 lines); no per-event ack or redelivery in the part read, so ack-after-persist stays ours |
 | `peter-leonov/webhooks-proxy-tunnel` (MIT)    | Worker + DO tunnel to a local Node client over WebSocket; no hibernation, no persistence                                                                                                                                                                                                                                                                                                                           | A new connection closes the old one with a dedicated code (4101), a precedent for the replaced-socket rule; `timingSafeEqual`; do not copy its token scheme               |
 | `probot/smee.io`, `NuovarDev/HookHQ`          | Live-fanout baseline (no persistence, no ack); an outbound-webhook SaaS, the wrong direction                                                                                                                                                                                                                                                                                                                       | Cite only; HookHQ's backoff and jitter code                                                                                                                               |
 
@@ -581,11 +583,11 @@ after approval update [host-persistence.md](../host-persistence.md) in each slic
 | Location / owner                                                  | Data, scope and lifecycle                                                                                                                                               |
 | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hub SQLite `config`                                               | Non-empty actor allowlist and default mention/label, supplied at deployment; no empty seed. The Hub token and GitHub secret come from the process environment, not rows |
-| Hub SQLite `daemons`                                              | Daemon UUID (`environmentId`), credential hash, hold flag, state, creation time, last cached subscriptions (no paths, prompts or credentials)                           |
+| Hub SQLite `environments`                                         | Environment UUID, credential hash, hold flag, state, creation time, last cached subscriptions (no paths, prompts or credentials)                                        |
 | Hub SQLite `enrollment_tokens`                                    | Token hash, expiry and used flag, at most ten pending; swept by the hold interval                                                                                       |
 | Hub SQLite `events`                                               | Event id (carries source and delivery id), normalized event, routing outcome, attempts, `expiresAt`; no raw body or headers; payload cleared at a terminal outcome      |
-| Hub `conversation_routes` (later)                                 | Conversation key to Daemon UUID only                                                                                                                                    |
-| Daemon `$PIE_HOME/hub/enrollment.json`, target Daemon writer only | Origin, Daemon UUID, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                                                |
+| Hub `conversation_routes` (later)                                 | Conversation key to Environment UUID only                                                                                                                               |
+| Daemon `$PIE_HOME/hub/enrollment.json`, target daemon writer only | Origin, Environment UUID, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                                           |
 | Daemon `$PIE_HOME/hub/subscriptions.json`                         | Subscriptions for the enrolled Hub; no prompt, path or credential                                                                                                       |
 | Daemon `$PIE_HOME/hub/events/<eventId>.json`                      | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                         |
 | Daemon `$PIE_HOME/hub/conversations/<sha256(key)>.json` (later)   | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                                     |
@@ -600,7 +602,7 @@ are an ordered SQL list keyed by `PRAGMA user_version`. Later phases add tables
 (`config`, `conversation_routes`) without changing these.
 
 ```sql
-CREATE TABLE daemons (
+CREATE TABLE environments (
   environment_id  TEXT PRIMARY KEY,
   credential_hash BLOB,
   state           TEXT NOT NULL CHECK (state IN ('active', 'revoked')),
@@ -618,7 +620,7 @@ CREATE TABLE enrollment_tokens (
 
 CREATE TABLE events (
   event_id        TEXT PRIMARY KEY,
-  environment_id  TEXT REFERENCES daemons (environment_id),
+  environment_id  TEXT REFERENCES environments (environment_id),
   type            TEXT NOT NULL,
   key             TEXT CHECK (length(key) <= 200),
   payload         TEXT CHECK (payload IS NULL OR json_valid(payload)),
@@ -638,7 +640,7 @@ CREATE INDEX events_pending ON events (environment_id, received_at);
 - The event row and its routing outcome commit in one transaction before any 202 or ack.
   Backoff timers are in memory; after a restart pending rows redeliver oldest first on
   reconnect, which at-least-once delivery already permits.
-- Enrollment is one transaction: token unused and unexpired, Daemon row inserted
+- Enrollment is one transaction: token unused and unexpired, environment row inserted
   (the primary key rejects an already-active UUID; a revoked row is updated to active
   with the new credential hash), token marked used. A retry with the same UUID and
   credential hash after a lost ack succeeds.
@@ -655,7 +657,7 @@ Candidate rules needing explicit approval:
   `writeFileAtomic` supports a mode but the document/collection APIs do not, so
   propagate it before storing credentials; refuse symlinked roots.
 - New records use version-1 envelopes, no legacy adoption. Missing enrollment means
-  disabled; corrupt or newer Daemon records disable Hub delivery without reset and
+  disabled; corrupt or newer daemon records disable Hub delivery without reset and
   never block unrelated local Sessions. Migration failure leaves original bytes.
 - Schedule files are not modified, so rollback is safe: an older binary ignores
   `hub/`. A later Schedule field or run reason needs its own v2 migration and
@@ -664,7 +666,7 @@ Candidate rules needing explicit approval:
   `$PIE_HOME`; do not claim Environment isolation for it, serialize proof that uses
   one, and never guess-restore the previous default.
 - Atomic rename covers process failure, not power loss. Hub's SQLite commit (WAL,
-  `synchronous=FULL`) precedes any response or ack; Daemon JSON does not claim power-loss
+  `synchronous=FULL`) precedes any response or ack; daemon JSON does not claim power-loss
   durability. If that is required, decide fsync or a database first.
 - No automatic receipt pruning on either side: deleting receipts reopens duplicate
   execution. Cap 100,000 per side; at the cap refuse new admissions but keep duplicate
@@ -674,7 +676,7 @@ Candidate rules needing explicit approval:
   checkouts nor Pi state; revocation and erasure are distinct. Never silently clear a
   corrupt receipt to make a request work.
 - Hub logs bounded, redacted structured output to stdout (the process
-  manager collects it); the Daemon
+  manager collects it); the daemon
   reuses `pie.log`. Enrollment tokens are stored only as hashes with expiry. No new
   Desktop or browser store.
 
@@ -692,20 +694,20 @@ only if Cloudflare is proposed.
 ### Phase 1: connection, events and hold
 
 Contract; secure storage capability; Hub host (Node process, SQLite store, config, schema);
-enrollment and revocation; Daemon enrollment and administration RPC; event
+enrollment and revocation; daemon enrollment and administration RPC; event
 delivery with ack and receipts; `POST /events`; opt-in hold; CLI
-administration. Hello carries no subscriptions yet and the Daemon has no effect
+administration. Hello carries no subscriptions yet and the daemon has no effect
 handler: it logs a safe summary and exposes the last event through `hub.status`.
 
 ### Phase 2: GitHub and routing
 
-GitHub adapter and verification, Daemon subscriptions, routing with
+GitHub adapter and verification, daemon subscriptions, routing with
 `no_route`/`ambiguous_route`, delivery receipts end to end. Still no Session starts.
 
 ### Phase 3: effects (own approval)
 
 Schedule admission and the at-most-once claim; conversations and control;
-Daemon-scoped UI with screenshots and video of remote isolation.
+Environment-scoped UI with screenshots and video of remote isolation.
 
 ### Phase 4: write-back (own approval)
 
@@ -715,22 +717,22 @@ Required automated checks use existing package Vitest tests and Turbo typecheck,
 Turbo tests. Focus on public seams:
 
 - Wrong UUID, replayed or expired enrollment token, lost enroll ack, duplicate
-  socket, `4403` revocation, and a second Daemon cannot read or ack the first's
+  socket, `4403` revocation, and a second Environment cannot read or ack the first's
   events. Enrollment or delivery with A's UUID on B fails before any write.
 - Duplicate source deliveries produce one event; a lost ack redelivers and is handled once; restart each side at every write
   boundary. Hold respects TTL, caps, order and opt-out deletion; held events never
   contain raw bodies or headers.
-- Routing: zero, one, two matching Daemons; two subscriptions in one; stale
+- Routing: zero, one, two matching Environments; two subscriptions in one; stale
   cache; no event is delivered on `no_route` or `ambiguous_route`.
 - Malformed or oversized frames and bodies, bad signatures, unauthorized actors,
   rate limits and secret canaries exercise the actual boundaries.
-- Phase 3 adds: a conversation key from another Daemon, or one that maps to a
+- Phase 3 adds: a conversation key from another Environment, or one that maps to a
   Session a person created, is refused; control and continue never reach outside the
   table; pause racing admission; busy, archived and missing-worktree Sessions.
 
 Runtime proof is separate and per phase. Phase 1: isolated Hub process (local, temporary data directory and port)
-and two Daemon homes with distinct UUIDs, both enrolled; inject events to each;
-verify receipts, no cross-delivery, hold across a Daemon restart, and revocation.
+and two daemon homes with distinct UUIDs, both enrolled; inject events to each;
+verify receipts, no cross-delivery, hold across a daemon restart, and revocation.
 A real signed GitHub delivery needs a public HTTPS endpoint and is a production
 exposure requiring consent; tailnet or local fixtures prove WSS and routing, not
 GitHub.com ingress. No daily homes, no token logs, no captured secrets in evidence;
@@ -746,17 +748,17 @@ Phase 1 needs 1 to 3 only; the rest can wait.
 1. **Host:** settled in revision 7: Node/Bun self-hosted first, Cloudflare later
    behind the Effect seam. Storage: SQLite via `node:sqlite`, checked under Bun. Still open for Phase 1: TLS/proxy recipe.
    Deployment itself needs separate consent.
-2. **Hold defaults:** per-Daemon opt-in, 24-hour TTL, the section 6 caps,
+2. **Hold defaults:** per-Environment opt-in, 24-hour TTL, the section 6 caps,
    verified normalized events only?
 3. **Enrollment and storage:** Hub-token enrollment with the token holder
    pinning the UUID, no password or login; the section 9 worksheet's owners, modes,
-   retained and capped receipts, and no power-loss guarantee on the Daemon?
-4. **Binding placement (Phase 3):** subscriptions on the Daemon with Schedule files
+   retained and capped receipts, and no power-loss guarantee on the daemon?
+4. **Binding placement (Phase 3):** subscriptions on the daemon with Schedule files
    unchanged (safe rollback, UI joins receipts) rather than a Schedule `trigger`
    field (Schedule v2, restore-only downgrade)?
 5. **Busy conversations (Phase 3):** reject a continuation while the Session runs
    (the event is lost with a receipt), or add a bounded per-conversation queue on the
-   Daemon (more durable state and crash semantics)?
+   daemon (more durable state and crash semantics)?
 6. **Write-back (Phase 4):** which settled message is posted and how it is read
    without scraping transcripts; opt-in per subscription; whether public repositories
    are allowed at all.
