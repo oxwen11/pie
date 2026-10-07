@@ -68,7 +68,7 @@ transcript text.
   a browser Origin are refused. `respond` is not a tool, and there is no delete.
 - Extend `packages/pie/src/node/session-cli.test.ts`, which already starts
   isolated `pie serve` with `PIE_E2E_PI_EXECUTABLE` pointing at
-  `tools/testing/fake-pi.mjs`. Cover `--from`, delivery, queue replace, `pie ls`,
+  `tools/test/fake-pi.js`. Cover `--from`, delivery, queue replace, `pie ls`,
   archive and unarchive, PR link, schedule run, and project
   create. Run `pnpm --filter @getpie/cli test` for that file.
 - Runtime proof follows

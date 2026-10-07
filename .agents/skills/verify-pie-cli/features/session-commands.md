@@ -4,7 +4,7 @@ Session is the default object. Daily verbs are at the root. The rest are `pie se
 
 Root: `run`, `send`, `ls`, `logs`, `wait`, `interrupt`.
 
-`pie session`: `rename`, `model`, `queue`, `archive`, `rm`, `respond`.
+`pie session`: `rename`, `model`, `queue`, `archive`, `respond`. Sessions are archived, never deleted.
 
 `project`, `schedule`, `pr`, and `mcp` stay their own root nouns.
 
@@ -14,7 +14,7 @@ Launch with a fake Pi so a turn does not need a provider. The daemon must inheri
 
 ```bash
 export PIE_E2E=1
-export PIE_E2E_PI_EXECUTABLE="$PWD/tools/testing/fake-pi.mjs"
+export PIE_E2E_PI_EXECUTABLE="$PWD/tools/test/fake-pi.js"
 export PIE_E2E_PI_RESPONSE=VERIFY_FAKE_PI
 pnpm exec pie-verify cli launch
 pnpm exec pie-verify cli doctor
@@ -42,4 +42,5 @@ Proof:
 - `send --no-wait` exits 0.
 - `session archive` removes it from `ls`; `ls --all` still shows it. `--undo` brings it back.
 - There is no `session rm` command: `pie session rm` exits non-zero as an unknown command.
+- fake-pi does not persist history. A session whose runtime was closed (for example by `archive`) cannot be resumed, so `run --from` and `session_handoff` against it fail and create nothing. Use a source that has not been archived.
 - Do not assert transcript text from `pie logs` as the model reply. fake-pi does not persist history. Assert the id and the submitted prompt via the CLI exit and `ls`.
