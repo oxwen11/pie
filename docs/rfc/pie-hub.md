@@ -490,7 +490,7 @@ semantics, and the whole thing runs locally under the ordinary test and verify t
 
 **Storage: SQLite (Developer, revision 7).** Hub state is one SQLite file,
 `$HUB_HOME/hub.sqlite`, opened by the single process (directory `0700`, file `0600`,
-WAL, `synchronous=FULL`, `foreign_keys=ON`). Tables are those in section 9: `environments`,
+WAL, `synchronous=FULL`). Tables are those in section 9: `environments`,
 `enrollment_tokens`, `events` (later `webhooks`).
 Why SQLite rather than files: dedupe, hold, claim and ack are small transactions
 (`INSERT OR IGNORE` on the source delivery id, an attempt counter, oldest-first with
@@ -660,7 +660,7 @@ after approval update [host-persistence.md](../host-persistence.md) in each slic
 
 Strict tables with constraints, minimal fields, no ORM; hand-written SQL in one store
 module, one function and transaction per operation. Times are Unix milliseconds set
-by Hub. `PRAGMA journal_mode=WAL`, `synchronous=FULL`, `foreign_keys=ON`; migrations
+by Hub. `PRAGMA journal_mode=WAL`, `synchronous=FULL`; migrations
 are an ordered SQL list keyed by `PRAGMA user_version`. Later phases add tables
 (`webhooks` in Phase 2) without changing these.
 
@@ -682,7 +682,7 @@ CREATE TABLE enrollment_tokens (
 
 CREATE TABLE events (
   event_id        TEXT PRIMARY KEY,
-  environment_id  TEXT REFERENCES environments (environment_id),
+  environment_id  TEXT,
   type            TEXT NOT NULL,
   payload         TEXT CHECK (payload IS NULL OR json_valid(payload)),
   received_at     INTEGER NOT NULL,
@@ -806,14 +806,18 @@ screenshots and video. This documentation revision claims none of these gates.
 
 ## 11. Decisions for the Developer
 
-Phase 1 needs 1 to 3 only; the rest can wait.
+Phase 1 needs 1 to 3 only, and they are settled; the rest can wait. Also settled for
+Phase 1: no foreign keys (routing guarantees the references), the terminal outcome
+`daemon_not_connected` keeps its name (it is the process that is not connected), Hub
+generates each webhook's signing secret and shows it once, and `POST /events` names its
+target `environmentId`.
 
 1. **Host:** settled in revision 7: Node/Bun self-hosted first, Cloudflare later
    behind the Effect seam. Storage: SQLite via `node:sqlite`, checked under Bun. Still open for Phase 1: TLS/proxy recipe.
    Deployment itself needs separate consent.
 2. **Hold defaults (settled):** on by default with a per-Environment opt-out, 24-hour
    TTL, the section 6 caps, verified events only (the vendor's JSON, no headers).
-3. **Enrollment and storage:** Hub-token enrollment with the token holder
+3. **Enrollment and storage (settled):** Hub-token enrollment with the token holder
    pinning the UUID, no password or login; the section 9 worksheet's owners, modes,
    retained and capped receipts, and no power-loss guarantee on the daemon?
 4. **Binding placement (Phase 3):** a webhook-to-Schedule mapping on the daemon with Schedule files
