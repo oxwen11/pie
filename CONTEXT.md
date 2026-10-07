@@ -116,12 +116,12 @@ A public event broker deployed once. It verifies external events, stores them, a
 _Avoid_: relay, second daemon, Hub-owned Schedule store, workflow engine, per-user or multi-tenant service
 
 **Hub event**:
-One verified, normalized external occurrence, identified by `eventId` derived from the source delivery id. Delivery is at-least-once with a receipt on the daemon; a retry is the same event, and an uncertain outcome is not permission to repeat its effects. An offline Environment may have events held (opt-in, bounded, 24 hours).
+One verified external occurrence, identified by `eventId` derived from the source delivery id. Delivery is at-least-once with a receipt on the daemon; a retry is the same event, and an uncertain outcome is not permission to repeat its effects. An offline Environment may have events held (opt-in, bounded, 24 hours).
 _Avoid_: eventId as sessionId, bare SessionRef across Environments, exactly-once agent effects, raw webhook request
 
 **Hub webhook**:
-The trigger: a Hub URL for one source, bound to one Environment, with the event types it wants chosen from that source's closed catalog (for example `pull_request.merged`). The rule is deterministic and uses event metadata only. Conditions on an event's content belong to the consumer's filter, not the trigger.
-_Avoid_: Hub-side matching on event content, fan-out to several Environments, treating a new Hub enrollment as automatic authorization for old Schedules
+The trigger: a Hub URL for one source, bound to one Environment, with the event names it wants, written exactly as the vendor names them (for example GitHub's `issue_comment.created`). Hub invents no event types. Conditions on an event's content belong to the consumer's filter, not the trigger.
+_Avoid_: a Hub-defined event vocabulary, Hub-side matching on event content, fan-out to several Environments, treating a new Hub enrollment as automatic authorization for old Schedules
 
 **Conversation**:
 The continuity of one external thread (for example a GitHub issue), recorded by the target daemon as `conversationKey -> Session`. Hub names it only by an opaque key and never sends or receives a `SessionRef`; a Session a person created is not part of any conversation.
