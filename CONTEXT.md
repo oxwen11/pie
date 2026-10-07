@@ -120,7 +120,7 @@ One verified, normalized external occurrence, identified by `eventId` derived fr
 _Avoid_: eventId as sessionId, bare SessionRef across Environments, exactly-once agent effects, raw webhook request
 
 **Hub subscription**:
-A consumer-declared filter (source, repository, events, mention or label) stored on the daemon and advertised to Hub in hello. Hub routes an event only to exactly one matching subscription. A later phase may attach a manual Schedule; the Schedule file is unchanged.
+A consumer-declared rule (a `kind`; for the `event` kind, a source plus attribute conditions such as repository, type or mention) stored on the daemon and advertised to Hub in hello. Hub routes an event only to exactly one matching subscription. A later phase may attach a manual Schedule; the Schedule file is unchanged.
 _Avoid_: a Schedule `trigger` field, a second job definition, treating a new Hub enrollment as automatic authorization for old Schedules
 
 **Conversation**:
