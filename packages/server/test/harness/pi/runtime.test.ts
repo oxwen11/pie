@@ -5,10 +5,10 @@ import { Deferred, Effect, Fiber, Queue, Ref, Stream } from "effect";
 
 import { AgentOperationError } from "../../../src/harness/errors";
 import type { SessionEnvelopeDraft } from "../../../src/harness/events/framework";
-import type { PiProcess } from "../../../src/harness/pi/process";
-import { makePiAgentRuntime } from "../../../src/harness/pi/runtime";
-import type { PiStreamItem } from "../../../src/harness/pi/transform";
 import { streamFromQueueOne } from "../../../src/harness/queue-stream";
+import type { PiProcess } from "../../../src/pi/process";
+import { makePiAgentRuntime } from "../../../src/pi/runtime";
+import type { PiStreamItem } from "../../../src/pi/transform";
 
 const SESSION_ID = "session-1";
 const TURN_ID = "turn-1";

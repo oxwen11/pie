@@ -1,10 +1,7 @@
 import { Effect } from "effect";
 import { describe, expect, it } from "vitest";
 
-import {
-  checkPiAvailability,
-  resolvePiExecutable,
-} from "../../../src/harness/pi/resolve-executable";
+import { checkPiAvailability, resolvePiExecutable } from "../../../src/pi/resolve-executable";
 import { fakeExecutables, fakeStats, fileInfo } from "../../fake-file-system";
 
 const rpc = "/opt/pie/dist/pi-process/pi-process.js";

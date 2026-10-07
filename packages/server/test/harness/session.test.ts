@@ -8,9 +8,9 @@ import type * as Cause from "effect/Cause";
 import { EventBus, EventBusLayer } from "../../src/events";
 import { AgentOperationError, type SessionEnvelopeBody } from "../../src/harness";
 import { AgentUnavailable, SessionClosed, SessionNotResumable } from "../../src/harness/errors";
-import type { PiAgentRuntime } from "../../src/harness/pi/runtime";
 import { streamFromQueueOne } from "../../src/harness/queue-stream";
 import { type PiAgentSessionShape, makePiAgentSession } from "../../src/harness/session";
+import type { PiAgentRuntime } from "../../src/pi/runtime";
 
 const ref: SessionRef = {
   projectId: "project-1",

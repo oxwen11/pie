@@ -12,21 +12,22 @@ import { EventBusLayer } from "../src/events";
 import { FileSystemServiceLayer } from "../src/fs";
 import { GitServiceLayer, WorktreeServiceLayer } from "../src/git";
 import {
-  PiAgentServiceLayer,
   PiAgentSessionManagerLayer,
   PiAgentSessionServiceLayer,
   PiAgentSessionService,
 } from "../src/harness";
-import { makePiAgent, PiAgent } from "../src/harness/pi/agent";
-import { makePiProcess } from "../src/harness/pi/process";
-import type { PiExecutable } from "../src/harness/pi/resolve-executable";
+import { PiAgent } from "../src/harness/pi-port";
 import * as Observability from "../src/observability";
 import { makePackageService, PackageService } from "../src/packages";
+import { makePiAgent } from "../src/pi/agent";
+import { PiAgentServiceLayer } from "../src/pi/agent-service";
+import { makePiProcess } from "../src/pi/process";
+import type { PiExecutable } from "../src/pi/resolve-executable";
 import { ProjectRepositoryLayer, ProjectServiceLayer } from "../src/project";
 import { PullRequestService, PullRequestServiceLayer } from "../src/pull-request";
 import type { RpcContext } from "../src/rpc/context";
 import { router } from "../src/rpc/router";
-import { PiProcessTag, PullRequestCoordinatorLayer } from "../src/rpc/runtime";
+import { PiProcessTag, PullRequestCoordinatorLayer } from "../src/runtime";
 import { ScheduleRepositoryLayer, ScheduleServiceLayer } from "../src/schedule";
 import { SettingsRepositoryLayer } from "../src/settings";
 import { makeSkillService, SkillService } from "../src/skills";
@@ -138,7 +139,7 @@ export async function makeRpcTestHarness(home: string, options: RpcTestHarnessOp
   const appLayer = Layer.mergeAll(
     EventBusLayer,
     sessionImageAssetsLayer,
-    PiAgentServiceLayer.pipe(Layer.provide(NodeServices.layer)),
+    PiAgentServiceLayer,
     harnessSessionLayer,
     projectServiceLayer,
     settingsRepositoryLayer,

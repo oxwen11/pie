@@ -10,7 +10,7 @@ import type {
 } from "@earendil-works/pi-coding-agent";
 
 // Pi's RPC wire protocol (JSON lines over stdio). The child is pie-owned
-// (`harness/pi/rpc`); types still come from the published package because they
+// (`pi/rpc`); types still come from the published package because they
 // match the vendored command table at the current pin. All imports here are
 // type-only. pie-pi-process is the live session path. Idle transcript
 // and model reads, and model catalog lookup, use the library in-process.

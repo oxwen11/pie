@@ -2,7 +2,7 @@ import { getAgentDir, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { ListAgentModelsOutput } from "@getpie/contract";
 import { type Duration, Effect } from "effect";
 
-import { AgentOperationError } from "../errors";
+import { AgentOperationError } from "../harness/errors";
 import { runPiDiscoveryCommand } from "./discovery-command";
 import { type PiModelRef, toAgentModel } from "./model-mapping";
 import { PI_PROJECT_SETTINGS_OPTIONS } from "./project-resource-policy";

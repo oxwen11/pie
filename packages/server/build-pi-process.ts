@@ -21,7 +21,7 @@ NodeRuntime.runMain(
     yield* fs.remove(outDir, { recursive: true, force: true });
     yield* fs.makeDirectory(outDir, { recursive: true });
 
-    const piProcess = url.fileURLToPath(new URL("./src/harness/pi/rpc/entry.ts", import.meta.url));
+    const piProcess = url.fileURLToPath(new URL("./src/pi/rpc/entry.ts", import.meta.url));
     // Codemode embeds quickjs.wasm as a sibling asset. --outfile cannot emit it.
     const piProcessExit = yield* spawner.exitCode(
       ChildProcess.make(

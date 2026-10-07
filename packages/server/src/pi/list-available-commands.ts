@@ -2,7 +2,7 @@ import { getAgentDir } from "@earendil-works/pi-coding-agent";
 import type { AgentCommand } from "@getpie/contract";
 import { type Duration, Effect } from "effect";
 
-import { AgentOperationError } from "../errors";
+import { AgentOperationError } from "../harness/errors";
 import { runPiDiscoveryCommand } from "./discovery-command";
 
 /**

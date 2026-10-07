@@ -1,7 +1,3 @@
-import fs from "node:fs";
-import path from "node:path";
-
-import { SessionManager } from "@earendil-works/pi-coding-agent";
 import type {
   AgentModelState,
   PieUIMessage,
@@ -20,8 +16,7 @@ import {
   SessionNotResumable,
   type ResumeSessionError,
 } from "./errors";
-import { entriesToUIMessages } from "./pi/history";
-import type { PiAgentRuntime } from "./pi/runtime";
+import type { PiAgentRuntime } from "./pi-port";
 import {
   foldSessionEvent,
   initialSessionState,
@@ -46,9 +41,6 @@ import { inSession } from "./session-identity";
  * it and outlives every runtime it ever holds, so observing one costs no
  * process, and a crashed runtime leaves a session that is still queryable and
  * can start over.
- *
- * Cold reads reuse one opened `SessionManager` instead of starting that
- * process. The session decides which: a held runtime, else the Pi file API.
  *
  * A private collaborator of {@link PiAgentSessionManager}: no Context tag.
  * It does not spawn a process itself — the manager hands it an `acquire` —
@@ -141,7 +133,7 @@ export type PiAgentSessionShape = {
    * rather than racing it.
    */
   readonly releaseRuntime: Effect.Effect<void>;
-  /** Settled transcript. Runtime if one is held, otherwise one opened SessionManager. */
+  /** Settled transcript. Runtime if one is held, otherwise the injected cold read. */
   readonly messages: (
     agentSessionId: string,
     cwd: string,
@@ -149,14 +141,13 @@ export type PiAgentSessionShape = {
     ReadonlyArray<PieUIMessage>,
     SessionNotResumable | AgentOperationError | SessionClosed
   >;
-  /** Model from the runtime, or from the opened SessionManager. Missing file is `undefined`. */
+  /** Model from the runtime, or from the injected cold read. Missing file is `undefined`. */
   readonly modelState: (
     agentSessionId: string,
     cwd: string,
   ) => Effect.Effect<AgentModelState | undefined, AgentOperationError | SessionClosed>;
 };
 
-/** Test seam. Production uses {@link SessionManager.open}. */
 export type SessionColdRead = (
   agentSessionId: string,
   cwd: string,
@@ -164,20 +155,6 @@ export type SessionColdRead = (
   { readonly messages: ReadonlyArray<PieUIMessage>; readonly model: AgentModelState },
   AgentOperationError | SessionNotResumable
 >;
-
-const sessionFile = (agentSessionId: string, cwd: string): string | undefined => {
-  const resolved = path.resolve(cwd);
-  let real = resolved;
-  try {
-    real = fs.realpathSync(resolved);
-  } catch {
-    real = resolved;
-  }
-  return (
-    SessionManager.findById(real, agentSessionId) ??
-    (real === resolved ? undefined : SessionManager.findById(resolved, agentSessionId))
-  );
-};
 
 export const makePiAgentSession = (
   ref: SessionRef,
@@ -187,21 +164,12 @@ export const makePiAgentSession = (
   Effect.gen(function* () {
     const ownerScope = yield* Scope.Scope;
     const state = yield* Ref.make(initialSessionState);
-    // One Pi file handle. Dropped when a process starts or stops, because that rewrites the file.
-    let piFile: SessionManager | undefined;
+    // A live process rewrites the file, so this cache must not outlive it.
     let cold:
       | { readonly messages: ReadonlyArray<PieUIMessage>; readonly model: AgentModelState }
       | undefined;
     const forgetFile = () => {
-      piFile = undefined;
       cold = undefined;
-    };
-    const openFile = (agentSessionId: string, cwd: string): SessionManager | undefined => {
-      if (piFile) return piFile;
-      const file = sessionFile(agentSessionId, cwd);
-      if (file === undefined) return undefined;
-      piFile = SessionManager.open(file);
-      return piFile;
     };
     const lifecycle = yield* Ref.make<Lifecycle>({
       held: undefined,
@@ -470,7 +438,6 @@ export const makePiAgentSession = (
       ),
     );
 
-    // Process owns the file while it is held or still starting. Otherwise one SessionManager.
     const route = <A, E, E2>(
       fromRuntime: (runtime: PiAgentRuntime) => Effect.Effect<A, E>,
       fromFile: Effect.Effect<A, E2>,
@@ -490,9 +457,25 @@ export const makePiAgentSession = (
         }),
       );
 
+    const pieSessionError = <A>(
+      effect: Effect.Effect<A, AgentOperationError | SessionNotResumable>,
+    ) =>
+      effect.pipe(
+        Effect.mapError((error) => {
+          if (error.sessionId === ref.sessionId) return error;
+          return error._tag === "AgentOperationError"
+            ? new AgentOperationError({
+                sessionId: ref.sessionId,
+                operation: error.operation,
+                cause: error.cause,
+              })
+            : new SessionNotResumable({ sessionId: ref.sessionId });
+        }),
+      );
+
     const fileMessages = (agentSessionId: string, cwd: string) => {
       if (readCold) {
-        return readCold(agentSessionId, cwd).pipe(
+        return pieSessionError(readCold(agentSessionId, cwd)).pipe(
           Effect.tap((value) =>
             Effect.sync(() => {
               cold = value;
@@ -501,25 +484,13 @@ export const makePiAgentSession = (
           Effect.map((value) => value.messages),
         );
       }
-      return Effect.try({
-        try: () => openFile(agentSessionId, cwd),
-        catch: (cause) =>
-          new AgentOperationError({ sessionId: ref.sessionId, operation: "read-session", cause }),
-      }).pipe(
-        Effect.flatMap((manager) =>
-          manager
-            ? Effect.succeed(
-                entriesToUIMessages(manager.getEntries(), manager.getLeafId(), agentSessionId),
-              )
-            : Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId })),
-        ),
-      );
+      return Effect.fail(new SessionNotResumable({ sessionId: ref.sessionId }));
     };
 
     const fileModel = (agentSessionId: string, cwd: string) => {
       if (readCold) {
         if (cold) return Effect.succeed<AgentModelState | undefined>(cold.model);
-        return readCold(agentSessionId, cwd).pipe(
+        return pieSessionError(readCold(agentSessionId, cwd)).pipe(
           Effect.tap((value) =>
             Effect.sync(() => {
               cold = value;
@@ -529,17 +500,7 @@ export const makePiAgentSession = (
           Effect.catchTag("SessionNotResumable", () => Effect.succeed(undefined)),
         );
       }
-      return Effect.try({
-        try: () => openFile(agentSessionId, cwd),
-        catch: (cause) =>
-          new AgentOperationError({ sessionId: ref.sessionId, operation: "read-session", cause }),
-      }).pipe(
-        Effect.map((manager) => {
-          if (!manager) return undefined;
-          const model = manager.buildSessionProjection().model;
-          return model === null ? {} : { provider: model.provider, modelId: model.modelId };
-        }),
-      );
+      return Effect.succeed(undefined);
     };
 
     return {

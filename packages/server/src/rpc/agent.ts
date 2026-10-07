@@ -1,7 +1,7 @@
 import { agentContract } from "@getpie/contract/agent";
 import { Effect } from "effect";
 
-import { PiAgentService } from "../harness";
+import { PiAgentService } from "../pi/agent-service";
 import { ProjectService } from "../project";
 import type { RpcContext } from "./context";
 import { implement } from "./orpc";

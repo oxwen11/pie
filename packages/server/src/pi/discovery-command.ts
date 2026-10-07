@@ -1,7 +1,7 @@
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { type Duration, Effect } from "effect";
 
-import { PiTransportError } from "../errors";
+import { PiTransportError } from "../harness/errors";
 import { PI_PROJECT_PROCESS_ARGS } from "./project-resource-policy";
 import type { RpcCommand } from "./protocol";
 import { resolvePiExecutable } from "./resolve-executable";
