@@ -1,3 +1,4 @@
+// @ts-check
 import fs from "node:fs";
 import module from "node:module";
 import path from "node:path";
@@ -8,20 +9,38 @@ import url from "node:url";
 // daemon needs this hook to supply the on-disk extension.
 const extensions = [".ts", ".tsx", ".mts", ".js", ".mjs", ".cjs", ".json"];
 
+/**
+ * @param {string} specifier
+ * @returns {boolean}
+ */
 const isRelativeOrAbsolute = (specifier) => {
   if (specifier.startsWith("./")) return true;
   if (specifier.startsWith("../")) return true;
   return path.isAbsolute(specifier);
 };
 
+/**
+ * @param {string} specifier
+ * @returns {boolean}
+ */
 const hasKnownExtension = (specifier) => extensions.some((ext) => specifier.endsWith(ext));
 
-const isNotFound = (error) =>
-  typeof error === "object" &&
-  error !== null &&
-  "code" in error &&
-  (error.code === "ERR_MODULE_NOT_FOUND" || error.code === "ERR_UNSUPPORTED_DIR_IMPORT");
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+const isNotFound = (error) => {
+  if (typeof error !== "object" || error === null || !("code" in error)) return false;
+  const code = error.code;
+  return code === "ERR_MODULE_NOT_FOUND" || code === "ERR_UNSUPPORTED_DIR_IMPORT";
+};
 
+/**
+ * @param {string} specifier
+ * @param {import("node:module").ResolveHookContext} context
+ * @param {Parameters<import("node:module").ResolveHookSync>[2]} nextResolve
+ * @returns {import("node:module").ResolveFnOutput | undefined}
+ */
 const tryResolve = (specifier, context, nextResolve) => {
   try {
     return nextResolve(specifier, context);
