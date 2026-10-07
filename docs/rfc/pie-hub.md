@@ -15,8 +15,8 @@ Settled by the Developer:
 - One Hub deployment; many enrolled Environments (not one).
 - Hub's job is uniform ingress and delivery. Consumption is pluggable; the first
   and only V1 consumer is a Pie daemon.
-- Hub authority over a daemon is limited to its own conversations; the daemon
-  holds the Session mapping; the daemon writes back with local credentials.
+- Hub's authority over a daemon is narrow frames only (deliver an event, receive an
+  ack); the daemon writes back with local credentials.
 - Trigger sources: GitHub first; a generic webhook, Slack, Sentry and Linear follow as
   one source adapter each, with no change to the event envelope or the webhook model (section 4).
 - Build the connection first; Schedules, Sessions and write-back come later.
@@ -107,7 +107,7 @@ Checked t3code `main` at `9bd1d8009` and paseo `main` at `a7f7405c` (both
 | Identity      | Server-owned id, independent of route; client keeps ordered routes, checks the descriptor before credentials | `srv_` id per home; host profile with several connections                                             | Already shipped: Environment UUID + `EnvironmentRpc`; reuse                  |
 | Ingress       | `webhook` trigger on a task; token in path, optional HMAC, verified on the daemon, via the tunnel            | Daemon dials Hub with an enrollment token; GitHub/Slack triggers live in a closed service             | paseo's shape; GitHub HMAC verified on Hub                                   |
 | Direction     | relay pushes to the environment and infers liveness from status codes                                        | daemon dials out                                                                                      | Daemon dials out; delivery uses explicit ack/nack, not status-code inference |
-| Authority     | Per-RPC scopes                                                                                               | `hub.execute`, then ordinary daemon-wide agent RPCs                                                   | Narrow frames; later, only Hub-owned conversations                           |
+| Authority     | Per-RPC scopes                                                                                               | `hub.execute`, then ordinary daemon-wide agent RPCs                                                   | Narrow frames                                                                |
 | Idempotency   | `commandId` from delivery id plus receipts; 48 h id table; 202 then in-memory fork (a crash loses the work)  | Creation key journals the agent id first; unfinished delivery is `outcome_unknown`, never resubmitted | Persist a receipt before any effect; `outcome_unknown` (section 7)           |
 | Offline       | 503/504 by default; opt-in relay hold in a Durable Object, 24 h, raw tokenized requests                      | Reconnect with backoff; nothing held; missed schedule runs not replayed                               | Opt-in hold of verified structured events, 24 h, capped (section 6)          |
 | Secrets       | Webhook token and secret in plaintext SQLite columns                                                         | 0700/0600 private files                                                                               | Credential hash on Hub; raw credential 0600 on daemon; no token in URLs      |
@@ -154,7 +154,7 @@ unsupported and is never treated as two Environments.
 Browser pairing grants daemon RPC; relay transports daemon traffic. Neither is a
 restricted Hub credential: reuse their access paths to administer a target, never
 their tokens on the Hub socket. The Hub socket may deliver events, receive acks,
-status and (later) conversation state. It may not read Sessions, transcripts, files,
+and status. It may not read Sessions, transcripts, files,
 settings, credentials or terminals, or manage its own enrollment.
 
 Proposed daemon RPCs: `hub.connect`, `hub.status`, `hub.refresh`, `hub.disconnect`.
@@ -291,7 +291,7 @@ Each source is one adapter with the same three duties:
 3. **Drop what is not wanted.** An unsupported action or event is `204` with no record.
 
 Common HTTP: bad signature or unauthorized actor 403; malformed 400; oversized 413
-(over the event size limit, default 1 MiB, raised only when real payloads need it); a verified delivery gets 202 only after its event and routing outcome are
+(over the event size limit); a verified delivery gets 202 only after its event and routing outcome are
 durably stored; a duplicate delivery gets 200 with the existing safe receipt (Hub does
 not compare bodies); storage failure 503. The response never waits for a consumer.
 
@@ -331,8 +331,9 @@ One socket per Environment. Frames are Effect Schemas in `packages/contract`:
 - `hub.ping`/`hub.pong`: 30-second heartbeat; two missed close the socket.
 
 Validate UUIDs, field lengths and discriminants at both receivers. No raw error
-strings, `workspace` or `SessionRef` cross to Hub. Limits: WS event frame up to the event
-size limit plus its envelope, hello 64 KiB, 10-second header/body deadlines; five Hub-token or enrollment failures
+strings, `workspace` or `SessionRef` cross to Hub. Limits: the event size limit (default 1 MiB), applied to the HTTP body from
+`Content-Length` and a streaming byte cap so Hub never buffers more, and reused as the
+WS event frame bound plus its envelope; hello 64 KiB, 10-second header/body deadlines; five Hub-token or enrollment failures
 per minute per source; at most 32 pending unauthenticated upgrades; bounded
 concurrent webhook handling with 429 beyond it. Untrusted requests never write
 arbitrary ids as paths or log bodies, secrets, argv or unsanitized peer errors.
@@ -441,24 +442,17 @@ consumer's and arrive with Phase 3.
   removed when the run settles, orphans swept at startup, and never copied into the
   receipt.
 
-### Conversations
+### Sessions
 
-A **conversation** is an external thread's continuity, and only the daemon knows it.
-The daemon computes a thread identity itself from the vendor's own payload fields by a
-fixed rule per vendor event (for GitHub, the repository's full name and the issue or
-pull request number) and owns `{ thread } -> { scheduleId, SessionRef, state }`. With no
-conversation, the daemon fires the Schedule's session policy (start) and records the
-thread before the prompt; with one, it prompts that Session (continue) with only the
-new event's file (below). A running Session is `busy` (decision 5), an archived one
-`session_archived`, a missing checkout `session_unavailable`; none starts a new
-Session implicitly. Hub holds no thread, Session or conversation information: the
-webhook already fixes which Environment receives every event of a thread.
-
-`hub.event.control` with `interrupt | archive | restore` acts on one owned
-conversation through `interrupt`, `archive` and `restoreWorktree`, reached only from
-Hub HTTP in V1. Conversation state events (`running | idle | archived |
-unavailable`) carry no transcript and no ref. A conversation cap of 10,000 refuses
-new starts while continue, control and status keep working.
+A Hub-fired run uses the Schedule's existing session policy and adds nothing: `isolated`
+(a new Session for every event), `owned` (one Schedule-owned Session, created on the
+first event and reused) or `existing` (a chosen Session). Binding a thread, issue or
+pull request to its own Session is out of scope for now. Hub holds no Session
+information, and the webhook fixes which Environment receives events. A reused Session
+that is running, archived or missing its checkout is `busy`, `session_archived` or
+`session_unavailable` (decision 5); none starts a new Session implicitly. Interrupt,
+archive and restore remain the Environment's own operations; Hub sends no control
+frames.
 
 ### Write-back
 
@@ -656,7 +650,6 @@ after approval update [host-persistence.md](../host-persistence.md) in each slic
 | Daemon `$PIE_HOME/hub/webhooks.json` (Phase 3)                    | `webhookId` to Schedule mapping, filter and `reply` opt-in; no prompt, path or credential                                                                                                                             |
 | Daemon `$PIE_HOME/hub/events/<eventId>.json`                      | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                                                                       |
 | Daemon `$PIE_HOME/hub/inbox/<eventId>.json` (Phase 3, proposed)   | The event for the started agent to read; `0600`, removed when the run settles, orphans swept at startup; no copy in the receipt                                                                                       |
-| Daemon `$PIE_HOME/hub/conversations/<sha256(key)>.json` (later)   | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                                                                                   |
 | Existing Schedule files                                           | **No change.** Reason `manual`, effective prompt in the run snapshot; existing 20-run retention and fired counter remain                                                                                              |
 
 ### Hub SQLite schema (Phase 1; candidate)
@@ -772,7 +765,7 @@ Still no Session starts.
 
 ### Phase 3: effects (own approval)
 
-Schedule admission and the at-most-once claim; conversations and control;
+Schedule admission and the at-most-once claim;
 Environment-scoped UI with screenshots and video of remote isolation.
 
 ### Phase 4: write-back (own approval)
@@ -793,8 +786,8 @@ Turbo tests. Focus on public seams:
   Environment's webhook never reaches another Environment.
 - Malformed or oversized frames and bodies, bad signatures, unauthorized actors,
   rate limits and secret canaries exercise the actual boundaries.
-- Phase 3 adds: a thread that maps to a Session a person created is refused; control and continue never reach outside the
-  table; pause racing admission; busy, archived and missing-worktree Sessions.
+- Phase 3 adds: pause racing admission; a busy, archived or missing-worktree reused
+  Session.
 
 Runtime proof is separate and per phase. Phase 1: isolated Hub process (local, temporary data directory and port)
 and two daemon homes with distinct UUIDs, both enrolled; inject events to each;
@@ -822,24 +815,22 @@ Phase 1 needs 1 to 3 only; the rest can wait.
 4. **Binding placement (Phase 3):** a webhook-to-Schedule mapping on the daemon with Schedule files
    unchanged (safe rollback, UI joins receipts) rather than a Schedule `trigger`
    field (Schedule v2, restore-only downgrade)?
-5. **Busy conversations (Phase 3):** reject a continuation while the Session runs
-   (the event is lost with a receipt), or add a bounded per-conversation queue on the
-   daemon (more durable state and crash semantics)?
+5. **Busy Session (Phase 3):** with an `owned` or `existing` Schedule session, an event
+   can arrive while that Session runs: reject it with a receipt (the event is lost), or
+   add a bounded queue on the daemon (more durable state and crash semantics)?
 6. **Write-back (Phase 4):** which settled message is posted and how it is read
    without scraping transcripts; opt-in per webhook mapping; whether public repositories
    are allowed at all.
-7. **Control surface (Phase 3):** Hub HTTP only (here) or also adapter-emitted
-   commands such as a comment asking Pie to stop?
-8. **Trigger (Phase 2):** a webhook URL bound to one Environment plus a deterministic
+7. **Trigger (Phase 2):** a webhook URL bound to one Environment plus a deterministic
    selection of the vendor's own event names (section 4), with scope and
    content matching left for later and for the consumer's filter?
-9. **Filter (Phase 3):** evaluated by the daemon before any run (recommended) with
+8. **Filter (Phase 3):** evaluated by the daemon before any run (recommended) with
    literal and glob matching and a required actor allowlist, regular expressions or not,
    and a later optional model judge (section 7)? Or leave it to the agent after it
    starts (a model run per event)?
-10. **Content handoff (Phase 3):** a temporary owner-only file the agent reads
-    (recommended; a host write needing your approval) or the content inlined in the
-    prompt?
+9. **Content handoff (Phase 3):** a temporary owner-only file the agent reads
+   (recommended; a host write needing your approval) or the content inlined in the
+   prompt?
 
 Until confirmed, these remain alternatives under review, not settled ADRs or approved
 host writes. The implemented Environment identity and RPC isolation invariants, the

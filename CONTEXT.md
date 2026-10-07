@@ -112,7 +112,7 @@ _Avoid_: `{ version, data }` envelope; `ui.theme`; putting window bounds or `PIE
 These terms describe the [Hub RFC](docs/rfc/pie-hub.md), not shipped capabilities.
 
 **Hub**:
-A public event broker deployed once. It verifies external events, stores them, and delivers them to the enrolled Environment whose subscription matches. It is neither another Environment nor a transport for general daemon access, and it can act only on its own conversations.
+A public event broker deployed once. It verifies external events, stores them, and delivers them to the enrolled Environment its webhook is bound to. It is neither another Environment nor a transport for general daemon access.
 _Avoid_: relay, second daemon, Hub-owned Schedule store, workflow engine, per-user or multi-tenant service
 
 **Hub event**:
@@ -122,10 +122,6 @@ _Avoid_: eventId as sessionId, bare SessionRef across Environments, exactly-once
 **Hub webhook**:
 The trigger: a Hub URL for one source, bound to one Environment, with the event names it wants, written exactly as the vendor names them (for example GitHub's `issue_comment.created`). Hub invents no event types. Conditions on an event's content belong to the consumer's filter, not the trigger.
 _Avoid_: a Hub-defined event vocabulary, Hub-side matching on event content, fan-out to several Environments, treating a new Hub enrollment as automatic authorization for old Schedules
-
-**Conversation**:
-The continuity of one external thread (for example a GitHub issue), recorded by the target daemon as `thread -> Session`, with the thread identity computed by the daemon from the vendor's own payload fields. Hub knows nothing of conversations and never sends or receives a `SessionRef`; a Session a person created is not part of any conversation.
-_Avoid_: Hub-held session mapping, addressing a Session by id from Hub
 
 ## Environments
 
