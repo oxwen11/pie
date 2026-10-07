@@ -637,3 +637,19 @@ new designs:
 - Server data JSON permissions and the daemon SQLite lock mode rely on umask.
 - JSON coordination is not cross-process, so one `$PIE_HOME` assumes one active
   server writer.
+
+## Pie Hub data
+
+Hub is a separate deployment, not part of a daemon's `$PIE_HOME`. Its design is the
+[Hub RFC](rfc/pie-hub.md).
+
+| Property      | Current contract                                                                                                                                                                  |
+| ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$HUB_HOME/hub.sqlite` (plus `-wal` and `-shm`); default `./hub-data`, `/data` in the container image                                                                             |
+| Owner         | The single Hub process (`packages/hub`). SQLite's exclusive lock refuses a second process on the same file                                                                        |
+| Data          | `environments`, `enrollment_tokens`, `events`. Only hashes of credentials and enrollment tokens; held event payloads until a terminal outcome; no headers or signatures           |
+| Write points  | Enrollment, revoke, hold changes, event receipt, delivery attempts and acks, and the sweep. A row is committed before the HTTP 2xx or WebSocket ack is sent                       |
+| Compatibility | `PRAGMA user_version` with ordered migrations in a transaction at startup. A newer database or a failed `integrity_check` refuses to start and is never repaired by clearing data |
+| Retention     | Held events expire after 24 hours; settled event rows are kept 48 hours for dedupe; used and expired enrollment tokens are swept                                                  |
+| Permissions   | Directory `0700`, files `0600` (the entry point creates the file `0600`; the image sets `/data` to `0700`)                                                                        |
+| Backup        | Outside Hub, through SQLite (`VACUUM INTO` or the backup API), not a copy of a live WAL file                                                                                      |

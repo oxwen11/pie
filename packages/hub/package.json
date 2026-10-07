@@ -5,17 +5,27 @@
   "description": "Pie Hub: event broker that delivers vendor webhooks to enrolled Environments",
   "type": "module",
   "exports": {
-    "./store": "./src/store.ts"
+    "./store": "./src/store.ts",
+    "./server": "./src/server.ts"
   },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "clean": "git clean -xdf node_modules dist .turbo"
+    "clean": "git clean -xdf node_modules dist .turbo",
+    "build": "tsdown",
+    "start": "node dist/main.js"
+  },
+  "dependencies": {
+    "@getpie/contract": "workspace:*",
+    "effect": "catalog:effect",
+    "ws": "catalog:"
   },
   "devDependencies": {
     "@getpie/typescript": "workspace:*",
     "@types/node": "catalog:",
+    "@types/ws": "catalog:",
+    "tsdown": "catalog:",
     "vitest": "catalog:"
   },
   "engines": {

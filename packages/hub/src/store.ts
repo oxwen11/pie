@@ -104,7 +104,11 @@ export class HubStore {
   static open(path: string): HubStore {
     const db = new sqlite.DatabaseSync(path);
     try {
-      db.exec("PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;");
+      // EXCLUSIVE keeps the file lock for the life of the connection: a second Hub process on the
+      // same file fails here, with no lock file to go stale after a crash.
+      db.exec(
+        "PRAGMA locking_mode = EXCLUSIVE; PRAGMA journal_mode = WAL; PRAGMA synchronous = FULL;",
+      );
       if (text(db.prepare("PRAGMA integrity_check").get(), "integrity_check") !== "ok")
         throw new HubStoreError("database failed integrity_check");
       const version = num(db.prepare("PRAGMA user_version").get(), "user_version");
