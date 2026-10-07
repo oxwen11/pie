@@ -23,7 +23,7 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "PIE_PORT=4180 tsx src/node/cli.ts serve",
+    "dev": "PIE_PORT=4180 node --experimental-transform-types --disable-warning=ExperimentalWarning --import ../../tools/node/register-ts-hook.mjs src/node/cli.ts serve",
     "build": "tsdown",
     "start": "node dist/cli.js",
     "publint": "publint",

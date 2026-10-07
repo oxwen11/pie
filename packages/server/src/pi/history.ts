@@ -109,13 +109,13 @@ function callPart(call: PendingCall): PiUIMessagePart {
       providerExecuted: true,
     } satisfies PiDynamicToolPart;
   }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tool name is a runtime string; disk JSON cannot prove the tool-<name> × input correlation
   return {
     type: `tool-${call.toolName}`,
     toolCallId: call.toolCallId,
     state: "input-available",
     input: call.input,
     providerExecuted: true,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tool name is a runtime string; disk JSON cannot prove the tool-<name> × input correlation
   } as PiToolPart;
 }
 
@@ -160,12 +160,12 @@ function resultParts(call: PendingCall, result: PiToolResultMessage): PiUIMessag
           ...files,
         ];
   }
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tool name is a runtime string; disk JSON cannot prove the tool-<name> × input correlation
   const toolPart = {
     type: `tool-${call.toolName}`,
     toolCallId: call.toolCallId,
     providerExecuted: true,
     ...settled,
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- tool name is a runtime string; disk JSON cannot prove the tool-<name> × input correlation
   } as PiToolPart;
   return result.isError ? [toolPart] : [toolPart, ...files];
 }

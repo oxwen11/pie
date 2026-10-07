@@ -125,7 +125,7 @@ export function ModelSelectorPicker({
     >
       <ComboboxTrigger
         aria-label={ariaLabel}
-        className="data-placeholder:text-muted-foreground hover:bg-accent min-w-0"
+        className="min-w-0"
         data-slot="model-selector-trigger"
         render={<Button size="sm" variant="ghost" />}
       >
@@ -137,7 +137,9 @@ export function ModelSelectorPicker({
         )}
         <ComboboxValue placeholder="Default">
           {(option: ModelOption | null) => (
-            <span className="min-w-0 flex-1 truncate text-left">{option?.label ?? "Default"}</span>
+            <span className="in-data-placeholder:text-muted-foreground min-w-0 flex-1 truncate text-left">
+              {option?.label ?? "Default"}
+            </span>
           )}
         </ComboboxValue>
       </ComboboxTrigger>
