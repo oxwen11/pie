@@ -3,7 +3,7 @@
 Status: proposed, not implemented. Rebased against `origin/main` at `91247adf`.
 Revision 7 changes the V1 host from Cloudflare to Node/Bun (section 8).
 Revision 6 reshapes the proposal around the Developer's direction: Hub is
-**deployed once** by **one operator** and **receives events for many
+**deployed once** and **receives events for many
 Environments**. It receives, verifies, stores and delivers; what an Environment
 does with an event is that consumer's business. Decisions marked **approval
 required** are not authorization to implement host writes or to deploy.
@@ -12,7 +12,7 @@ required** are not authorization to implement host writes or to deploy.
 
 Settled by the Developer:
 
-- One Hub deployment per operator; many enrolled Environments (not one).
+- One Hub deployment; many enrolled Environments (not one).
 - Hub's job is uniform ingress and delivery. Consumption is pluggable; the first
   and only V1 consumer is a Pie daemon.
 - Hub authority over a daemon is limited to its own conversations; the daemon
@@ -52,7 +52,7 @@ this baseline. Neither `CONTEXT.md` nor this proposal is implementation proof.
 
 ```text
 GitHub --signed webhook--> Hub (deployed once, public HTTPS)
-operator --bearer--------> Hub        verify -> normalize -> store -> route
+Hub token --bearer-----> Hub        verify -> normalize -> store -> route
                              ^
                              | authenticated outbound WSS, one per Environment
         +--------------------+--------------------+
@@ -80,7 +80,7 @@ Consumers are pluggable in principle; V1 has one, a Pie daemon. Nothing else is
 built (no HTTP callback consumer, no polling API, no `tail` command) until there is
 a concrete need. The seam is the event envelope plus ack.
 
-One operator owns one deployment and all of its Environments. There is no account
+One deployment serves all of its Environments. There is no account
 system, tenant isolation, or per-user configuration. A Desktop may still connect to
 other Environments that are not enrolled. Multi-tenant hosting is out of scope and
 would be a separate design.
@@ -166,11 +166,11 @@ guesses a URL from an id. Desktop calls `environmentRpc.for(environmentId).hub.*
 
 ### Enrollment — approval required
 
-An operator bearer supplied to Hub as a secret binding authenticates administration.
+A **Hub token**, supplied to Hub as a secret, authenticates calls to Hub's own API.
 It is distinct from the webhook secret and the daemon bearer. No password database,
 CLI login file, or `login/logout`.
 
-1. `POST /operator/enrollment-tokens` (operator bearer) with an optional label
+1. `POST /enrollment-tokens` (Hub token) with an optional label
    mints a 256-bit token, valid ten minutes, at most ten pending; Hub stores only its
    hash and expiry.
 2. On the target, `pie hub connect` takes the Hub origin, `--token-stdin` and an
@@ -179,7 +179,7 @@ CLI login file, or `login/logout`.
 3. The daemon generates a relationship UUID and 256-bit credential, persists a
    **pending** relationship, then calls `POST /enroll` with those, its Environment
    UUID and the token. In one serialized step Hub consumes the token, **pins the
-   presented UUID** (the token holder is the operator) and stores the credential
+   presented UUID** (whoever holds the token is trusted to enroll) and stores the credential
    hash. A UUID already enrolled is a conflict.
 4. The daemon authenticates the WSS with the credential; an acknowledged handshake
    promotes pending to active. If the `/enroll` ack was lost, retry authentication
@@ -202,7 +202,7 @@ origin and a safe reason. Any other close reconnects.
 
 Disconnect disables local delivery first and attempts credential-authenticated
 revocation; if Hub is unreachable the local record stays disabled and revocation
-unconfirmed. The operator can `DELETE /operator/relationships/<id>`; revoke persists
+unconfirmed. A Hub token holder can `DELETE /relationships/<id>`; revoke persists
 before sockets close. Neither deletes receipts or cancels started work. Re-enrollment
 gets a new id. CLI disconnect needs `--expected-environment-id` and `--yes`.
 
@@ -214,7 +214,7 @@ gets a new id. CLI disconnect needs `--expected-environment-id` and `--yes`.
 type HubEvent = {
   version: 1;
   eventId: string;
-  source: "operator" | "github";
+  source: "hub" | "github";
   type: string; // e.g. "issue_comment.created"
   key?: string; // opaque conversation key, <= 200 chars, e.g. "github:owner/repo#123"
   receivedAt: string; // timezone-aware ISO, set by Hub
@@ -223,7 +223,7 @@ type HubEvent = {
 };
 ```
 
-`operator` events come from `POST /operator/events` and give a source-agnostic way
+`hub` events come from `POST /events` and give a source-agnostic way
 to test and operate Hub without GitHub. `payload` is validated per `source`/`type`
 at Hub and again at the daemon; a receiver rejects unknown sources rather than
 guessing.
@@ -237,7 +237,7 @@ relationship so it can route to (and hold for) an Environment that is offline.
 ```ts
 type HubSubscription = {
   id: string;
-  source: "github" | "operator";
+  source: "github" | "hub";
   repository?: { host: "github.com"; owner: string; repository: string };
   events?: string[];
   mention?: string;
@@ -262,7 +262,7 @@ For an event, Hub considers every enrolled relationship's cached subscriptions:
 - None: `no_route`. More than one (two Environments, or two subscriptions in one):
   `ambiguous_route`. Neither is delivered or retried; both are terminal receipts.
 - Never choose by arrival order, load, "first online", fan-out or failover. Two
-  machines handling one repository needs an explicit operator target, which is not
+  machines handling one repository needs an explicit target, which is not
   part of V1.
 
 A stale cache may route legitimately to the wrong Environment or reject a valid
@@ -275,7 +275,7 @@ discovers external `git remote set-url` changes.
 Only `issue_comment.created`, `pull_request_review_comment.created` and
 `issues.labeled` are eligible. Verify HMAC-SHA256 over the bounded raw body with
 constant-time comparison **before** decoding. Require event/delivery headers, JSON
-content type and a non-empty operator-configured `fromUsers` allowlist (logins
+content type and a non-empty Hub-configured `fromUsers` allowlist (logins
 compared case-insensitively). A comment matches a literal mention token, not a
 regex or a longer handle; a label matches case-insensitively. Subscription values
 override Hub defaults `@pie` and `pie`. The normalized payload carries repository,
@@ -302,7 +302,7 @@ One socket per relationship. Frames are Effect Schemas in `packages/contract`:
 
 Validate UUIDs, field lengths and discriminants at both receivers. No raw error
 strings, `workspace` or `SessionRef` cross to Hub. Limits: WS frame 64 KiB, hello
-64 KiB, 10-second header/body deadlines; five operator-auth or enrollment failures
+64 KiB, 10-second header/body deadlines; five Hub-token or enrollment failures
 per minute per source; at most 32 pending unauthenticated upgrades; bounded
 concurrent webhook handling with 429 beyond it. Untrusted requests never write
 arbitrary ids as paths or log bodies, secrets, argv or unsanitized peer errors.
@@ -316,8 +316,8 @@ retry of a handled event returns `duplicate`. The same `eventId` with a differen
 payload hash is `execution_conflict`. Effects, which come later, add the stricter
 at-most-once rule of section 7.
 
-**Hold** is per relationship and **off by default** (`hold: true` set by the
-operator at enrollment or later):
+**Hold** is per relationship and **off by default** (`hold: true` set
+at enrollment or later):
 
 - Not held: if the Environment is not connected when an event is routed, the event
   is a terminal `daemon_not_connected` receipt. No queue, no replay.
@@ -335,8 +335,8 @@ operator at enrollment or later):
 - Dedupe: Hub keeps the source delivery id for at least 48 hours, longer than the
   hold TTL, released only when a delivery id is not durably recorded.
 
-A receipt or terminal outcome, not a log line, tells the operator what happened to
-an event; `GET /operator/events` lists safe outcomes. Hub stores no model output.
+A receipt or terminal outcome, not a log line, tells what happened to
+an event; `GET /events` lists safe outcomes. Hub stores no model output.
 
 ## 7. Later phases: effects in the daemon
 
@@ -391,7 +391,7 @@ information and losing it only makes the next event start a new thread.
 
 `hub.event.control` with `interrupt | archive | restore` acts on one owned
 conversation through `interrupt`, `archive` and `restoreWorktree`, reached only from
-operator HTTP in V1. Conversation state events (`running | idle | archived |
+Hub HTTP in V1. Conversation state events (`running | idle | archived |
 unavailable`) carry no transcript and no ref. A conversation cap of 10,000 refuses
 new starts while continue, control and status keep working.
 
@@ -420,12 +420,12 @@ proves a human created a Session.
 
 ## 8. Hosting: Node/Bun first, Cloudflare later
 
-**V1 host: one long-lived Node (24) process**, also runnable under Bun, that the
-operator deploys once on any machine with a public HTTPS endpoint (a VPS, a container
+**V1 host: one long-lived Node (24) process**, also runnable under Bun, that is
+deployed once on any machine with a public HTTPS endpoint (a VPS, a container
 platform, or a tailnet/Funnel address). It serves `/webhook/github`, `/enroll`,
-`/operator/*` and `/daemon` (WebSocket). One process owning one data directory
+`/enrollment-tokens`, `/events`, `/relationships` and `/daemon` (WebSocket). One process owning one data directory
 is the transaction domain, which replaces a distributed lock; a second Hub process on
-the same directory is unsupported (an exclusive lock file refuses it). Tradeoff accepted: the operator runs and patches a server and
+the same directory is unsupported (an exclusive lock file refuses it). Tradeoff accepted: whoever hosts it runs and patches a server and
 owns uptime; in exchange the deployment needs no vendor account, quotas or hibernation
 semantics, and the whole thing runs locally under the ordinary test and verify tools.
 
@@ -450,11 +450,11 @@ closest open-source precedent (`nikuscs/orbs`, section 8) takes the same route. 
   seam; verify it under Bun in Phase 1 and, only if Bun lacks it, add a `bun:sqlite`
   adapter behind the same seam. No ORM or native add-on in V1. Tests use an in-memory
   database through the same seam.
-- Backup is the operator's job: copy with `VACUUM INTO` or SQLite's backup API, not a
+- Backup is outside Hub: copy with `VACUUM INTO` or SQLite's backup API, not a
   raw copy of a live WAL file; the Dokploy volume backup alone is not safe unless Hub is
   stopped or the copy goes through SQLite.
 
-Host choice still to settle in the Phase 1 slice, not here: the TLS/reverse-proxy recipe (Hub speaks plain HTTP behind the operator's
+Host choice still to settle in the Phase 1 slice, not here: the TLS/reverse-proxy recipe (Hub speaks plain HTTP behind a reverse
 proxy; it never terminates TLS itself). Runtime: Node 24 and Bun both provide
 HTTP, WebSocket and a built-in synchronous SQLite. A single process has no hibernation, so
 heartbeat is an ordinary timer and the hold sweep is an interval, not an alarm.
@@ -515,7 +515,7 @@ these observations:
   in about 50 ms and `getWebSocketAutoResponseTimestamp` recorded it, so missed
   heartbeats can be judged from an alarm without per-ping code.
 - **Hibernation and wake.** After 20 idle seconds the object was re-initialised (its
-  constructor ran again) while the socket stayed open; the next operator event
+  constructor ran again) while the socket stayed open; the next event
   reached the socket in 15-18 ms. Keep the constructor cheap, and do not generate
   random values at module scope (workerd rejects it).
 - **Persist, push, ack.** Events are inserted with `INSERT OR IGNORE` before the push;
@@ -533,7 +533,7 @@ these observations:
 write is persisted (the acks above prove ordering in our code, not the gate); behavior
 and latency on Cloudflare's network rather than local `wrangler dev`; Free-plan
 quota behavior under real use. Deployment is a production operation and needs the
-operator's explicit consent; this RFC authorizes none.
+Developer's explicit consent; this RFC authorizes none.
 
 ### Effect as the host seam
 
@@ -581,18 +581,18 @@ The [host-write gate](../../.agents/rules/topics/persistence.md) requires Develo
 confirmation before formats are chosen. This is a candidate, not an approved plan;
 after approval update [host-persistence.md](../host-persistence.md) in each slice.
 
-| Location / owner                                                                 | Data, scope and lifecycle                                                                                                                                            |
-| -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hub SQLite `config`                                                              | Non-empty actor allowlist and default mention/label, operator-supplied; no empty seed. Operator bearer and GitHub secret come from the process environment, not rows |
-| Hub SQLite `relationships`                                                       | Relationship id, Environment UUID, credential hash, hold flag, state, creation time, last cached subscriptions (no paths, prompts or credentials)                    |
-| Hub SQLite `enrollment_tokens`                                                   | Token hash, expiry and used flag, at most ten pending; swept by the hold interval                                                                                    |
-| Hub SQLite `events`                                                              | Event id (carries source and delivery id), normalized event, routing outcome, attempts, `expiresAt`; no raw body or headers; payload cleared at a terminal outcome   |
-| Hub `conversation_routes` (later)                                                | Conversation key to relationship id only                                                                                                                             |
-| Daemon `$PIE_HOME/hub/relationship.json`, target daemon writer only              | Origin, Environment UUID, relationship id, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                       |
-| Daemon `$PIE_HOME/hub/subscriptions.json`                                        | Subscriptions naming a relationship; no prompt, path or credential                                                                                                   |
-| Daemon `$PIE_HOME/hub/events/<relationshipId>/<eventId>.json`                    | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                      |
-| Daemon `$PIE_HOME/hub/conversations/<relationshipId>/<sha256(key)>.json` (later) | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                                  |
-| Existing Schedule files                                                          | **No change.** Reason `manual`, effective prompt in the run snapshot; existing 20-run retention and fired counter remain                                             |
+| Location / owner                                                                 | Data, scope and lifecycle                                                                                                                                               |
+| -------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Hub SQLite `config`                                                              | Non-empty actor allowlist and default mention/label, supplied at deployment; no empty seed. The Hub token and GitHub secret come from the process environment, not rows |
+| Hub SQLite `relationships`                                                       | Relationship id, Environment UUID, credential hash, hold flag, state, creation time, last cached subscriptions (no paths, prompts or credentials)                       |
+| Hub SQLite `enrollment_tokens`                                                   | Token hash, expiry and used flag, at most ten pending; swept by the hold interval                                                                                       |
+| Hub SQLite `events`                                                              | Event id (carries source and delivery id), normalized event, routing outcome, attempts, `expiresAt`; no raw body or headers; payload cleared at a terminal outcome      |
+| Hub `conversation_routes` (later)                                                | Conversation key to relationship id only                                                                                                                                |
+| Daemon `$PIE_HOME/hub/relationship.json`, target daemon writer only              | Origin, Environment UUID, relationship id, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                          |
+| Daemon `$PIE_HOME/hub/subscriptions.json`                                        | Subscriptions naming a relationship; no prompt, path or credential                                                                                                      |
+| Daemon `$PIE_HOME/hub/events/<relationshipId>/<eventId>.json`                    | Fingerprint, admission state, optional run/ref (later), outcome and timestamps; no payload copy                                                                         |
+| Daemon `$PIE_HOME/hub/conversations/<relationshipId>/<sha256(key)>.json` (later) | Key, scheduleId, SessionRef, state, last event id; capped at 10,000                                                                                                     |
+| Existing Schedule files                                                          | **No change.** Reason `manual`, effective prompt in the run snapshot; existing 20-run retention and fired counter remain                                                |
 
 ### Hub SQLite schema (Phase 1; candidate)
 
@@ -673,11 +673,11 @@ Candidate rules needing explicit approval:
 - No automatic receipt pruning on either side: deleting receipts reopens duplicate
   execution. Cap 100,000 per side; at the cap refuse new admissions but keep duplicate
   and status access. Compaction needs a later design. Deleting the Hub object or a
-  `$PIE_HOME` is an explicit operator act that discards dedupe.
+  `$PIE_HOME` is an explicit act that discards dedupe.
 - Disconnect and revoke keep receipts and Schedule history and delete neither
   checkouts nor Pi state; revocation and erasure are distinct. Never silently clear a
   corrupt receipt to make a request work.
-- Hub logs bounded, redacted structured output to stdout (the operator's process
+- Hub logs bounded, redacted structured output to stdout (the process
   manager collects it); the daemon
   reuses `pie.log`. Enrollment tokens are stored only as hashes with expiry. No new
   Desktop or browser store.
@@ -697,7 +697,7 @@ only if Cloudflare is proposed.
 
 Contract; secure storage capability; Hub host (Node process, SQLite store, config, schema);
 enrollment and revocation; daemon relationship and administration RPC; event
-delivery with ack and receipts; `POST /operator/events`; opt-in hold; CLI
+delivery with ack and receipts; `POST /events`; opt-in hold; CLI
 administration. Hello carries no subscriptions yet and the daemon has no effect
 handler: it logs a safe summary and exposes the last event through `hub.status`.
 
@@ -752,7 +752,7 @@ Phase 1 needs 1 to 3 only; the rest can wait.
    Deployment itself needs separate consent.
 2. **Hold defaults:** per-relationship opt-in, 24-hour TTL, the section 6 caps,
    verified normalized events only?
-3. **Enrollment and storage:** operator-bearer enrollment with the token holder
+3. **Enrollment and storage:** Hub-token enrollment with the token holder
    pinning the UUID, no password or login; the section 9 worksheet's owners, modes,
    retained and capped receipts, and no power-loss guarantee on the daemon?
 4. **Binding placement (Phase 3):** subscriptions on the daemon with Schedule files
@@ -764,7 +764,7 @@ Phase 1 needs 1 to 3 only; the rest can wait.
 6. **Write-back (Phase 4):** which settled message is posted and how it is read
    without scraping transcripts; opt-in per subscription; whether public repositories
    are allowed at all.
-7. **Control surface (Phase 3):** operator-only HTTP (here) or also adapter-emitted
+7. **Control surface (Phase 3):** Hub HTTP only (here) or also adapter-emitted
    commands such as a comment asking Pie to stop?
 
 Until confirmed, these remain alternatives under review, not settled ADRs or approved

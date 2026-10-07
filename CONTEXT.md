@@ -112,7 +112,7 @@ _Avoid_: `{ version, data }` envelope; `ui.theme`; putting window bounds or `PIE
 These terms describe the [Hub RFC](docs/rfc/pie-hub.md), not shipped capabilities.
 
 **Hub**:
-A public event broker deployed once by one operator. It verifies external events, stores them, and delivers them to the enrolled Environment whose subscription matches. It is neither another Environment nor a transport for general daemon access, and it can act only on its own conversations.
+A public event broker deployed once. It verifies external events, stores them, and delivers them to the enrolled Environment whose subscription matches. It is neither another Environment nor a transport for general daemon access, and it can act only on its own conversations.
 _Avoid_: relay, second daemon, Hub-owned Schedule store, workflow engine, per-user or multi-tenant service
 
 **Relationship**:
