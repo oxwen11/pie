@@ -104,6 +104,8 @@ export const makePiTransport = (
               PIE_AUTH_TOKEN: undefined,
               PIE_SESSION_BRIDGE_URL: undefined,
               PIE_SESSION_BRIDGE_TOKEN: undefined,
+              PIE_MCP_URL: undefined,
+              PIE_MCP_TOKEN: undefined,
               ...options.env,
             },
           },

@@ -1,4 +1,5 @@
 import { Schema, SchemaGetter } from "effect";
+import { mcp } from "orpc-mcp";
 
 import { CreateWorktreeInputSchema, serverErrors, SessionRefSchema } from "./domain";
 import { oc } from "./orpc";
@@ -319,10 +320,26 @@ export const RunScheduleOutputSchema = Schema.Struct({
 export type RunScheduleOutput = typeof RunScheduleOutputSchema.Type;
 
 export const scheduleContract = {
-  list: base.output(Schema.Array(ScheduleSchema)),
-  get: base.input(ScheduleIdInputSchema).output(ScheduleSchema),
-  create: base.input(CreateScheduleInputSchema).output(ScheduleSchema),
-  update: base.input(UpdateScheduleInputSchema).output(ScheduleSchema),
-  delete: base.input(ScheduleIdInputSchema),
-  runNow: base.input(ScheduleIdInputSchema).output(RunScheduleOutputSchema),
+  list: base
+    .meta(mcp.tool({ name: "schedule_list", description: "List schedules" }))
+    .output(Schema.Array(ScheduleSchema)),
+  get: base
+    .meta(mcp.tool({ name: "schedule_get", description: "Read one schedule" }))
+    .input(ScheduleIdInputSchema)
+    .output(ScheduleSchema),
+  create: base
+    .meta(mcp.tool({ name: "schedule_create", description: "Create a schedule" }))
+    .input(CreateScheduleInputSchema)
+    .output(ScheduleSchema),
+  update: base
+    .meta(mcp.tool({ name: "schedule_update", description: "Update a schedule" }))
+    .input(UpdateScheduleInputSchema)
+    .output(ScheduleSchema),
+  rm: base
+    .meta(mcp.tool({ name: "schedule_rm", description: "Delete a schedule" }))
+    .input(ScheduleIdInputSchema),
+  run: base
+    .meta(mcp.tool({ name: "schedule_run", description: "Run a schedule once" }))
+    .input(ScheduleIdInputSchema)
+    .output(RunScheduleOutputSchema),
 };

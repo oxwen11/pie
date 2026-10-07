@@ -14,6 +14,7 @@ import {
 import { Paths, PathsLayer } from "../config/paths";
 import * as Observability from "../observability";
 import { ResourceMonitoringLayer } from "../observability/resources";
+import { agentMcpListenUrl, setAgentMcpEndpoint } from "../pi/pie-mcp";
 import { loadOrCreateEnvironmentId } from "./environment-id";
 import { formatReadyLine } from "./handshake";
 import {
@@ -239,6 +240,8 @@ const serveWith = (input: ServeInput) =>
     // Machine-readable first, for the desktop supervisor; human-readable
     // second. Both go to stdout; observability writes to the local log file and
     // only mirrors to stderr when `PIE_PRINT_LOGS=1`.
+    yield* Effect.addFinalizer(() => Effect.sync(() => setAgentMcpEndpoint(undefined)));
+    setAgentMcpEndpoint(agentMcpListenUrl(host, port));
     console.log(formatReadyLine({ port }));
     console.log(`pie listening on http://${host}:${port}`);
 

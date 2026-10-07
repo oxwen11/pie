@@ -51,7 +51,7 @@ it.each(["resolve", "reject"])(
       localLink: {
         call: async (path) => {
           switch (path.join(".")) {
-            case "project.list":
+            case "project.ls":
               return [localProject];
             case "agent.listModels":
               return { models: [{ provider: "e2e", modelId: "fake", name: "Fake" }] };
@@ -128,7 +128,7 @@ it.each(["resolve", "reject"])(
         ],
       };
       for (const listener of listeners) listener(snapshot);
-      const remoteKey = environmentRpc.for("remote").project.list.queryOptions().queryKey;
+      const remoteKey = environmentRpc.for("remote").project.ls.queryOptions().queryKey;
       await expect.poll(() => queryClient.getQueryState(remoteKey)?.fetchStatus).toBe("fetching");
       await expect.element(editor).toHaveTextContent(originalText);
       expect(editor.element()).toBe(originalEditor);
@@ -182,7 +182,7 @@ it("blocks send from the selected Environment's model list", async () => {
     createRemoteLink: () => ({
       call: async (path) => {
         switch (path.join(".")) {
-          case "project.list":
+          case "project.ls":
             return [remoteProject];
           case "agent.listModels":
             return { models: [] };
@@ -194,7 +194,7 @@ it("blocks send from the selected Environment's model list", async () => {
     localLink: {
       call: async (path) => {
         switch (path.join(".")) {
-          case "project.list":
+          case "project.ls":
             return [localProject];
           case "agent.listModels":
             return { models: [{ provider: "e2e", modelId: "fake", name: "Fake" }] };
@@ -299,7 +299,7 @@ async function mountLocalDraft(listModels: () => Promise<unknown>) {
     localLink: {
       call: async (path) => {
         switch (path.join(".")) {
-          case "project.list":
+          case "project.ls":
             return [localProject];
           case "agent.listModels":
             return listModels();

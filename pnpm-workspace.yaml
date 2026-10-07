@@ -63,6 +63,7 @@ catalogs:
     "@orpc/client": 2.0.0-beta.42
     "@orpc/contract": 2.0.0-beta.42
     "@orpc/experimental-effect": 2.0.0-beta.42
+    "@orpc/json-schema": 2.0.0-beta.42
     "@orpc/server": 2.0.0-beta.42
     "@orpc/tanstack-query": 2.0.0-beta.42
   # ProseMirror state is shared through @tiptap/pm — mixed tiptap versions
@@ -151,6 +152,10 @@ allowBuilds:
   simple-git-hooks: false
 patchedDependencies:
   "@earendil-works/pi-coding-agent@1.0.2": patches/@earendil-works__pi-coding-agent@1.0.2.patch
+  # orpc-mcp imports `tryDecodeURIComponent` from @orpc/shared, which beta.42
+  # dropped; the patch inlines it. On bump: drop the patch once orpc-mcp stops
+  # importing it (dist/shared/orpc-mcp.*.mjs).
+  orpc-mcp@0.1.3: patches/orpc-mcp@0.1.3.patch
   # react-scan fetches react-grab.com/api/version from `start()` with no way to
   # opt out — the renderer CSP blocks it and logs an error on every launch. The
   # patch makes that one function return early; nothing else. On a react-scan

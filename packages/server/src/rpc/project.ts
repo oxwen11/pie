@@ -8,7 +8,7 @@ import { implement } from "./orpc";
 const orpc = implement(projectContract).$context<RpcContext>();
 
 export const projectRouter = orpc.router({
-  list: orpc.list.effect(function* () {
+  ls: orpc.ls.effect(function* () {
     const projects = yield* ProjectService;
     return yield* projects.list();
   }),

@@ -20,10 +20,11 @@ Keep decisions and open work, not a permanent record of the work that produced t
 | [0008](adr/0008-chat-image-capabilities.md)                      | Chat image capabilities, not arbitrary filesystem access |
 | [0009](adr/0009-pi-session-runtime-and-recovery.md)              | One Pi runtime owner and one live consumption path       |
 | [0010](adr/0010-github-pull-request-actions.md)                  | GitHub CLI access and host-authorized PR mutations       |
+| [0011](adr/0011-session-cli-and-mcp.md)                          | One Session service behind the CLI and MCP               |
 
 ## RFCs and open work
 
-- [CLI](rfc/pie-cli.md) — remaining session/project, Schedule, Hub, and terminal command proposals; current commands use CLI help.
+- [CLI](rfc/pie-cli.md) — remaining Hub and terminal command proposals; session listing and Schedule verbs are [ADR 0011](adr/0011-session-cli-and-mcp.md). Current commands use CLI help.
 - [Hub](rfc/pie-hub.md) — proposed external-event ingress; not another daemon or Schedule store.
 - [Resource monitoring](rfc/resource-monitoring.md) — one contract covering implementation differences, host-write approval, runtime acceptance, and essential source references.
 - [Oversized PR diffs](rfc/pr-diff-oversized-files.md) — fallback beyond the current truncated preview.

@@ -115,7 +115,7 @@ Stable handles (from source, not guesses):
 | Session heading | window titlebar heading is the session title (prompt text after create) or **New chat**; project is an icon labeled **Project: \<name\>**, not text beside the title |
 | Content panel | **Toggle content panel** (session routes only). Empty copy: **Choose what to show alongside the chat.** Openable titles: **Files**, **Review**, **Terminal**, **Browser**. **File** is a family opened from the Files tree, not a blank first panel. |
 
-Do not call `agent.session.create` / `project.create` over raw RPC to "skip" the UI. Those are the production procedures the page already uses; driving them from a script is not a user path. After a UI action, **do** read `$PIE_HOME` to confirm the side effect.
+Do not call `session.create` / `project.create` over raw RPC to "skip" the UI. Those are the production procedures the page already uses; driving them from a script is not a user path. After a UI action, **do** read `$PIE_HOME` to confirm the side effect.
 
 `pi` (the coding agent binary) is required only for assistant streaming. Session create, the user bubble, and sidebar rows must still happen if `pi` is missing — expect **Model request failed** / **Thinking…** then an error, not a missing `/session/<uuid>`.
 

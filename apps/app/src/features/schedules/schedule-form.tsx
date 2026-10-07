@@ -164,7 +164,7 @@ function ScheduleFormFields({
   const projectLocked = source.kind === "edit";
   const formApi = useMemo(() => ({ form, setForm }), [form, setForm]);
   const sessions = useQuery({
-    ...orpcQueryUtils.agent.session.list.queryOptions({
+    ...orpcQueryUtils.session.ls.queryOptions({
       input: { projectId: form.projectId, archived: false },
     }),
     enabled: scheduleSessionsEnabled(form.reuseSession, form.projectId),

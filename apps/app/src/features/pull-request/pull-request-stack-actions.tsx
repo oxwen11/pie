@@ -53,7 +53,7 @@ export function PullRequestStackActions({
     // Even a lost response can follow a write: consume the preview and refresh.
     onSettled: () => {
       preview.reset();
-      void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.statuses.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.pr.ls.key() });
       void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.detail.key() });
     },
   });

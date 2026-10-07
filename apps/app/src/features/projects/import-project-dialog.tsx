@@ -242,7 +242,7 @@ function ImportFolderDialog({
     onSuccess: (project) => {
       onClose();
       onImported?.(project, environmentId);
-      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.project.list.key() });
+      return queryClient.invalidateQueries({ queryKey: orpcQueryUtils.project.ls.key() });
     },
     onError: (error) => {
       toast.error(`Failed to import project: ${error.message}`);

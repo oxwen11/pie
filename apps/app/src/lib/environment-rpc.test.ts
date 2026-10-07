@@ -46,21 +46,21 @@ describe("createEnvironmentRpc", () => {
     expect(rpc.httpBaseUrl("env-local")).toBe("http://127.0.0.1:4000");
     expect(rpc.httpBaseUrl("env-remote")).toBe(remote.httpBaseUrl);
     expect(rpc.for("env-remote")).toBe(firstRemote);
-    expect(local.project.list.key()[0]).toBe("env-local");
-    expect(firstRemote.project.list.key()[0]).toBe("env-remote");
+    expect(local.project.ls.key()[0]).toBe("env-local");
+    expect(firstRemote.project.ls.key()[0]).toBe("env-remote");
 
     await Promise.all([
-      queryClient.fetchQuery(local.project.list.queryOptions()),
-      queryClient.fetchQuery(firstRemote.project.list.queryOptions()),
+      queryClient.fetchQuery(local.project.ls.queryOptions()),
+      queryClient.fetchQuery(firstRemote.project.ls.queryOptions()),
     ]);
-    await firstRemote.project.list.call(undefined, {
+    await firstRemote.project.ls.call(undefined, {
       context: { environmentId: "env-local" },
     });
 
     expect(calls).toEqual([
-      { environmentId: "env-local", path: ["project", "list"] },
-      { environmentId: "env-remote", path: ["project", "list"] },
-      { environmentId: "env-remote", path: ["project", "list"] },
+      { environmentId: "env-local", path: ["project", "ls"] },
+      { environmentId: "env-remote", path: ["project", "ls"] },
+      { environmentId: "env-remote", path: ["project", "ls"] },
     ]);
   });
 
@@ -88,9 +88,9 @@ describe("createEnvironmentRpc", () => {
     const orpc = rpc.for("env-remote");
     expect(linkCount).toBe(1);
     remote = connection(5001, "b");
-    await orpc.project.list.call(undefined);
+    await orpc.project.ls.call(undefined);
     remote = { ...remote, wsBaseUrl: "ws://127.0.0.1:6001" };
-    await orpc.project.list.call(undefined);
+    await orpc.project.ls.call(undefined);
 
     expect(linkCount).toBe(3);
     expect(disposeCount).toBe(2);
@@ -110,10 +110,10 @@ describe("createEnvironmentRpc", () => {
     });
     const local = rpc.for("env-local");
     const remoteOrpc = rpc.for("env-remote");
-    const localKey = local.project.list.key();
-    const remoteKey = remoteOrpc.project.list.key();
-    const localMutationKey = local.agent.session.archive.key();
-    const remoteMutationKey = remoteOrpc.agent.session.archive.key();
+    const localKey = local.project.ls.key();
+    const remoteKey = remoteOrpc.project.ls.key();
+    const localMutationKey = local.session.archive.key();
+    const remoteMutationKey = remoteOrpc.session.archive.key();
     queryClient.setQueryData(localKey, ["local"]);
     queryClient.setQueryData(remoteKey, ["remote"]);
     queryClient.getMutationCache().build(queryClient, {
@@ -137,7 +137,7 @@ describe("createEnvironmentRpc", () => {
     expect(queryClient.getMutationCache().findAll({ mutationKey: remoteMutationKey })).toHaveLength(
       0,
     );
-    await expect(remoteOrpc.project.list.call(undefined)).rejects.toThrow(/not connected/);
+    await expect(remoteOrpc.project.ls.call(undefined)).rejects.toThrow(/not connected/);
     expect(() => rpc.for("env-remote")).toThrow(/not connected/);
 
     rpc.sync(new Map([["env-remote", remote]]));
