@@ -34,10 +34,11 @@ export type RequestAppOptions = {
   readonly shutdown: (() => void) | undefined;
   readonly registerElectron: ((registration: ElectronRegistration) => void) | undefined;
   /**
-   * External MCP door. Present only for an authenticated daemon: its bearer is
-   * derived from the daemon token and the grant is the whole of its authority.
+   * MCP door, always mounted. `token` is the bearer derived from the daemon
+   * token for `pie mcp`; it is undefined without one (`pie serve`), where only
+   * the per-process tokens issued to in-process Pi are accepted.
    */
-  readonly mcp: { readonly token: string; readonly context: RpcContext } | undefined;
+  readonly mcp: { readonly token: string | undefined; readonly context: RpcContext };
   /** Everything the API routes below do not claim. */
   readonly ui: UIApp;
 };
@@ -153,10 +154,7 @@ const route = (
     }
 
     // No CORS and no daemon token: it has its own bearer and refuses any Origin.
-    if (
-      options.mcp !== undefined &&
-      new URL(request.url, "http://localhost").pathname === MCP_PATH
-    ) {
+    if (new URL(request.url, "http://localhost").pathname === MCP_PATH) {
       return yield* handleMcp(options.mcp);
     }
 

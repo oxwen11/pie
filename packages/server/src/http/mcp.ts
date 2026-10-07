@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 
+import { EffectSchemaToJsonSchemaConverter } from "@orpc/experimental-effect";
 import { StandardJsonSchemaConverter } from "@orpc/json-schema";
 import { Effect } from "effect";
 import { HttpServerRequest, HttpServerResponse } from "effect/http";
@@ -22,16 +23,17 @@ export const deriveMcpToken = (daemonToken: string): string =>
 
 const handler = new MCPHandler(router, {
   serverInfo: { name: "pie", version: "0.0.1" },
-  converters: [new StandardJsonSchemaConverter()],
+  // Pie's contracts are Effect Schemas; Standard Schema vendors are the fallback.
+  converters: [new EffectSchemaToJsonSchemaConverter(), new StandardJsonSchemaConverter()],
 });
 
 /**
  * `/mcp` is the oRPC router, filtered to procedures marked `mcp.tool()`.
  * `orpc-mcp` owns the protocol. Pie still refuses a browser Origin. A bearer
- * must be the derived MCP token or a token issued for one Pi process.
+ * must be the derived MCP token (daemon only) or a token issued for one Pi process.
  */
 export const handleMcp = (options: {
-  readonly token: string;
+  readonly token: string | undefined;
   readonly context: RpcContext;
 }): Effect.Effect<
   HttpServerResponse.HttpServerResponse,
@@ -44,7 +46,8 @@ export const handleMcp = (options: {
       return HttpServerResponse.text("Forbidden", { status: 403 });
     }
     const presented = bearerToken(request.headers.authorization);
-    if (!tokensMatch(options.token, presented) && !agentMcpTokenMatches(presented)) {
+    const derived = options.token !== undefined && tokensMatch(options.token, presented);
+    if (!derived && !agentMcpTokenMatches(presented)) {
       return HttpServerResponse.text("Unauthorized", { status: 401 });
     }
     const web = yield* HttpServerRequest.toWeb(request).pipe(Effect.option);

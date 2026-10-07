@@ -12,7 +12,17 @@ import { issueAgentMcpToken, revokeAgentMcpToken } from "../../src/pi/pie-mcp";
 import { discardContext } from "../platform";
 
 const TOKEN = "test-token-mcp";
-const ToolList = Schema.Struct({ tools: Schema.Array(Schema.Struct({ name: Schema.String })) });
+const ToolList = Schema.Struct({
+  tools: Schema.Array(
+    Schema.Struct({
+      name: Schema.String,
+      inputSchema: Schema.Struct({
+        properties: Schema.optionalKey(Schema.Record(Schema.String, Schema.Unknown)),
+        required: Schema.optionalKey(Schema.Array(Schema.String)),
+      }),
+    }),
+  ),
+});
 const Ticket = Schema.Struct({ ticket: Schema.String });
 const Sessions = Schema.Array(Schema.Struct({ sessionId: Schema.String }));
 
@@ -143,6 +153,12 @@ describe("external MCP door", () => {
     const agentToken = issueAgentMcpToken();
     const accepted = await post({ authorization: `Bearer ${agentToken}` }, ping);
     expect(accepted.status).toBe(200);
+    // A process token opens /mcp and nothing else.
+    const api = await fetch(`${base}/api/ws-ticket`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${agentToken}` },
+    });
+    expect(api.status).toBe(401);
     revokeAgentMcpToken(agentToken);
     const revoked = await post({ authorization: `Bearer ${agentToken}` }, ping);
     expect(revoked.status).toBe(401);
@@ -153,9 +169,18 @@ describe("external MCP door", () => {
       clientInfo: { name: "t", version: "0" },
     });
     expect(init.protocolVersion).toBe("2025-06-18");
-    const names = Schema.decodeUnknownSync(ToolList)(await rpc("tools/list")).tools.map(
-      (tool) => tool.name,
+    const { tools } = Schema.decodeUnknownSync(ToolList)(await rpc("tools/list"));
+    const names = tools.map((tool) => tool.name);
+    // A model only sees this schema; without it every call is a guess.
+    const inputs = Object.fromEntries(
+      tools.map((tool) => [tool.name, Object.keys(tool.inputSchema.properties ?? {})]),
     );
+    expect(inputs.session_ls).toEqual(expect.arrayContaining(["projectId"]));
+    expect(inputs.session_rename).toEqual(expect.arrayContaining(["ref", "title"]));
+    expect(inputs.session_send).toEqual(expect.arrayContaining(["ref", "parts"]));
+    expect(inputs.pr_link).toEqual(expect.arrayContaining(["ref", "pullRequest"]));
+    const noInput = new Set(["project_ls", "schedule_list"]);
+    expect(names.filter((name) => !noInput.has(name) && inputs[name]?.length === 0)).toEqual([]);
     expect(names).toEqual(
       expect.arrayContaining([
         "session_ls",
@@ -246,4 +271,37 @@ describe("external MCP door", () => {
     const afterRun = Schema.decodeUnknownSync(Sessions)(JSON.parse(runList.text));
     expect(afterRun.map((session) => session.sessionId)).toContain(ran.ref.sessionId);
   }, 60_000);
+
+  it("under pie serve (no daemon token) accepts only a per-process token", async () => {
+    process.env.PIE_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-mcp-serve-"));
+    const { createServer } = await import("../../src/http/server");
+    const started = await createServer({
+      shutdown: () => {},
+      effectContext: await discardContext(),
+    });
+    server = started;
+    await new Promise<void>((resolve) => {
+      started.listen(0, "127.0.0.1", resolve);
+    });
+    const address = started.address();
+    if (address === null || typeof address === "string") throw new Error("no TCP address");
+    const post = (headers: Record<string, string>) =>
+      fetch(`http://127.0.0.1:${address.port}${MCP_PATH}`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          ...headers,
+        },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "ping" }),
+      });
+    const none = await post({});
+    expect(none.status).toBe(401);
+    const agentToken = issueAgentMcpToken();
+    const accepted = await post({ authorization: `Bearer ${agentToken}` });
+    expect(accepted.status).toBe(200);
+    revokeAgentMcpToken(agentToken);
+    const revoked = await post({ authorization: `Bearer ${agentToken}` });
+    expect(revoked.status).toBe(401);
+  });
 });

@@ -276,10 +276,10 @@ const buildServer = (
           allowedHosts,
           tickets,
           pairing,
-          mcp:
-            authToken === undefined
-              ? undefined
-              : { token: deriveMcpToken(authToken), context: rpcRuntime.context },
+          mcp: {
+            token: authToken === undefined ? undefined : deriveMcpToken(authToken),
+            context: rpcRuntime.context,
+          },
           environmentId: resolvedEnvironmentId,
           shutdown,
           registerElectron:
