@@ -324,6 +324,8 @@ One socket per Environment. Frames are Effect Schemas in `packages/contract`:
 
 - `hub.hello` (daemon to Hub): protocol version, the Environment UUID, optional
   features.
+- `hub.welcome` (Hub to daemon): sent after Hub accepts a hello; it is the acknowledged
+  handshake that promotes a pending enrollment to active (section 3).
 - `hub.event.deliver` (Hub to daemon): a `HubEvent` plus `deliveryAttempt`.
 - `hub.event.ack` (daemon to Hub): `{ eventId, status }` with `status` one of
   `accepted | rejected | duplicate`, a stable `code` on rejection, and nothing else.
