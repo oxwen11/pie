@@ -18,7 +18,7 @@ import type { SkillService } from "../skills";
 import type { TerminalManager } from "../terminal";
 
 /** Services every RPC procedure may `yield*`. */
-export type RpcContext = WithEffectContext<
+export type RpcServices =
   | EventBus
   | SessionImageAssets
   | FileSystem
@@ -34,5 +34,5 @@ export type RpcContext = WithEffectContext<
   | GitService
   | PullRequestService
   | PullRequestCoordinator
-  | TerminalManager
->;
+  | TerminalManager;
+export type RpcContext = WithEffectContext<RpcServices>;

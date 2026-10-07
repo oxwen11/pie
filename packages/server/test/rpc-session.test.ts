@@ -184,7 +184,7 @@ async function createWorktreeSession(
 ) {
   await initGitRepo(workspace);
   const project = await client.project.create({ path: workspace });
-  return client.agent.session.create({ projectId: project.id, worktree: {} });
+  return client.session.create({ projectId: project.id, worktree: {} });
 }
 
 describe("agent.session router", () => {
@@ -192,15 +192,15 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const created = await client.agent.session.create({
+      const created = await client.session.create({
         projectId: project.id,
       });
       const { ref } = created;
       expect(ref.projectId).toBe(project.id);
       expect(created.workspace.cwd).toBe(workspace);
 
-      const events = await client.agent.session.subscribe({ scope: { kind: "session", ref } });
-      const receipt = await client.agent.session.prompt({
+      const events = await client.session.subscribe({ scope: { kind: "session", ref } });
+      const receipt = await client.session.send({
         ref,
         parts: [{ type: "text", text: "ping" }],
       });
@@ -221,9 +221,9 @@ describe("agent.session router", () => {
       expect(chunks.length).toBeGreaterThan(0);
       expect(chunks.at(-1)?.type).toBe("finish");
 
-      const snapshot = await client.agent.session.getSnapshot({ ref });
+      const snapshot = await client.session.getSnapshot({ ref });
       expect(snapshot.cursor).toBeGreaterThan(0);
-      await client.agent.session.close({ ref });
+      await client.session.close({ ref });
     } finally {
       await dispose();
     }
@@ -233,12 +233,12 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const { ref } = await client.agent.session.create({ projectId: project.id });
-      await client.agent.session.close({ ref });
+      const { ref } = await client.session.create({ projectId: project.id });
+      await client.session.close({ ref });
 
-      const prepared = await client.agent.session.prepare({ ref });
-      const status = await client.agent.session.getStatus({ ref });
-      const snapshot = await client.agent.session.getSnapshot({ ref });
+      const prepared = await client.session.prepare({ ref });
+      const status = await client.session.getStatus({ ref });
+      const snapshot = await client.session.getSnapshot({ ref });
 
       expect(prepared).toEqual({ ref, workspace: { cwd: workspace } });
       expect(status).toEqual({ phase: "idle" });
@@ -253,39 +253,39 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const { ref } = await client.agent.session.create({ projectId: project.id });
+      const { ref } = await client.session.create({ projectId: project.id });
 
-      const active = await client.agent.session.list({ projectId: project.id });
+      const active = await client.session.ls({ projectId: project.id });
       expect(active).toHaveLength(1);
       expect(active[0]?.sessionId).toBe(ref.sessionId);
       expect(active[0]?.status).toBeUndefined();
       expect(active[0]?.archived).toBe(false);
 
-      await client.agent.session.rename({ ref, title: "Login bug" });
-      const renamed = await client.agent.session.list({ projectId: project.id });
+      await client.session.rename({ ref, title: "Login bug" });
+      const renamed = await client.session.ls({ projectId: project.id });
       expect(renamed[0]?.title).toBe("Login bug");
 
-      await client.agent.session.archive({ ref, archived: true });
-      const archived = await client.agent.session.list({ projectId: project.id, archived: true });
+      await client.session.archive({ ref, archived: true });
+      const archived = await client.session.ls({ projectId: project.id, archived: true });
       expect(archived[0]?.archived).toBe(true);
-      await expect(
-        client.agent.session.list({ projectId: project.id, archived: false }),
-      ).resolves.toEqual([]);
+      await expect(client.session.ls({ projectId: project.id, archived: false })).resolves.toEqual(
+        [],
+      );
 
-      await client.agent.session.archive({ ref, archived: false });
-      const restored = await client.agent.session.list({ projectId: project.id, archived: false });
+      await client.session.archive({ ref, archived: false });
+      const restored = await client.session.ls({ projectId: project.id, archived: false });
       expect(restored[0]?.archived).toBe(false);
-      await expect(
-        client.agent.session.list({ projectId: project.id, archived: true }),
-      ).resolves.toEqual([]);
+      await expect(client.session.ls({ projectId: project.id, archived: true })).resolves.toEqual(
+        [],
+      );
 
-      await client.agent.session.close({ ref });
-      const idle = await client.agent.session.list({ projectId: project.id, archived: false });
+      await client.session.close({ ref });
+      const idle = await client.session.ls({ projectId: project.id, archived: false });
       expect(idle).toHaveLength(1);
       expect(idle[0]?.status).toBeUndefined();
 
-      await client.agent.session.delete({ ref });
-      const empty = await client.agent.session.list({ projectId: project.id, archived: false });
+      await client.session.archive({ ref, archived: true });
+      const empty = await client.session.ls({ projectId: project.id, archived: false });
       expect(empty).toHaveLength(0);
     } finally {
       await dispose();
@@ -296,10 +296,10 @@ describe("agent.session router", () => {
     const { client, workspace, dispose } = await setup();
     try {
       const project = await client.project.create({ path: workspace });
-      const { ref } = await client.agent.session.create({ projectId: project.id });
+      const { ref } = await client.session.create({ projectId: project.id });
 
-      const observer = await client.agent.session.subscribe({ scope: { kind: "global" } });
-      await client.agent.session.rename({ ref, title: "Login bug" });
+      const observer = await client.session.subscribe({ scope: { kind: "global" } });
+      await client.session.rename({ ref, title: "Login bug" });
 
       let announced: string | undefined;
       for await (const item of observer) {
@@ -324,15 +324,15 @@ describe("agent.session router", () => {
       expect(created.workspace.cwd).not.toBe(workspace);
       expect(fs.existsSync(created.workspace.cwd)).toBe(true);
 
-      const prepared = await client.agent.session.prepare({ ref: created.ref });
+      const prepared = await client.session.prepare({ ref: created.ref });
       expect(prepared.workspace).toEqual(created.workspace);
 
-      await client.agent.session.prompt({
+      await client.session.send({
         ref: created.ref,
         parts: [{ type: "text", text: "hello" }],
       });
 
-      const afterPrompt = await client.agent.session.prepare({ ref: created.ref });
+      const afterPrompt = await client.session.prepare({ ref: created.ref });
       expect(afterPrompt.workspace).toEqual(created.workspace);
 
       const branch = await client.git.branch({ ref: created.ref });
@@ -342,7 +342,7 @@ describe("agent.session router", () => {
       const tree = await client.fs.readTree({ ref: created.ref });
       expect(tree.cwd).toBe(created.workspace.cwd);
 
-      await client.agent.session.close({ ref: created.ref });
+      await client.session.close({ ref: created.ref });
     } finally {
       await dispose();
     }
@@ -355,7 +355,7 @@ describe("agent.session router", () => {
       fs.rmSync(created.workspace.cwd, { recursive: true, force: true });
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
 
-      await expect(client.agent.session.prepare({ ref: created.ref })).rejects.toMatchObject({
+      await expect(client.session.prepare({ ref: created.ref })).rejects.toMatchObject({
         code: "WORKTREE_MISSING",
         data: {
           sessionId: created.ref.sessionId,
@@ -365,14 +365,14 @@ describe("agent.session router", () => {
       });
       expect(fs.existsSync(created.workspace.cwd)).toBe(false);
 
-      const restored = await client.agent.session.restoreWorktree({ ref: created.ref });
+      const restored = await client.session.restoreWorktree({ ref: created.ref });
       expect(restored.workspace).toEqual(created.workspace);
       expect(fs.existsSync(created.workspace.cwd)).toBe(true);
 
-      const ready = await client.agent.session.prepare({ ref: created.ref });
+      const ready = await client.session.prepare({ ref: created.ref });
       expect(ready.workspace).toEqual(created.workspace);
 
-      await client.agent.session.close({ ref: created.ref });
+      await client.session.close({ ref: created.ref });
     } finally {
       await dispose();
     }
@@ -388,7 +388,7 @@ describe("agent.session router", () => {
       expect(created.workspace.cwd).toMatch(
         new RegExp(`[\\\\/]worktrees[\\\\/]${repoName}[\\\\/][a-z0-9]{4}$`),
       );
-      await client.agent.session.close({ ref: created.ref });
+      await client.session.close({ ref: created.ref });
     } finally {
       await dispose();
     }
@@ -399,12 +399,12 @@ describe("agent.session router", () => {
     try {
       const project = await client.project.create({ path: workspace });
       await expect(
-        client.agent.session.create({
+        client.session.create({
           projectId: project.id,
           worktree: {},
         }),
       ).rejects.toMatchObject({ code: "INVALID_ARGUMENT" });
-      const listed = await client.agent.session.list({ projectId: project.id });
+      const listed = await client.session.ls({ projectId: project.id });
       expect(listed).toEqual([]);
     } finally {
       await dispose();

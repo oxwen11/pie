@@ -18,7 +18,7 @@ describe("project router", () => {
       const again = await h.client.project.create({ path: workspace });
       expect(again.id).toBe(created.id);
 
-      await expect(h.client.project.list()).resolves.toEqual([created]);
+      await expect(h.client.project.ls()).resolves.toEqual([created]);
     } finally {
       await h.dispose();
     }
@@ -35,7 +35,7 @@ describe("project router", () => {
       expect(path.basename(created.path)).toBe(created.name);
       expect(path.basename(path.dirname(created.path))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(fs.existsSync(created.path)).toBe(true);
-      await expect(h.client.project.list()).resolves.toEqual([created]);
+      await expect(h.client.project.ls()).resolves.toEqual([created]);
     } finally {
       await h.dispose();
     }

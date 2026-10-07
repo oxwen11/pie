@@ -40,10 +40,10 @@ layer(Layer.empty)("rpc effect/wrap", (it) => {
       const records: Array<LogRecord> = [];
       const wrap = makeRpcWrap(yield* captureContext(records));
 
-      yield* Effect.exit(wrap(Effect.fail("store unavailable"), { path: ["project", "list"] }));
+      yield* Effect.exit(wrap(Effect.fail("store unavailable"), { path: ["project", "ls"] }));
 
       const failure = records.find((record) => record.annotations.event === "rpc.failed");
-      assert.equal(failure?.annotations.procedure, "project.list");
+      assert.equal(failure?.annotations.procedure, "project.ls");
     }),
   );
 
@@ -56,7 +56,7 @@ layer(Layer.empty)("rpc effect/wrap", (it) => {
 
       yield* Effect.exit(
         wrap(Effect.fail("store unavailable").pipe(Effect.provide(innerContext)), {
-          path: ["project", "list"],
+          path: ["project", "ls"],
         }),
       );
 
@@ -118,7 +118,7 @@ layer(Layer.empty)("rpc effect/wrap", (it) => {
       const records: Array<LogRecord> = [];
       const wrap = makeRpcWrap(yield* captureContext(records));
 
-      yield* wrap(Effect.succeed(1), { path: ["project", "list"] });
+      yield* wrap(Effect.succeed(1), { path: ["project", "ls"] });
 
       assert.deepEqual(records, []);
     }),
@@ -134,7 +134,7 @@ layer(Layer.empty)("rpc effect/wrap", (it) => {
         ]),
       );
       const wrap = makeRpcWrap(context);
-      const value = yield* wrap(Effect.succeed(1), { path: ["project", "list"] });
+      const value = yield* wrap(Effect.succeed(1), { path: ["project", "ls"] });
       assert.equal(value, 1);
     }),
   );

@@ -5,7 +5,6 @@ import type {
   SessionPendingPrompt,
 } from "@getpie/contract";
 import { Deferred, Effect, Exit, Queue, Ref, Scope, Semaphore, Stream } from "effect";
-import type { Crypto, FileSystem } from "effect";
 import type * as Cause from "effect/Cause";
 import type * as ChildProcessSpawner from "effect/process/ChildProcessSpawner";
 import { v7 as uuid } from "uuid";
@@ -19,11 +18,16 @@ import {
 } from "../harness/errors";
 import { drainQueue, streamFromQueueOne } from "../harness/queue-stream";
 import { toAgentModel, toAgentModelState, type PiModel } from "./model-mapping";
+import {
+  agentMcpEndpoint,
+  issueAgentMcpToken,
+  pieMcpExtensionPath,
+  revokeAgentMcpToken,
+} from "./pie-mcp";
 import { PI_PROJECT_PROCESS_ARGS } from "./project-resource-policy";
 import type { RpcExtensionUIResponse, RpcSessionState, SessionEntries } from "./protocol";
 import { buildUiRequest, declineUiResponse, mapUiResponse } from "./request";
 import type { PiExecutable } from "./resolve-executable";
-import { makePiSessionToolsBridge, type PiSessionToolsShape } from "./session-tools";
 import { createPiTransform, type PiStreamItem } from "./transform";
 import { makePiTransport, type PiTransport, type PiTransportFailure } from "./transport";
 
@@ -91,7 +95,6 @@ export interface PiProcessOptions {
 
 export interface PiProcessDependencies<R> {
   readonly makeTransport: (config: {
-    readonly tools?: PiSessionToolsShape;
     readonly sessionId: string;
     readonly cwd?: string;
     readonly args?: ReadonlyArray<string>;
@@ -103,13 +106,11 @@ export interface PiProcessDependencies<R> {
 export interface PiProcess {
   readonly session: {
     readonly create: (config: {
-      readonly tools?: PiSessionToolsShape;
       readonly cwd: string;
       readonly provider?: string;
       readonly modelId?: string;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
     readonly resume: (config: {
-      readonly tools?: PiSessionToolsShape;
       readonly sessionId: string;
       readonly cwd?: string;
     }) => Effect.Effect<{ readonly sessionId: string }, PiTransportFailure>;
@@ -398,7 +399,6 @@ export const makePiProcessWithDependencies = <R>(
       sessionId: string,
       cwd?: string,
       spawnArgs?: ReadonlyArray<string>,
-      tools?: PiSessionToolsShape,
     ): Effect.Effect<{ readonly sessionId: string }, PiTransportFailure> =>
       Effect.gen(function* () {
         const scope = yield* Scope.fork(ownerScope, "sequential");
@@ -406,7 +406,6 @@ export const makePiProcessWithDependencies = <R>(
           const transport = yield* dependencies
             .makeTransport({
               sessionId,
-              ...(tools ? { tools } : undefined),
               ...(cwd ? { cwd } : undefined),
               ...(spawnArgs && spawnArgs.length > 0 ? { args: spawnArgs } : undefined),
             })
@@ -516,15 +515,9 @@ export const makePiProcessWithDependencies = <R>(
             config.provider && config.modelId
               ? ["--provider", config.provider, "--model", config.modelId]
               : [];
-          return openSession(
-            uuid(),
-            config.cwd,
-            [...modelArgs, ...PI_PROJECT_PROCESS_ARGS],
-            config.tools,
-          );
+          return openSession(uuid(), config.cwd, [...modelArgs, ...PI_PROJECT_PROCESS_ARGS]);
         },
-        resume: (config) =>
-          openSession(config.sessionId, config.cwd, PI_PROJECT_PROCESS_ARGS, config.tools),
+        resume: (config) => openSession(config.sessionId, config.cwd, PI_PROJECT_PROCESS_ARGS),
         prompt: (input) =>
           Effect.gen(function* () {
             const session = yield* getSession(input.sessionId);
@@ -721,26 +714,31 @@ export const makePiProcessWithDependencies = <R>(
 
 export const makePiProcess = (
   options: PiProcessOptions = {},
-): Effect.Effect<
-  PiProcess,
-  never,
-  ChildProcessSpawner.ChildProcessSpawner | FileSystem.FileSystem | Crypto.Crypto | Scope.Scope
-> =>
+): Effect.Effect<PiProcess, never, ChildProcessSpawner.ChildProcessSpawner | Scope.Scope> =>
   makePiProcessWithDependencies({
     onSpawn: options.onSpawn,
     onExit: options.onExit,
     makeTransport: (config) =>
       Effect.gen(function* () {
-        const bridge = config.tools ? yield* makePiSessionToolsBridge(config.tools) : undefined;
-        const args = [...(options.args ?? []), ...(config.args ?? []), ...(bridge?.args ?? [])];
-        const transport = yield* makePiTransport({
-          ...(bridge ? { env: bridge.env } : undefined),
+        const mcpExtension = pieMcpExtensionPath(options.executable?.prefixArgs.at(-1));
+        const mcpUrl = agentMcpEndpoint();
+        const mcpToken = mcpUrl === undefined ? undefined : issueAgentMcpToken();
+        if (mcpToken !== undefined) {
+          yield* Effect.addFinalizer(() => Effect.sync(() => revokeAgentMcpToken(mcpToken)));
+        }
+        const args = [
+          ...(options.args ?? []),
+          ...(config.args ?? []),
+          ...(mcpExtension === undefined ? [] : ["--pie-mcp-extension", mcpExtension]),
+        ];
+        return yield* makePiTransport({
+          ...(mcpUrl !== undefined && mcpToken !== undefined
+            ? { env: { PIE_MCP_URL: mcpUrl, PIE_MCP_TOKEN: mcpToken } }
+            : undefined),
           ...(options.executable ? { executable: options.executable } : undefined),
           sessionId: config.sessionId,
           ...(config.cwd ? { cwd: config.cwd } : undefined),
           ...(args.length > 0 ? { args } : undefined),
         });
-        if (bridge) yield* bridge.ready.pipe(Effect.raceFirst(transport.awaitTermination));
-        return transport;
       }),
   });

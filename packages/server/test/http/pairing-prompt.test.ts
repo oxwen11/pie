@@ -122,11 +122,11 @@ describe("createServer pairing prompt", () => {
     });
 
     const project = await client.project.create({ path: workspace });
-    const created = await client.agent.session.create({ projectId: project.id });
-    const events = await client.agent.session.subscribe({
+    const created = await client.session.create({ projectId: project.id });
+    const events = await client.session.subscribe({
       scope: { kind: "session", ref: created.ref },
     });
-    const receipt = await client.agent.session.prompt({
+    const receipt = await client.session.send({
       ref: created.ref,
       parts: [{ type: "text", text: "ping" }],
     });
@@ -147,6 +147,6 @@ describe("createServer pairing prompt", () => {
     }
     expect(ended).toBe(true);
     expect(streamed).toContain("pong");
-    await client.agent.session.close({ ref: created.ref });
+    await client.session.close({ ref: created.ref });
   });
 });

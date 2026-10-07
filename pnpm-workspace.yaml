@@ -67,6 +67,7 @@ catalogs:
     "@orpc/client": 2.0.0-beta.42
     "@orpc/contract": 2.0.0-beta.42
     "@orpc/experimental-effect": 2.0.0-beta.42
+    "@orpc/json-schema": 2.0.0-beta.42
     "@orpc/server": 2.0.0-beta.42
     "@orpc/tanstack-query": 2.0.0-beta.42
   # ProseMirror state is shared through @tiptap/pm — mixed tiptap versions
@@ -165,4 +166,8 @@ patchedDependencies:
   # comment and swallowed `@theme`. Strip comments only outside strings.
   # On bump: dist/index.js `parseDeclarations` / `parseClassSelectors`.
   "@shadcn/lint@0.1.0": patches/@shadcn__lint@0.1.0.patch
+  # orpc-mcp imports `tryDecodeURIComponent` from @orpc/shared, which beta.42
+  # dropped; the patch inlines it. On bump: drop the patch once orpc-mcp stops
+  # importing it (dist/shared/orpc-mcp.*.mjs).
+  orpc-mcp@0.1.3: patches/orpc-mcp@0.1.3.patch
   react-scan@0.5.7: patches/react-scan@0.5.7.patch

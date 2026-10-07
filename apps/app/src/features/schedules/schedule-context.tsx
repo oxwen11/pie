@@ -114,7 +114,7 @@ export function ScheduleProvider({
   const invalidate = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: orpcQueryUtils.schedule.list.key() }),
-      queryClient.invalidateQueries({ queryKey: orpcQueryUtils.agent.session.list.key() }),
+      queryClient.invalidateQueries({ queryKey: orpcQueryUtils.session.ls.key() }),
     ]);
 
   const create = useMutation({
@@ -148,8 +148,8 @@ export function ScheduleProvider({
   });
 
   const remove = useMutation({
-    mutationKey: orpcQueryUtils.schedule.delete.key(),
-    mutationFn: (id: string) => orpcQueryUtils.schedule.delete.call({ id }),
+    mutationKey: orpcQueryUtils.schedule.rm.key(),
+    mutationFn: (id: string) => orpcQueryUtils.schedule.rm.call({ id }),
     onSuccess: () => {
       setDeletingId(null);
       setSelectedId(null);
@@ -160,8 +160,8 @@ export function ScheduleProvider({
   });
 
   const runNow = useMutation({
-    mutationKey: orpcQueryUtils.schedule.runNow.key(),
-    mutationFn: (id: string) => orpcQueryUtils.schedule.runNow.call({ id }),
+    mutationKey: orpcQueryUtils.schedule.run.key(),
+    mutationFn: (id: string) => orpcQueryUtils.schedule.run.call({ id }),
     onSuccess: (result) => {
       void invalidate();
       if (result.ref !== undefined) {
@@ -178,7 +178,7 @@ export function ScheduleProvider({
   const editing = scheduleOf(items, editingId);
   const deleting = scheduleOf(items, deletingId);
   const sessions = useQuery({
-    ...orpcQueryUtils.agent.session.list.queryOptions({
+    ...orpcQueryUtils.session.ls.queryOptions({
       input:
         selected === undefined ? skipToken : { projectId: selected.projectId, archived: false },
     }),

@@ -19,18 +19,18 @@ export function useSessionListSync(
   useEffect(() => {
     const abort = new AbortController();
     const listKeyFor = (projectId: string, archived: boolean) =>
-      orpc.agent.session.list.queryOptions({ input: { projectId, archived } }).queryKey;
+      orpc.session.ls.queryOptions({ input: { projectId, archived } }).queryKey;
 
     const run = async () => {
       while (!abort.signal.aborted) {
         try {
-          const stream = await orpc.agent.session.subscribe.call(
+          const stream = await orpc.session.subscribe.call(
             { scope: { kind: "global" } },
             { signal: abort.signal },
           );
           onSubscribed?.();
           await queryClient.invalidateQueries({
-            queryKey: orpc.agent.session.list.key(),
+            queryKey: orpc.session.ls.key(),
           });
           for await (const item of stream) {
             if (item.type !== "event") continue;

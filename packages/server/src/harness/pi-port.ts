@@ -5,7 +5,6 @@ import type {
   SessionCapabilities,
   SessionPendingPrompt,
 } from "@getpie/contract";
-import type { PullRequestRef, SessionPullRequestLink } from "@getpie/contract/pull-request";
 import { Context, Effect, type Scope, Stream } from "effect";
 
 import type {
@@ -109,18 +108,3 @@ export type PiAgentShape = {
 };
 
 export class PiAgent extends Context.Service<PiAgent, PiAgentShape>()("PiAgent") {}
-
-/** Callbacks capture the validated SessionRef and await the Session service's durable writes. */
-export type PiSessionToolsShape = {
-  readonly list: Effect.Effect<ReadonlyArray<SessionPullRequestLink>, unknown>;
-  readonly register: (
-    ref: PullRequestRef,
-    restore: boolean,
-  ) => Effect.Effect<"linked" | "exists" | "excluded", unknown>;
-  readonly exclude: (ref: PullRequestRef) => Effect.Effect<void, unknown>;
-};
-
-/** Supplied at runtime acquisition, never a dependency of PiAgent's construction layer. */
-export class PiSessionTools extends Context.Service<PiSessionTools, PiSessionToolsShape>()(
-  "PiSessionTools",
-) {}

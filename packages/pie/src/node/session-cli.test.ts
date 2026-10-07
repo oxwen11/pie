@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import url from "node:url";
 
-import type { SessionRef, SubscribeStreamEvent } from "@getpie/contract";
+import type { PromptPart, SessionRef, SubscribeStreamEvent } from "@getpie/contract";
 import { fakePiPath } from "@getpie/test/paths";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -212,6 +212,8 @@ describe("pie run against live serve", () => {
   let projectId: string;
   let closeObserver: (() => void) | undefined;
   const createdIds: string[] = [];
+  /** Every prompt the server accepted, by session: what Pi was actually given. */
+  const submitted = new Map<string, PromptPart[][]>();
 
   beforeAll(async () => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-cli-home-"));
@@ -226,13 +228,16 @@ describe("pie run against live serve", () => {
 
     const observer = createPieClientFromEndpoint({ address, token: undefined });
     closeObserver = observer.close;
-    const firehose = await observer.client.agent.session.subscribe({
+    const firehose = await observer.client.session.subscribe({
       scope: { kind: "global" },
     });
     swallowAbort(async () => {
       for await (const item of firehose) {
-        if (item.type === "event" && item.event.type === "session.created") {
-          createdIds.push(item.event.ref.sessionId);
+        if (item.type !== "event") continue;
+        if (item.event.type === "session.created") createdIds.push(item.event.ref.sessionId);
+        if (item.event.type === "session.prompt.submitted") {
+          const key = item.event.ref.sessionId;
+          submitted.set(key, [...(submitted.get(key) ?? []), [...item.event.parts]]);
         }
       }
     });
@@ -320,6 +325,177 @@ describe("pie run against live serve", () => {
     expect(parseRefLine(followUp).sessionId).toBe(a.sessionId);
   }, 60_000);
 
+  it("pie ls prints the session pie run just created", () => {
+    const created = parseRefLine(
+      runCli(
+        ["run", "--no-wait", "-q", "--url", address, "--project-id", projectId, "CLI_LS"],
+        env,
+      ),
+    );
+    const listed = JSON.parse(
+      runCli(["ls", "--url", address, "--project-id", projectId, "--json"], env),
+    ) as Array<{ sessionId: string }>;
+    expect(listed.some((session) => session.sessionId === created.sessionId)).toBe(true);
+  }, 60_000);
+
+  const flags = () => ["--url", address, "--project-id", projectId];
+  const newSession = (text: string) =>
+    parseRefLine(runCli(["run", "-q", "--no-wait", ...flags(), text], env)).sessionId;
+  const listIds = (...extra: string[]) =>
+    (
+      JSON.parse(runCli(["ls", ...flags(), "--json", ...extra], env)) as Array<{
+        sessionId: string;
+      }>
+    ).map((session) => session.sessionId);
+  const lastPrompt = async (sessionId: string) => {
+    await waitFor(`prompt submitted to ${sessionId}`, () => submitted.has(sessionId));
+    return submitted.get(sessionId)?.at(-1) ?? [];
+  };
+
+  it("run --from submits the source selection, then the whole new prompt", async () => {
+    const source = newSession("CLI_FROM_SOURCE");
+    const created = parseRefLine(
+      runCli(["run", "-q", "--no-wait", ...flags(), "--from", source, "CLI_FROM_NEXT"], env),
+    );
+    expect(created.sessionId).not.toBe(source);
+    const parts = await lastPrompt(created.sessionId);
+    expect(parts).toHaveLength(2);
+    expect(parts[0]).toMatchObject({ type: "text", text: expect.stringContaining("handed off") });
+    expect(parts[1]).toEqual({ type: "text", text: "CLI_FROM_NEXT" });
+  }, 60_000);
+
+  it("run --from creates nothing when the new prompt leaves no room for history", () => {
+    const source = newSession("CLI_FROM_FULL");
+    const before = listIds();
+    const result = runCliResult(
+      ["run", "-q", "--no-wait", ...flags(), "--from", source, "x".repeat(58_000)],
+      env,
+    );
+    expect(result.status).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toContain("does not fit");
+    expect(listIds()).toEqual(before);
+  }, 60_000);
+
+  it("send --delivery and --from reach the target session", async () => {
+    const source = newSession("CLI_SEND_SOURCE");
+    const target = newSession("CLI_SEND_TARGET");
+    runCli(["wait", target, ...flags()], env);
+    runCli(["send", target, "CLI_SEND_STEER", "--delivery", "steer", "--no-wait", ...flags()], env);
+    runCli(["send", target, "CLI_SEND_FROM", "--from", source, "--no-wait", ...flags()], env);
+    await waitFor("both sends submitted", () => (submitted.get(target)?.length ?? 0) >= 3);
+    const parts = submitted.get(target)?.at(-1) ?? [];
+    expect(parts).toHaveLength(2);
+    expect(parts[1]).toEqual({ type: "text", text: "CLI_SEND_FROM" });
+  }, 60_000);
+
+  it("queue replaces the whole queue and an empty call clears it", () => {
+    const sessionId = newSession("CLI_QUEUE");
+    const replaced = runCli(
+      [
+        "session",
+        "queue",
+        sessionId,
+        "--steering",
+        "one",
+        "--follow-up",
+        "two",
+        "--follow-up",
+        "three",
+        ...flags(),
+      ],
+      env,
+    );
+    expect(parseRefLine(replaced).sessionId).toBe(sessionId);
+    const cleared = runCli(["session", "queue", sessionId, "--json", ...flags()], env);
+    expect(JSON.parse(cleared)).toMatchObject({ sessionId, ok: true });
+  }, 60_000);
+
+  it("rename, archive and --undo change what pie ls shows", () => {
+    const sessionId = newSession("CLI_ARCHIVE");
+    runCli(["session", "rename", sessionId, "Renamed by CLI", ...flags()], env);
+    const titled = JSON.parse(runCli(["ls", ...flags(), "--json"], env)) as Array<{
+      sessionId: string;
+      title?: string;
+    }>;
+    expect(titled.find((session) => session.sessionId === sessionId)?.title).toBe("Renamed by CLI");
+    runCli(["session", "archive", sessionId, ...flags()], env);
+    expect(listIds()).not.toContain(sessionId);
+    expect(listIds("--all")).toContain(sessionId);
+    runCli(["session", "archive", sessionId, "--undo", ...flags()], env);
+    expect(listIds()).toContain(sessionId);
+  }, 60_000);
+
+  it("pr link, ls and exclude keep an association without GitHub", () => {
+    const sessionId = newSession("CLI_PR");
+    const pr = "https://github.com/Owner/Repo/pull/7";
+    expect(runCli(["pr", "link", sessionId, pr, ...flags()], env).trim()).toBe("linked");
+    expect(runCli(["pr", "link", sessionId, pr, ...flags()], env).trim()).toBe("exists");
+    expect(runCli(["pr", "ls", sessionId, ...flags()], env).trim()).toBe("owner/repo#7\tlinked");
+    runCli(["pr", "exclude", sessionId, pr, ...flags()], env);
+    expect(runCli(["pr", "ls", sessionId, ...flags()], env).trim()).toBe("owner/repo#7\texcluded");
+    expect(runCli(["pr", "link", sessionId, pr, ...flags()], env).trim()).toBe("excluded");
+    const bad = runCliResult(
+      ["pr", "link", sessionId, "https://example.com/a/b/pull/1", ...flags()],
+      env,
+    );
+    expect(bad.status).toBe(1);
+  }, 60_000);
+
+  it("schedule create, run, update and rm go through the schedule contract", async () => {
+    const created = JSON.parse(
+      runCli(
+        [
+          "schedule",
+          "create",
+          "CLI_SCHEDULE_PROMPT",
+          "--name",
+          "cli-sched",
+          "--manual",
+          "--json",
+          ...flags(),
+        ],
+        env,
+      ),
+    ) as { id: string; spec: { kind: string } };
+    expect(created.spec.kind).toBe("manual");
+    const started = parseRefLine(runCli(["schedule", "run", created.id, "--url", address], env));
+    const parts = await lastPrompt(started.sessionId);
+    expect(parts).toEqual([{ type: "text", text: "CLI_SCHEDULE_PROMPT" }]);
+    expect(runCli(["schedule", "list", "-q", "--url", address], env)).toContain(created.id);
+    const updated = JSON.parse(
+      runCli(
+        [
+          "schedule",
+          "update",
+          created.id,
+          "--every",
+          "5m",
+          "--disable",
+          "--json",
+          "--url",
+          address,
+        ],
+        env,
+      ),
+    ) as { enabled: boolean; spec: { kind: string } };
+    expect(updated).toMatchObject({ enabled: false, spec: { kind: "every" } });
+    runCli(["schedule", "rm", created.id, "--url", address], env);
+    expect(runCli(["schedule", "list", "-q", "--url", address], env)).not.toContain(created.id);
+  }, 60_000);
+
+  it("project create registers a directory and project ls lists it", () => {
+    const fresh = fs.mkdtempSync(path.join(os.tmpdir(), "pie-cli-project-"));
+    const id = runCli(["project", "create", fresh, "-q", "--url", address], env).trim();
+    expect(runCli(["project", "ls", "-q", "--url", address], env).split("\n")).toContain(id);
+    expect(runCli(["project", "create", fresh, "-q", "--url", address], env).trim()).toBe(id);
+  }, 60_000);
+
+  it("pie mcp refuses an unauthenticated serve", () => {
+    const result = runCliResult(["mcp", "--url", address], env);
+    expect(result.status).toBe(1);
+    expect(`${result.stdout}${result.stderr}`).toContain("authenticated daemon");
+  }, 60_000);
+
   it("supports --no-wait then wait/send", () => {
     const created = parseRefLine(
       runCli(
@@ -351,9 +527,9 @@ describe("pie run against live serve", () => {
     const observerHandle = createPieClientFromEndpoint({ address, token: undefined });
     try {
       const observer = observerHandle.client;
-      const created = await observer.agent.session.create({ projectId });
+      const created = await observer.session.create({ projectId });
       const observed: string[] = [];
-      const stream = await observer.agent.session.subscribe({
+      const stream = await observer.session.subscribe({
         scope: { kind: "session", ref: created.ref },
       });
       swallowAbort(async () => {
@@ -387,7 +563,7 @@ describe("pie run against live serve", () => {
         env,
       );
 
-      await observer.agent.session.prompt({
+      await observer.session.send({
         ref: created.ref,
         parts: [{ type: "text", text: "OBS_USER_GAMMA" }],
       });
@@ -493,7 +669,7 @@ describe("pie run against the daemon", () => {
     });
     const seen: string[] = [];
     try {
-      const firehose = await observer.client.agent.session.subscribe({
+      const firehose = await observer.client.session.subscribe({
         scope: { kind: "global" },
       });
       swallowAbort(async () => {

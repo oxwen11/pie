@@ -1,6 +1,6 @@
 import type { SessionRef } from "@getpie/contract";
 import type { PullRequestRef } from "@getpie/contract/pull-request";
-import { pullRequestContract, pullRequestKey } from "@getpie/contract/pull-request";
+import { prContract, pullRequestContract, pullRequestKey } from "@getpie/contract/pull-request";
 import { Effect } from "effect";
 
 import { PiAgentSessionService } from "../harness";
@@ -12,6 +12,7 @@ import { implement } from "./orpc";
 import { resolveWorkspaceCwdOrFail } from "./resolve-workspace";
 
 const orpc = implement(pullRequestContract).$context<RpcContext>();
+const pr = implement(prContract).$context<RpcContext>();
 
 type PullRequestReadErrors = {
   MISSING_GH: (input: { message: string }) => unknown;
@@ -113,6 +114,40 @@ const catchAction = <
       Effect.fail(errors.HOST_REJECTED({ message: "GitHub rejected the action" })),
   });
 
+export const prRouter = pr.router({
+  ls: pr.ls.effect(function* ({ input }) {
+    return yield* (yield* PullRequestCoordinator).statuses(input.refs);
+  }),
+  exclude: pr.exclude.effect(function* ({ input, errors }) {
+    return yield* (yield* PiAgentSessionService)
+      .excludePullRequest(input.ref, input.pullRequest)
+      .pipe(
+        Effect.catchTags({
+          SessionNotFound: () =>
+            Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
+          StoreReadError: () =>
+            Effect.fail(errors.INTERNAL({ data: { message: "Session store could not be read" } })),
+          StoreWriteError: () =>
+            Effect.fail(errors.STORE_WRITE_FAILED({ message: "Association could not be saved" })),
+        }),
+      );
+  }),
+  link: pr.link.effect(function* ({ input, errors }) {
+    return yield* (yield* PiAgentSessionService)
+      .registerPullRequest(input.ref, input.pullRequest, "agent", input.restore === true)
+      .pipe(
+        Effect.catchTags({
+          SessionNotFound: () =>
+            Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
+          StoreReadError: () =>
+            Effect.fail(errors.INTERNAL({ data: { message: "Session store could not be read" } })),
+          StoreWriteError: () =>
+            Effect.fail(errors.STORE_WRITE_FAILED({ message: "Association could not be saved" })),
+        }),
+      );
+  }),
+});
+
 export const pullRequestRouter = orpc.router({
   current: orpc.current.effect(function* ({ input, errors }) {
     const cwd = yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors);
@@ -126,9 +161,6 @@ export const pullRequestRouter = orpc.router({
     const cwd = yield* resolveWorkspaceCwdOrFail({ ref: input.ref }, errors);
     return yield* service.diff(cwd).pipe(catchCurrentRead(errors));
   }),
-  statuses: orpc.statuses.effect(function* ({ input }) {
-    return yield* (yield* PullRequestCoordinator).statuses(input.refs);
-  }),
   demand: orpc.demand.effect(function* ({ input, errors }) {
     return yield* (yield* PullRequestCoordinator)
       .demand(input)
@@ -140,20 +172,6 @@ export const pullRequestRouter = orpc.router({
   }),
   refresh: orpc.refresh.effect(function* ({ input }) {
     return yield* (yield* PullRequestCoordinator).refresh(input.ref);
-  }),
-  exclude: orpc.exclude.effect(function* ({ input, errors }) {
-    return yield* (yield* PiAgentSessionService)
-      .excludePullRequest(input.ref, input.pullRequest)
-      .pipe(
-        Effect.catchTags({
-          SessionNotFound: () =>
-            Effect.fail(errors.SESSION_NOT_FOUND({ data: { message: "Session is unavailable" } })),
-          StoreReadError: () =>
-            Effect.fail(errors.INTERNAL({ data: { message: "Session store could not be read" } })),
-          StoreWriteError: () =>
-            Effect.fail(errors.STORE_WRITE_FAILED({ message: "Association could not be saved" })),
-        }),
-      );
   }),
   list: orpc.list.effect(function* ({ errors }) {
     return yield* (yield* PullRequestService).list().pipe(catchCurrentRead(errors));

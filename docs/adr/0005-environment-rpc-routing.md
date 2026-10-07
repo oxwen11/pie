@@ -26,8 +26,8 @@ EnvironmentRpc
 ```ts
 const orpc = environmentRpc.for(environmentId);
 
-await orpc.agent.session.prepare.call({ ref });
-useQuery(orpc.project.list.queryOptions());
+await orpc.session.prepare.call({ ref });
+useQuery(orpc.project.ls.queryOptions());
 ```
 
 Each cached oRPC proxy is stateless. Its client interceptor adds the immutable `environmentId` to every direct, query, mutation, and streaming call. `DynamicLink` reads that operation-local context and resolves the current WebSocket link. TanStack's native `prefix: environmentId` isolates identical procedures in the shared cache.
@@ -49,8 +49,8 @@ The daemon UUID—not SSH alias, hostname, project, or session—is the routing 
 
 Each connected Environment owns one worker. It opens the global session stream before fetching the baseline, then:
 
-1. fetches `project.list`;
-2. fetches active `agent.session.list` for every project;
+1. fetches `project.ls`;
+2. fetches active `session.ls` for every project;
 3. applies session events to that Environment's prefixed list keys;
 4. retries the stream with backoff until removed.
 

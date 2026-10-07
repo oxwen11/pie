@@ -1,4 +1,5 @@
 import { Schema } from "effect";
+import { mcp } from "orpc-mcp";
 
 import { SessionRefSchema } from "./domain";
 import { oc, toStandardSchema } from "./orpc";
@@ -276,6 +277,47 @@ const actionErrors = {
   HOST_REJECTED: {},
 };
 
+/** Saved associations on a Session. Matches `pie pr`. */
+export const prContract = {
+  ls: oc
+    .meta(
+      mcp.tool({
+        name: "pr_ls",
+        description: "Read saved PR associations for sessions, including exclusions.",
+      }),
+    )
+    .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema).check(Schema.isMaxLength(100)) }))
+    .errors(currentErrors)
+    .output(Schema.Array(PullRequestSessionStatusSchema)),
+  exclude: oc
+    .meta(
+      mcp.tool({
+        name: "pr_exclude",
+        description: "Persist an exclusion for a PR. Does not close the GitHub PR.",
+      }),
+    )
+    .input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema }))
+    .errors({ ...currentErrors, STORE_WRITE_FAILED: {} })
+    .output(Schema.Void),
+  link: oc
+    .meta(
+      mcp.tool({
+        name: "pr_link",
+        description: "Persist a known GitHub PR association without querying GitHub.",
+      }),
+    )
+    .input(
+      Schema.Struct({
+        ref: SessionRefSchema,
+        pullRequest: PullRequestRefSchema,
+        restore: Schema.optionalKey(Schema.Boolean),
+      }),
+    )
+    .errors({ ...currentErrors, STORE_WRITE_FAILED: {} })
+    .output(Schema.Literals(["linked", "exists", "excluded"])),
+};
+
+/** A GitHub pull request, not a Session association. */
 export const pullRequestContract = {
   current: oc
     .input(Schema.Struct({ ref: SessionRefSchema }))
@@ -290,10 +332,6 @@ export const pullRequestContract = {
     )
     .errors(currentErrors)
     .output(PullRequestDiffSchema),
-  statuses: oc
-    .input(Schema.Struct({ refs: Schema.Array(SessionRefSchema).check(Schema.isMaxLength(100)) }))
-    .errors(currentErrors)
-    .output(Schema.Array(PullRequestSessionStatusSchema)),
   demand: oc
     .input(PullRequestDemandInputSchema)
     .errors({ ...currentErrors, INVALID_LEASE: {} })
@@ -302,10 +340,6 @@ export const pullRequestContract = {
     .input(Schema.Struct({ ref: SessionRefSchema }))
     .errors(currentErrors)
     .output(PullRequestSessionStatusSchema),
-  exclude: oc
-    .input(Schema.Struct({ ref: SessionRefSchema, pullRequest: PullRequestRefSchema }))
-    .errors({ ...currentErrors, STORE_WRITE_FAILED: {} })
-    .output(Schema.Void),
   list: oc.errors(listErrors).output(Schema.Array(PullRequestListItemSchema)),
   detail: oc
     .input(
@@ -357,6 +391,27 @@ export const pullRequestKey = (ref: PullRequestRef): string => {
 };
 export const pullRequestUrl = (ref: PullRequestRef): string =>
   `https://${ref.host}/${ref.owner}/${ref.repository}/pull/${ref.number}`;
+
+/** Offline only. The product currently permits github.com, not arbitrary GH_HOST values. */
+export function parseSessionPullRequestUrl(value: string): PullRequestRef {
+  const match =
+    /^https:\/\/github\.com\/([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,38}))\/([a-zA-Z0-9_.-]{1,100})\/pull\/([1-9][0-9]*)\/?$/.exec(
+      value,
+    );
+  const owner = match?.[1];
+  const repository = match?.[2];
+  const rawNumber = match?.[3];
+  if (!owner || !repository || !rawNumber || repository === "." || repository === "..")
+    throw new Error("Invalid GitHub PR URL");
+  const number = Number(rawNumber);
+  if (!Number.isSafeInteger(number)) throw new Error("Invalid GitHub PR number");
+  return {
+    host: "github.com",
+    owner: owner.toLowerCase(),
+    repository: repository.toLowerCase(),
+    number,
+  };
+}
 
 export type PullRequestGroup = {
   readonly type: "native" | "single";

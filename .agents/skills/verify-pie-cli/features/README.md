@@ -11,6 +11,8 @@ Primary surface: `packages/pie` via `pnpm exec pie-verify cli run` (implementati
 | Attach to a running daemon | [daemon-reuse.md](daemon-reuse.md) | second `pie` / `pie daemon start` |
 | Token-gated ticket | [auth-ticket.md](auth-ticket.md) | `POST /api/ws-ticket` |
 | Help and flags | [help-and-flags.md](help-and-flags.md) | `pie --help`, `--port` |
+| Session commands | [session-commands.md](session-commands.md) | `pie run`, `ls`, `send`, `pie session archive` |
+| MCP | [mcp.md](mcp.md) | `pie mcp`, `POST /mcp` |
 
 Web UI and Electron are sibling skills, not features here.
 

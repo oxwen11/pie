@@ -40,7 +40,7 @@ export function PullRequestDemandProvider({ children }: { children: ReactNode })
     };
   });
   const repair = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.statuses.key() });
+    void queryClient.invalidateQueries({ queryKey: orpc.pr.ls.key() });
     void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.detail.key() });
   }, [queryClient, orpc]);
   const onSubscribed = useCallback(() => {

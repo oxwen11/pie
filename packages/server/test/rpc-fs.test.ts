@@ -91,7 +91,7 @@ describe("fs router", () => {
     const harness = await makeRpcTestHarness(home);
     try {
       const project = await harness.client.project.create({ path: cwd });
-      const { ref } = await harness.client.agent.session.create({ projectId: project.id });
+      const { ref } = await harness.client.session.create({ projectId: project.id });
       const tree = await harness.client.fs.readTree({ ref });
       expect(tree.cwd).toBe(cwd);
       expect(tree.entries).toEqual(expect.arrayContaining([{ path: "README.md", type: "file" }]));
