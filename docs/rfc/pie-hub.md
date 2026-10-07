@@ -422,16 +422,39 @@ proves a human created a Session.
 **V1 host: one long-lived Node (24) process**, also runnable under Bun, that the
 operator deploys once on any machine with a public HTTPS endpoint (a VPS, a container
 platform, or a tailnet/Funnel address). It serves `/webhook/github`, `/enroll`,
-`/operator/*` and `/daemon` (WebSocket). One process with one SQLite file is the
-transaction domain, which replaces a distributed lock; a second Hub process on the
-same file is unsupported. Tradeoff accepted: the operator runs and patches a server and
+`/operator/*` and `/daemon` (WebSocket). One process owning one data directory
+is the transaction domain, which replaces a distributed lock; a second Hub process on
+the same directory is unsupported (an exclusive lock file refuses it). Tradeoff accepted: the operator runs and patches a server and
 owns uptime; in exchange the deployment needs no vendor account, quotas or hibernation
 semantics, and the whole thing runs locally under the ordinary test and verify tools.
 
-Host choices still to settle in the Phase 1 slice, not here: the SQLite binding
-(`node:sqlite` on Node 24 versus `bun:sqlite`, behind the store seam so tests run on
-either) and the TLS/reverse-proxy recipe (Hub speaks plain HTTP behind the operator's
-proxy; it never terminates TLS itself). A single process has no hibernation, so
+**Storage: JSONL first, SQLite later (Developer, revision 7).** V1 keeps Hub state in
+`$HUB_HOME` as small JSON documents (`config`, `relationships`, `enrollment_tokens`,
+through `@getpie/effect-json-store`) plus one append-only **JSONL journal** for events.
+Each line is a record: `event` (normalized event, source delivery id, body SHA-256),
+`state` (routing outcome, delivery attempt, ack) or `drop` (expiry or opt-out). Startup
+replays the journal into in-memory indexes (dedupe by source delivery id, pending by
+relationship), so duplicate detection and oldest-first hold need no query engine. This
+fits the section 6 caps (1000 events, 50 MiB, 100 per key) and tens of Environments.
+Rules that make it safe:
+
+- One writer serializes appends; a record is appended and fsynced **before** the
+  webhook 2xx or the delivery ack is sent. A torn last line from a crash is truncated
+  on startup; a bad line elsewhere refuses to start and is never silently skipped.
+- Lines carry a schema version; unknown newer versions refuse to load (no downgrade
+  guessing).
+- Compaction (drop expired and acked-and-past-dedupe-window records) rewrites to a temp
+  file and renames; it runs on the sweep interval and at startup, and the dedupe record
+  must outlive the hold TTL (section 6).
+- The store is behind the same Effect seam as the host, with an in-memory test layer, so
+  moving to SQLite (when caps grow, queries are needed, or multi-process is wanted) is a
+  new Layer plus a one-shot importer from the journal, not a core rewrite. Trigger for
+  the move: compaction time or startup replay becomes noticeable, or a query the
+  indexes cannot answer is needed.
+
+Host choice still to settle in the Phase 1 slice, not here: the TLS/reverse-proxy recipe (Hub speaks plain HTTP behind the operator's
+proxy; it never terminates TLS itself). Runtime: Node 24 and Bun both need only
+`node:fs` and `node:http`/`ws`-class APIs, so no database binding is chosen. A single process has no hibernation, so
 heartbeat is an ordinary timer and the hold sweep is an interval, not an alarm.
 
 **Cloudflare later.** The earlier design (Worker + one SQLite Durable Object) stays a
@@ -557,10 +580,10 @@ after approval update [host-persistence.md](../host-persistence.md) in each slic
 
 | Location / owner                                                                 | Data, scope and lifecycle                                                                                                                                            |
 | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Hub SQLite `config`                                                              | Non-empty actor allowlist and default mention/label, operator-supplied; no empty seed. Operator bearer and GitHub secret come from the process environment, not rows |
-| Hub `relationships`                                                              | Relationship id, Environment UUID, label, credential hash, hold flag, state, timestamps, last cached subscriptions (no paths, prompts or credentials)                |
-| Hub `enrollment_tokens`                                                          | Token hash and expiry, at most ten pending; swept by the hold interval                                                                                               |
-| Hub `events`                                                                     | Event id, source delivery id and raw-body SHA-256, normalized event, routing outcome, delivery state, attempts, `expiresAt`; no raw body or headers                  |
+| Hub `config.json`                                                                | Non-empty actor allowlist and default mention/label, operator-supplied; no empty seed. Operator bearer and GitHub secret come from the process environment, not rows |
+| Hub `relationships.json`                                                         | Relationship id, Environment UUID, label, credential hash, hold flag, state, timestamps, last cached subscriptions (no paths, prompts or credentials)                |
+| Hub `enrollment_tokens.json`                                                     | Token hash and expiry, at most ten pending; swept by the hold interval                                                                                               |
+| Hub `events.jsonl` journal                                                       | Event id, source delivery id and raw-body SHA-256, normalized event, routing outcome, delivery state, attempts, `expiresAt`; no raw body or headers                  |
 | Hub `conversation_routes` (later)                                                | Conversation key to relationship id only                                                                                                                             |
 | Daemon `$PIE_HOME/hub/relationship.json`, target daemon writer only              | Origin, Environment UUID, relationship id, pending/active/disabled/revoked, raw credential and timestamps; credential removed after revocation                       |
 | Daemon `$PIE_HOME/hub/subscriptions.json`                                        | Subscriptions naming a relationship; no prompt, path or credential                                                                                                   |
@@ -582,8 +605,8 @@ Candidate rules needing explicit approval:
 - A Schedule run with `provider`/`modelId` persists Pi's shared default outside
   `$PIE_HOME`; do not claim Environment isolation for it, serialize proof that uses
   one, and never guess-restore the previous default.
-- Atomic rename covers process failure, not power loss. Hub's SQLite commit (WAL, `synchronous=FULL`)
-  precedes any response or ack; daemon JSON does not claim power-loss
+- Atomic rename covers process failure, not power loss. Hub's journal append is fsynced
+  before any response or ack; daemon JSON does not claim power-loss
   durability. If that is required, decide fsync or a database first.
 - No automatic receipt pruning on either side: deleting receipts reopens duplicate
   execution. Cap 100,000 per side; at the cap refuse new admissions but keep duplicate
@@ -610,7 +633,7 @@ only if Cloudflare is proposed.
 
 ### Phase 1: connection, events and hold
 
-Contract; secure storage capability; Hub host (Node process, SQLite, config, schema);
+Contract; secure storage capability; Hub host (Node process, JSONL journal and JSON documents, config, schema);
 enrollment and revocation; daemon relationship and administration RPC; event
 delivery with ack and receipts; `POST /operator/events`; opt-in hold; CLI
 administration. Hello carries no subscriptions yet and the daemon has no effect
@@ -648,7 +671,7 @@ Turbo tests. Focus on public seams:
   Session a person created, is refused; control and continue never reach outside the
   table; pause racing admission; busy, archived and missing-worktree Sessions.
 
-Runtime proof is separate and per phase. Phase 1: isolated Hub process (local, temporary SQLite file and port)
+Runtime proof is separate and per phase. Phase 1: isolated Hub process (local, temporary data directory and port)
 and two daemon homes with distinct UUIDs, both enrolled; inject events to each;
 verify receipts, no cross-delivery, hold across a daemon restart, and revocation.
 A real signed GitHub delivery needs a public HTTPS endpoint and is a production
@@ -664,7 +687,7 @@ screenshots and video. This documentation revision claims none of these gates.
 Phase 1 needs 1 to 3 only; the rest can wait.
 
 1. **Host:** settled in revision 7: Node/Bun self-hosted first, Cloudflare later
-   behind the Effect seam. Still open for Phase 1: SQLite binding, TLS/proxy recipe.
+   behind the Effect seam. Storage: JSONL journal first, SQLite later. Still open for Phase 1: TLS/proxy recipe.
    Deployment itself needs separate consent.
 2. **Hold defaults:** per-relationship opt-in, 24-hour TTL, the section 6 caps,
    verified normalized events only?
