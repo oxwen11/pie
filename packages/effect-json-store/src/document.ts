@@ -65,15 +65,17 @@ export interface JsonDocumentOptions<
    * until `set` or `update`. Defaults to true.
    */
   readonly seedMissing?: boolean;
+  /** Pinned after each atomic write. Omitted files keep the process umask. */
+  readonly mode?: number;
 }
 
 /**
  * Open a single versioned JSON document — a standalone file with a seed value,
- * loaded eagerly: a missing file is seeded with `defaults` immediately, an
- * outdated file is migrated step by step in memory (each step's output is
- * validated against the next version's schema) and written back once, and a
- * file from a newer version fails with {@link JsonStoreVersionTooNewError}
- * without ever being touched. Corrupt files fail loudly and are never reset.
+ * loaded eagerly. A missing file is seeded with `defaults` unless
+ * `seedMissing` is false, in which case the defaults stay in memory until the
+ * first `set` or `update`. An outdated file is migrated in memory and written
+ * back once. A newer file fails with {@link JsonStoreVersionTooNewError}
+ * without being touched. Corrupt files fail loudly and are never reset.
  *
  * For dynamic sets of keyed records, use `makeJsonCollection` instead.
  *
@@ -103,7 +105,7 @@ export const makeJsonDocument = <
     const { defaults, path: file, schema } = options;
     const migrations = options.migrations ?? [];
     const fs = yield* FileSystem.FileSystem;
-    const codec = makeFileCodec(fs, schema, migrations, options.legacy);
+    const codec = makeFileCodec(fs, schema, migrations, options.legacy, options.mode);
 
     const loadFromDisk: Effect.Effect<A, JsonStoreLoadError> = codec
       .load(file)

@@ -184,11 +184,6 @@ const adoptLegacyHosts = (file: { readonly environments: readonly unknown[] }) =
   }),
 });
 
-const currentEnvelope = Schema.Struct({
-  version: Schema.Literal(1),
-  data: SavedEnvironmentsSchema,
-});
-
 const unavailableError = () => new SshPersistError({ message: SAVED_HOSTS_UNAVAILABLE });
 
 const toSaved = (record: typeof SavedEnvironmentRecord.Type): SavedSshEnvironment => ({
@@ -242,29 +237,18 @@ export function makeDesktopSsh(input: {
       schema: SavedEnvironmentsSchema,
       defaults: { environments: [] },
       seedMissing: false,
+      mode: SAVED_FILE_MODE,
       legacy: { schema: LegacySavedFile, migrate: adoptLegacyHosts },
     } as const;
     const exists = yield* fs.exists(filePath).pipe(Effect.orElseSucceed(() => false));
     const opened = exists ? yield* Effect.exit(makeJsonDocument(documentOptions)) : undefined;
     let saved = opened !== undefined && opened._tag === "Success" ? opened.value : undefined;
     const unavailable = opened !== undefined && opened._tag === "Failure";
-    if (saved !== undefined) {
-      const raw = yield* fs.readFileString(filePath).pipe(Effect.orElseSucceed(() => ""));
-      let current = false;
-      try {
-        const parsed: unknown = JSON.parse(raw);
-        current = Exit.isSuccess(Schema.decodeUnknownExit(currentEnvelope)(parsed));
-      } catch {
-        current = false;
-      }
-      if (!current) yield* fs.chmod(filePath, SAVED_FILE_MODE).pipe(Effect.ignore);
-    }
     const liveRef = yield* Ref.make(new Map<string, LiveSshSession>());
     const persistGate = yield* Semaphore.make(1);
     const cli = { env: input.env };
     const client = yield* probeSshClient(cli);
     const loadEnvironmentId = input.loadEnvironmentId ?? fetchEnvironmentId;
-    const pinMode = fs.chmod(filePath, SAVED_FILE_MODE).pipe(Effect.ignore);
     const hosts = saved === undefined ? [] : (yield* saved.get).environments.map(toSaved);
 
     const requireSaved = Effect.gen(function* () {
@@ -293,7 +277,6 @@ export function makeDesktopSsh(input: {
                   Effect.annotateLogs({ path: filePath }),
                 ),
               ),
-              Effect.andThen(pinMode),
               Effect.mapError((cause) => persistError(filePath, cause)),
             );
         }),
@@ -405,7 +388,6 @@ export function makeDesktopSsh(input: {
                         Effect.annotateLogs({ path: filePath }),
                       ),
                     ),
-                    Effect.andThen(pinMode),
                     Effect.mapError((cause) => persistError(filePath, cause)),
                   );
                 yield* adoptLive({ id, target, environmentId, connected });

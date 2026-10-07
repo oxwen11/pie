@@ -127,7 +127,8 @@ describe("DesktopSsh saved hosts", () => {
         yield* fs.writeFileString(file, fileText);
         const ssh = yield* makeDesktopSsh({ persistPath: file });
         const listed = yield* ssh.listSaved;
-        return { listed, raw: yield* fs.readFileString(file) };
+        const info = yield* fs.stat(file);
+        return { listed, raw: yield* fs.readFileString(file), mode: (info.mode ?? 0) & 0o777 };
       }),
     );
     expect(error.listed).toEqual([
@@ -156,6 +157,7 @@ describe("DesktopSsh saved hosts", () => {
         ],
       },
     });
+    expect(error.mode).toBe(0o600);
   });
 
   it("remove deletes a saved host from disk", async () => {

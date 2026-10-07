@@ -70,12 +70,13 @@ export type DesktopApplicationDependencies = {
 };
 
 function emptySnapshot(hostsError?: string): EnvironmentSnapshot {
-  return {
+  const snapshot = {
     revision: 0,
     connecting: [],
     remotes: [],
-    ...(hostsError === undefined ? undefined : { hostsError }),
   };
+  if (hostsError === undefined) return snapshot;
+  return { ...snapshot, hostsError };
 }
 
 export function makeDesktopApplication({
@@ -93,11 +94,14 @@ export function makeDesktopApplication({
   const updateEnvironments = (
     updater: (current: EnvironmentSnapshot) => Omit<EnvironmentSnapshot, "revision">,
   ): Effect.Effect<EnvironmentSnapshot> =>
-    SubscriptionRef.updateAndGet(environmentsRef, (current) => ({
-      hostsError: current.hostsError,
-      ...updater(current),
-      revision: current.revision + 1,
-    }));
+    SubscriptionRef.updateAndGet(environmentsRef, (current) => {
+      const next = {
+        ...updater(current),
+        revision: current.revision + 1,
+      };
+      if (current.hostsError === undefined) return next;
+      return { ...next, hostsError: current.hostsError };
+    });
 
   const dropRemoteIfCurrent = (remote: SshRemoteEnvironment) =>
     SubscriptionRef.updateAndGet(environmentsRef, (current) => {
@@ -105,11 +109,13 @@ export function makeDesktopApplication({
       if (existing === undefined || existing.connection !== remote.connection) {
         return current;
       }
-      return {
-        ...current,
+      const next = {
+        connecting: current.connecting,
         remotes: current.remotes.filter((entry) => entry.id !== remote.id),
         revision: current.revision + 1,
       };
+      if (current.hostsError === undefined) return next;
+      return { ...next, hostsError: current.hostsError };
     });
 
   const connectSsh = (target: string, options?: { readonly background?: boolean }) =>
