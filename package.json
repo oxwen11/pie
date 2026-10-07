@@ -42,7 +42,7 @@
     "simple-git-hooks": "^2.14.0",
     "taze": "^19.17.2",
     "tsdown": "catalog:",
-    "turbo": "^2.10.12",
+    "turbo": "^2.11.5",
     "typescript": "catalog:",
     "ultracite": "^7.12.2",
     "unrun": "^0.3.1",

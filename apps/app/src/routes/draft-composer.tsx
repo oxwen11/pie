@@ -5,8 +5,10 @@ import { toast } from "sonner";
 
 import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
 import { ChatComposerFrame } from "@/features/chat/components/chat-composer-frame";
+import { SlashCommandMenu } from "@/features/chat/components/input/slash-command-menu";
 import { useChatComposerController } from "@/features/chat/components/input/use-chat-composer-controller";
 import { useChatInputHasContent } from "@/features/chat/components/input/use-chat-input-has-content";
+import { useSlashCommandState } from "@/features/chat/hooks/use-slash-command-state";
 import {
   DraftWorkspaceSelect,
   type DraftWorkspaceMode,
@@ -35,6 +37,7 @@ export function DraftComposer({
   readonly startPending: boolean;
 }) {
   const draftWorktree = useDraftWorktree(selected);
+  const commandState = useSlashCommandState(selected?.id);
   const controller = useChatComposerController({
     onSubmit: (text) => {
       if (draftWorktree.gitState === "workspace-unavailable") {
@@ -96,7 +99,9 @@ export function DraftComposer({
             providerId={draftModel?.provider}
           />
         }
-      />
+      >
+        <SlashCommandMenu state={commandState} />
+      </ChatComposerFrame>
     </div>
   );
 }

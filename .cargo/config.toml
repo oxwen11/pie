@@ -1,0 +1,4 @@
+[build]
+# Keep the workspace target inside the crate so Turbo outputs stay
+# package-relative. Paths here are relative to the repository root.
+target-dir = "native/resource-monitor/target"

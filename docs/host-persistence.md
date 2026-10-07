@@ -525,7 +525,14 @@ writes which Pie intentionally does not own:
    as settings, auth/model, trust, extension, or package state, when its own
    migrations and features require them. Pi, not Pie, owns those schemas and
    migrations. These locations and formats are informative, not a Pie storage
-   contract, because the executable can be replaced independently.
+   contract, because the executable can be replaced independently. The sidebar's
+   **Copy transcript path** lookup uses Pi's `SessionManager.findById` with the
+   session's canonical cwd. If its default session directory is absent, Pi
+   recursively creates an empty `$PI_CODING_AGENT_DIR/sessions/--<encoded-cwd>--/`
+   (default `~/.pi/agent/sessions/`; permissions follow the process umask), even
+   when no transcript is found. It writes no transcript or Pie metadata in that
+   case. Concurrent lookups use Pi's recursive mkdir; empty directories have no
+   migration or cleanup and remain after Pie is downgraded or uninstalled.
 2. **Workspace mutation.** Agent tools and commands may create, edit, rename, or
    delete arbitrary files under the selected project/worktree and may invoke
    other host tools with their own state. The paths and data structures are
