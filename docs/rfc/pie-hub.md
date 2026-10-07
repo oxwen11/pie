@@ -601,7 +601,7 @@ are an ordered SQL list keyed by `PRAGMA user_version`. Later phases add tables
 
 ```sql
 CREATE TABLE daemons (
-  id              TEXT PRIMARY KEY,
+  environment_id  TEXT PRIMARY KEY,
   credential_hash BLOB,
   state           TEXT NOT NULL CHECK (state IN ('active', 'revoked')),
   hold            INTEGER NOT NULL DEFAULT 0 CHECK (hold IN (0, 1)),
@@ -618,7 +618,7 @@ CREATE TABLE enrollment_tokens (
 
 CREATE TABLE events (
   event_id        TEXT PRIMARY KEY,
-  daemon_id       TEXT REFERENCES daemons (id),
+  environment_id  TEXT REFERENCES daemons (environment_id),
   type            TEXT NOT NULL,
   key             TEXT CHECK (length(key) <= 200),
   payload         TEXT CHECK (payload IS NULL OR json_valid(payload)),
@@ -629,7 +629,7 @@ CREATE TABLE events (
   attempts        INTEGER NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   CHECK (outcome IS NULL OR payload IS NULL)
 ) STRICT;
-CREATE INDEX events_pending ON events (daemon_id, received_at);
+CREATE INDEX events_pending ON events (environment_id, received_at);
 ```
 
 - `outcome IS NULL` means pending. Terminal rows keep no payload but stay 48 hours as
