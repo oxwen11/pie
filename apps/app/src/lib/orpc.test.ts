@@ -25,6 +25,12 @@ describe("createEnvironmentOrpc", () => {
       refetchOnWindowFocus: "always",
     });
     expect(queryClient.getQueryDefaults(orpc.agent.session.list.key()).staleTime).toBe(30_000);
+    expect(queryClient.getQueryDefaults(orpc.agent.listModels.key())).toMatchObject({
+      refetchOnWindowFocus: false,
+    });
+    expect(queryClient.getQueryDefaults(orpc.agent.commands.key())).toMatchObject({
+      refetchOnWindowFocus: false,
+    });
     const pullRequestDefaults = {
       staleTime: 15_000,
       retry: false,

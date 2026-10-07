@@ -4,12 +4,9 @@ import type { AddressInfo } from "node:net";
 import net from "node:net";
 import path from "node:path";
 
+import { DEFAULT_E2E_REPLY, e2ePiProcessEnv } from "@getpie/test/seed-e2e-pi-agent";
 import { type Browser, expect, type Page, test } from "@playwright/test";
 
-import {
-  DEFAULT_E2E_REPLY,
-  e2ePiProcessEnv,
-} from "../../../../tools/testing/seed-e2e-pi-agent.mts";
 import { PROJECT_ID, seedProject } from "./fixtures.js";
 
 /**

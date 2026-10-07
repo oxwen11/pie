@@ -161,11 +161,11 @@ export function SessionActionsMenu({
         </ContextMenuPopup>
       </ContextMenu>
       {/* Float over the row (and a trailing PR icon) instead of shifting into a second slot. */}
+      {/* react-doctor-disable-next-line no-hover-only-reveal -- :has(:focus-visible) reveals row/actions for keyboard users (browser-tested), not mouse focus. */}
       <SidebarMenuAction
-        className="md:group-hover/menu-item:bg-sidebar-accent md:group-focus-within/menu-item:bg-sidebar-accent z-10"
+        className="peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:group-hover/menu-item:bg-sidebar-accent md:group-has-focus-visible/menu-item:bg-sidebar-accent z-10 md:opacity-0 md:group-hover/menu-item:opacity-100 md:group-has-focus-visible/menu-item:opacity-100"
         disabled={setArchived.isPending}
         onClick={() => setArchived.mutate(!session.archived)}
-        showOnHover
         title={archiveLabel}
       >
         <ArchiveIcon />

@@ -8,8 +8,8 @@
     "directory": "packages/pie"
   },
   "bin": {
-    "pie": "./dist/cli.mjs",
-    "pie-relay": "./dist/relay.mjs"
+    "pie": "./dist/cli.js",
+    "pie-relay": "./dist/relay.js"
   },
   "files": [
     "dist"
@@ -25,7 +25,7 @@
   "scripts": {
     "dev": "PIE_PORT=4180 node --experimental-transform-types --disable-warning=ExperimentalWarning --import ../../tools/node/register-ts-hook.mjs src/node/cli.ts serve",
     "build": "tsdown",
-    "start": "node dist/cli.mjs",
+    "start": "node dist/cli.js",
     "publint": "publint",
     "prepublishOnly": "pnpm turbo run publint --filter=@getpie/cli",
     "test": "vitest run --passWithNoTests",
@@ -43,6 +43,7 @@
     "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
     "@getpie/server": "workspace:*",
+    "@getpie/test": "workspace:*",
     "@getpie/typescript": "workspace:*",
     "@orpc/client": "catalog:orpc",
     "@orpc/contract": "catalog:orpc",

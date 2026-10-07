@@ -207,11 +207,11 @@ fi
 # ~/.pie/daemon/daemon.pid is the one daemon record. Attach when it is healthy.
 # compatibilityKey is for the client: a mismatch must not open a tunnel.
 emit_daemon_record() {
-  node - "$DAEMON_RECORD" "$1" <<'NODE'
-const fs = require("node:fs");
-const os = require("node:os");
-const recordPath = process.argv[2] ?? "";
-const attach = process.argv[3] === "attach";
+  PIE_DAEMON_RECORD="$DAEMON_RECORD" PIE_DAEMON_ATTACH="$1" node --input-type=module - <<'NODE'
+import fs from "node:fs";
+import os from "node:os";
+const recordPath = process.env.PIE_DAEMON_RECORD ?? "";
+const attach = process.env.PIE_DAEMON_ATTACH === "attach";
 function fail(message) {
   if (!attach) process.stderr.write(message);
   process.exit(1);
@@ -258,7 +258,7 @@ async function main() {
       process.exit(1);
     }
   }
-  const compatibilityKey = typeof record.compatibilityKey === "string" ? record.compatibilityKey : "";
+  const compatibilityKey = typeof record.compatibilityKey === "string" && /^githash:[0-9a-f]{8}$/.test(record.compatibilityKey) ? record.compatibilityKey : "";
   process.stdout.write(JSON.stringify({ remotePort: port, token: token, hostname: os.hostname(), compatibilityKey: compatibilityKey }) + "\\n");
 }
 main();

@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./pie": "./dist/pie.mjs",
-    "./pie-boundaries": "./dist/pie-boundaries.mjs",
-    "./pie-query": "./dist/pie-query.mjs",
-    "./anti-slop": "./dist/anti-slop.mjs",
-    "./anti-slop-effect": "./dist/anti-slop-effect.mjs"
+    "./pie": "./dist/pie.js",
+    "./pie-boundaries": "./dist/pie-boundaries.js",
+    "./pie-query": "./dist/pie-query.js",
+    "./anti-slop": "./dist/anti-slop.js",
+    "./anti-slop-effect": "./dist/anti-slop-effect.js"
   },
   "scripts": {
     "build": "tsdown",

@@ -39,6 +39,7 @@
   "devDependencies": {
     "@effect/vitest": "catalog:effect",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@getpie/test": "workspace:*",
     "@playwright/test": "^1.63.0",
     "@tailwindcss/vite": "catalog:tailwind",
     "@tanstack/router-plugin": "catalog:",

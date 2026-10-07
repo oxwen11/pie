@@ -62,7 +62,7 @@ const resolveStaticDir = (
     const candidates = override
       ? [override]
       : [
-          "./client/", // packaged: dist/client next to dist/cli.mjs
+          "./client/", // packaged: dist/client next to dist/cli.js
           "../../../../apps/app/dist/", // monorepo, from src/node
           "../../../apps/app/dist/", // monorepo, from packages/pie/dist
         ];

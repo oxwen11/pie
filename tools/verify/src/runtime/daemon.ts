@@ -17,8 +17,6 @@ export type DaemonRecord = {
   pid: number;
   address: string;
   token: string;
-  startedAt?: string;
-  compatibilityKey?: string;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,15 +44,7 @@ export function readDaemonRecord(filePath: string): DaemonRecord {
   ) {
     throw new TypeError(`invalid daemon.pid at ${filePath}`);
   }
-  return {
-    pid: data.pid,
-    address: data.address,
-    token: data.token,
-    ...(typeof data.startedAt === "string" ? { startedAt: data.startedAt } : undefined),
-    ...(typeof data.compatibilityKey === "string"
-      ? { compatibilityKey: data.compatibilityKey }
-      : undefined),
-  };
+  return { pid: data.pid, address: data.address, token: data.token };
 }
 
 export function redactDaemonRecord(src: string, dest: string): void {
@@ -67,7 +57,7 @@ export function redactDaemonRecord(src: string, dest: string): void {
 }
 
 export function ensureCoreBuilt(repo: string): void {
-  if (fs.existsSync(path.join(repo, "packages/core/dist/compatibility.mjs"))) {
+  if (fs.existsSync(path.join(repo, "packages/core/dist/compatibility.js"))) {
     return;
   }
   console.log("building @getpie/core (packages/core/dist missing)");
@@ -81,7 +71,7 @@ export function ensureCoreBuilt(repo: string): void {
 }
 
 export function ensureServerBuilt(repo: string): void {
-  const server = path.join(repo, "packages/server/dist/server.mjs");
+  const server = path.join(repo, "packages/server/dist/server.js");
   const piProcess = path.join(repo, "packages/server/dist/pi-process/pi-process.js");
   if (fs.existsSync(server) && fs.existsSync(piProcess)) {
     return;
@@ -97,7 +87,7 @@ export function ensureServerBuilt(repo: string): void {
 }
 
 export async function resolveCompatKey(repo: string): Promise<string> {
-  const href = url.pathToFileURL(path.join(repo, "packages/core/dist/compatibility.mjs")).href;
+  const href = url.pathToFileURL(path.join(repo, "packages/core/dist/compatibility.js")).href;
   const mod: unknown = await import(href);
   if (!isCompatModule(mod)) {
     throw new TypeError(`invalid compatibility module at ${href}`);

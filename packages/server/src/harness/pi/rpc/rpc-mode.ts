@@ -1,5 +1,5 @@
 /**
- * Vendored from @earendil-works/pi-coding-agent v0.87.1
+ * Vendored from @earendil-works/pi-coding-agent v1.0.2
  * (`packages/coding-agent/src/modes/rpc/rpc-mode.ts`).
  *
  * Pie owns this loop so extension bind (`session.bindExtensions`), the RPC
@@ -91,6 +91,9 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     { resolve: (value: RpcExtensionUIResponse) => void; reject: (error: Error) => void }
   >();
 
+  // Startup bind runs before stdin is read, so no host can answer a dialog yet.
+  let acceptingUiResponses = false;
+
   // Shutdown request flag
   let shutdownRequested = false;
   let shuttingDown = false;
@@ -104,6 +107,8 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     parseResponse: (response: RpcExtensionUIResponse) => T,
   ): Promise<T> {
     if (opts?.signal?.aborted) return Promise.resolve(defaultValue);
+    // Decline instead of waiting on a reply that can never arrive.
+    if (!acceptingUiResponses) return Promise.resolve(defaultValue);
 
     const id = crypto.randomUUID();
     return new Promise((resolve, reject) => {
@@ -272,30 +277,10 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       return "";
     },
 
-    async editor(title: string, prefill?: string): Promise<string | undefined> {
-      const id = crypto.randomUUID();
-      return new Promise((resolve, reject) => {
-        pendingExtensionRequests.set(id, {
-          resolve: (response: RpcExtensionUIResponse) => {
-            if ("cancelled" in response && response.cancelled) {
-              resolve(undefined);
-            } else if ("value" in response) {
-              resolve(response.value);
-            } else {
-              resolve(undefined);
-            }
-          },
-          reject,
-        });
-        output({
-          type: "extension_ui_request",
-          id,
-          method: "editor",
-          title,
-          prefill,
-        });
-      });
-    },
+    editor: (title: string, prefill?: string): Promise<string | undefined> =>
+      createDialogPromise(undefined, undefined, { method: "editor", title, prefill }, (r) =>
+        "cancelled" in r && r.cancelled ? undefined : "value" in r ? r.value : undefined,
+      ),
 
     addAutocompleteProvider(): void {
       // Autocomplete provider composition is not supported in RPC mode
@@ -440,11 +425,18 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
             images: command.images,
             streamingBehavior: command.streamingBehavior,
             source: "rpc",
-            preflightResult: (didSucceed) => {
-              if (didSucceed) {
-                preflightSucceeded = true;
-                output(success(id, "prompt", { started: !session.isStreaming }));
-              }
+            preflightResult: (disposition) => {
+              preflightSucceeded = true;
+              // 0.99 reports disposition instead of a boolean. isStreaming is
+              // already true for a prompt that just started, so it cannot mean
+              // "queued". "handled" (an extension command consumed the input)
+              // starts no turn, so it is forwarded for the host to tell apart.
+              output(
+                success(id, "prompt", {
+                  started: disposition === "started",
+                  disposition,
+                }),
+              );
             },
           })
           .catch((cause: unknown) => {
@@ -457,13 +449,15 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       }
 
       case "steer": {
-        await session.steer(command.message, command.images, { source: "rpc" });
-        return success(id, "steer");
+        const disposition = await session.steer(command.message, command.images, { source: "rpc" });
+        return success(id, "steer", { disposition });
       }
 
       case "follow_up": {
-        await session.followUp(command.message, command.images, { source: "rpc" });
-        return success(id, "follow_up");
+        const disposition = await session.followUp(command.message, command.images, {
+          source: "rpc",
+        });
+        return success(id, "follow_up", { disposition });
       }
 
       case "abort": {
@@ -862,6 +856,7 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
     const detachJsonl = attachJsonlLineReader(process.stdin, (line) => {
       void handleInputLine(line);
     });
+    acceptingUiResponses = true;
     return () => {
       detachJsonl();
       process.stdin.off("end", onInputEnd);

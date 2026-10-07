@@ -4,21 +4,27 @@ import { Menu, MenuItem, MenuPopup, MenuTrigger } from "@getpie/ui/components/me
 import { cn } from "@getpie/ui/lib/utils";
 import { Maximize2Icon, Minimize2Icon, PlusIcon, XIcon } from "lucide-react";
 import { type ComponentProps, useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import type { OpenPanel } from "../model/content-panel";
 import { type ContentPanelSession, useContentPanel, usePanelSnapshot } from "./hooks";
 import type { AnyPanelView } from "./view";
 
 /**
- * Where the active panel renders: its own card beside the chat's, its tab strip,
- * and the empty state. Knows nothing about any particular panel — everything it
- * shows comes off the snapshot.
- *
- * A card beside the chat. Its enclosing shell panel owns width and spacing.
+ * The active content panel, tab strip and empty state. Knows nothing about any
+ * particular panel — everything it shows comes off the snapshot. The shared
+ * shell frame owns the outer border and corners; this column owns its content.
  */
-export type ContentPanelOutletProps = ComponentProps<"aside">;
+export type ContentPanelOutletProps = ComponentProps<"aside"> & {
+  /** Titlebar slot the tab strip portals into; nothing renders until it mounts. */
+  readonly tabStripTarget: HTMLElement | null;
+};
 
-export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletProps): ReactNode {
+export function ContentPanelOutlet({
+  className,
+  tabStripTarget,
+  ...props
+}: ContentPanelOutletProps): ReactNode {
   const presentation = usePanelSnapshot((snapshot) => snapshot.presentation);
   const session = useContentPanel();
 
@@ -31,15 +37,14 @@ export function ContentPanelOutlet({ className, ...props }: ContentPanelOutletPr
       data-slot="content-panel"
       data-state={presentation}
       className={cn(
-        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden border border-black/10 md:rounded-2xl dark:border-white/8",
-        presentation === "docked"
-          ? "md:rounded-s-none md:border-s-0"
-          : "md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)]",
+        "bg-card relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
         className,
       )}
       {...props}
     >
-      <TabStrip presentation={presentation} session={session} />
+      {tabStripTarget === null
+        ? null
+        : createPortal(<TabStrip presentation={presentation} session={session} />, tabStripTarget)}
       <PanelBody session={session} />
     </aside>
   );
@@ -67,19 +72,17 @@ function TabStrip({
   }, [activeId]);
 
   return (
-    <div
-      className="flex h-10 shrink-0 items-center gap-1 overflow-hidden border-b ps-1.5 pe-12"
-      data-drag-region=""
-    >
+    <div className="flex h-full min-w-0 flex-1 items-center gap-1 overflow-hidden ps-1.5">
       {/*
        * The scroller sizes to its content and shrinks — it is deliberately not
        * `flex-1`. "+" is its sibling, so it stays pinned just past the last
        * visible tab instead of scrolling off the end with them. `scrollbar-hide`
-       * because a bar here would eat the height it scrolls in.
+       * because a bar here would eat the height it scrolls in. `py-1` because
+       * overflow-x clips the y axis too, which would cut the active tab's shadow.
        */}
       <div
         ref={scroller}
-        className="scrollbar-hide flex min-w-0 items-center gap-0.5 overflow-x-auto"
+        className="scrollbar-hide flex min-w-0 items-center gap-1 overflow-x-auto py-1"
       >
         {panels.map((panel) => (
           <Tab key={panel.id} panel={panel} active={panel.id === activeId} session={session} />
@@ -126,11 +129,13 @@ function Tab({
       // `data-active`, as both `tabs` and `sidebar` spell it. Also how the strip
       // finds the tab to scroll into view.
       data-active={active || undefined}
+      // Browser-style tabs: a fixed width that shrinks before the strip scrolls,
+      // and a raised card surface for the current one.
       className={cn(
-        "group flex h-7 max-w-40 shrink-0 items-center gap-1 rounded-md ps-1.5 pe-1",
+        "group/tab flex h-8 w-60 min-w-24 shrink items-center gap-1 rounded-lg border ps-2.5 pe-1.5 text-sm",
         active
-          ? "bg-accent text-foreground"
-          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+          ? "bg-card text-foreground shadow-xs"
+          : "text-muted-foreground hover:bg-accent/60 hover:text-foreground border-transparent",
       )}
       // A middle click closes the tab, the way every tabbed thing does.
       onAuxClick={(event) => {
@@ -143,20 +148,20 @@ function Tab({
         type="button"
         // Which tab is current must not be carried by the background alone.
         aria-current={active || undefined}
-        className="flex min-w-0 items-center gap-1.5"
+        className="flex min-w-0 flex-1 items-center gap-1.5"
         onClick={() => session.activate(panel.id)}
         title={panel.label}
       >
-        <Icon className="size-3.5 shrink-0" />
+        <Icon className="size-4 shrink-0" />
         <span className="truncate">{panel.label}</span>
       </button>
       <button
         type="button"
-        className="hover:bg-muted flex size-4 shrink-0 items-center justify-center rounded-sm opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 focus-visible:opacity-100"
+        className="text-muted-foreground hover:bg-muted hover:text-foreground flex size-5 shrink-0 items-center justify-center rounded-md opacity-0 group-focus-within/tab:opacity-100 group-hover/tab:opacity-100 focus-visible:opacity-100"
         aria-label={`Close ${panel.label}`}
         onClick={() => session.close(panel.id)}
       >
-        <XIcon className="size-3" />
+        <XIcon className="size-3.5" />
       </button>
     </div>
   );

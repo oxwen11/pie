@@ -1,47 +1,38 @@
+import { getAgentDir, SettingsManager } from "@earendil-works/pi-coding-agent";
 import type { ListAgentModelsOutput } from "@getpie/contract";
-import { Effect } from "effect";
+import { type Duration, Effect } from "effect";
 
 import { AgentOperationError } from "../errors";
-import { toAgentModel } from "./model-mapping";
-import { PI_PROJECT_LOADER_OPTIONS, PI_PROJECT_SETTINGS_OPTIONS } from "./project-resource-policy";
+import { runPiDiscoveryCommand } from "./discovery-command";
+import { type PiModelRef, toAgentModel } from "./model-mapping";
+import { PI_PROJECT_SETTINGS_OPTIONS } from "./project-resource-policy";
 import { resolveDefaultPiModel } from "./resolve-default-model";
 
-const listModelsError = (cause: unknown) =>
-  new AgentOperationError({
-    sessionId: "",
-    operation: "list-models",
-    cause,
-  });
-
 /**
- * Available models plus Pi's startup default, from one
- * `createAgentSessionServices` load — same source as `pi --list-models` and
- * RPC `get_available_models`, without spawning pie-pi-process.
+ * Available models from a short-lived pie-pi-process `get_available_models`
+ * — the same RPC a live session answers, so extension-registered providers
+ * are included without running extension code in the daemon.
  */
 export function listAvailablePiModels(
   cwd: string,
+  agentDir = getAgentDir(),
+  timeout?: Duration.Input,
 ): Effect.Effect<ListAgentModelsOutput, AgentOperationError> {
-  return Effect.gen(function* () {
-    const { createAgentSessionServices, getAgentDir, SettingsManager } = yield* Effect.tryPromise({
-      try: () => import("@earendil-works/pi-coding-agent"),
-      catch: listModelsError,
-    });
-    const services = yield* Effect.tryPromise({
-      try: () =>
-        createAgentSessionServices({
-          cwd,
-          agentDir: getAgentDir(),
-          settingsManager: SettingsManager.create(cwd, getAgentDir(), PI_PROJECT_SETTINGS_OPTIONS),
-          resourceLoaderOptions: PI_PROJECT_LOADER_OPTIONS,
-        }),
-      catch: listModelsError,
-    });
-    const available = yield* Effect.tryPromise({
-      try: () => services.modelRuntime.getAvailable(),
-      catch: listModelsError,
-    });
-    const models = available.map(toAgentModel);
-    const defaultModel = resolveDefaultPiModel(models, services.settingsManager);
-    return defaultModel === undefined ? { models } : { models, defaultModel };
-  }).pipe(Effect.withSpan("pi.listAvailableModels", { attributes: { cwd } }));
+  return runPiDiscoveryCommand<{ models?: PiModelRef[] }>({
+    cwd,
+    agentDir,
+    command: { type: "get_available_models" },
+    timeout,
+  }).pipe(
+    Effect.map((data) => {
+      const models = (data.models ?? []).map(toAgentModel);
+      const settings = SettingsManager.create(cwd, agentDir, PI_PROJECT_SETTINGS_OPTIONS);
+      const defaultModel = resolveDefaultPiModel(models, settings);
+      return defaultModel === undefined ? { models } : { models, defaultModel };
+    }),
+    Effect.mapError(
+      (cause) => new AgentOperationError({ sessionId: "", operation: "list-models", cause }),
+    ),
+    Effect.withSpan("pi.listAvailableModels", { attributes: { cwd } }),
+  );
 }

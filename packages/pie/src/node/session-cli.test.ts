@@ -5,6 +5,7 @@ import path from "node:path";
 import url from "node:url";
 
 import type { SessionRef, SubscribeStreamEvent } from "@getpie/contract";
+import { fakePiPath } from "@getpie/test/paths";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { CONNECT_HINT, createPieClientFromEndpoint } from "./connect";
@@ -12,7 +13,6 @@ import { awaitTurn, parseDuration } from "./session-cli";
 
 const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
-const repoRoot = fromModuleUrl("../../../..");
 const cliEntry = fromModuleUrl("./cli.ts");
 const sourceHook = fromModuleUrl("../../../../tools/node/register-ts-hook.mjs");
 const sourceCliArgs = (args: readonly string[]) => [
@@ -23,7 +23,7 @@ const sourceCliArgs = (args: readonly string[]) => [
   cliEntry,
   ...args,
 ];
-const fakePi = path.join(repoRoot, "tools/testing/fake-pi.mjs");
+const fakePi = fakePiPath;
 const FAKE_REPLY = "CLI_FAKE_PI_REPLY";
 const TEST_KEY = "githash:00000000";
 

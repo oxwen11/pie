@@ -1,5 +1,5 @@
 /**
- * Vendored from @earendil-works/pi-coding-agent v0.87.1
+ * Vendored from @earendil-works/pi-coding-agent v1.0.2
  * (`packages/coding-agent/src/modes/rpc/jsonl.ts`).
  */
 

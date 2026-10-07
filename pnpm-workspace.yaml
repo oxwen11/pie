@@ -18,6 +18,9 @@ catalog:
   "@vitejs/plugin-react": ^6.1.1
   ai: ^7.0.122
   cn: ^0.2.6
+  # Single Commander major for the oRPC CLI adapter. Exact pin so a caret
+  # cannot pull a second major into the peer graph.
+  commander: 14.0.3
   lucide-react: ^1.48.0
   p-queue: ^9.3.3
   react-error-boundary: ^6.1.6
@@ -43,25 +46,25 @@ catalog:
 catalogs:
   # Effect v4 ecosystem is versioned in lockstep. Every `effect` / `@effect/*`
   # package must move together or you get two runtimes. Exact pins (no caret)
-  # because a prerelease caret would admit a later RC or the 4.0.0 stable.
+  # so the family moves together.
   # `@effect/platform-node-shared` is transitive-only and is listed so the
   # override below can pin it; no workspace package.json depends on it.
   effect:
-    effect: 4.0.0-rc.118
-    "@effect/platform-node": 4.0.0-rc.118
-    "@effect/platform-node-shared": 4.0.0-rc.118
-    "@effect/vitest": 4.0.0-rc.118
+    effect: 4.0.1
+    "@effect/platform-node": 4.0.1
+    "@effect/platform-node-shared": 4.0.1
+    "@effect/vitest": 4.0.1
   # oRPC must move as one family: exact pins (no caret) because prerelease
   # caret ranges admit the 2.0.0 stable release, and a mixed tree crashes at
   # runtime (stable client imports ORPC_HEADER, absent from the beta contract).
   # The published beta packages depend on each other with exact versions, so
   # pinning the direct deps here is sufficient — no override needed.
   orpc:
-    "@orpc/client": 2.0.0-beta.40
-    "@orpc/contract": 2.0.0-beta.40
-    "@orpc/experimental-effect": 2.0.0-beta.40
-    "@orpc/server": 2.0.0-beta.40
-    "@orpc/tanstack-query": 2.0.0-beta.40
+    "@orpc/client": 2.0.0-beta.42
+    "@orpc/contract": 2.0.0-beta.42
+    "@orpc/experimental-effect": 2.0.0-beta.42
+    "@orpc/server": 2.0.0-beta.42
+    "@orpc/tanstack-query": 2.0.0-beta.42
   # ProseMirror state is shared through @tiptap/pm — mixed tiptap versions
   # split that singleton, so the family upgrades together.
   tiptap:
@@ -86,12 +89,12 @@ catalogs:
   # Pi packages move together. Exact pins: the coding-agent patch key below
   # is version-specific, and a caret would admit a release the patch misses.
   pi:
-    "@earendil-works/pi-coding-agent": 0.87.1
-    "@earendil-works/pi-tui": 0.87.1
+    "@earendil-works/pi-coding-agent": 1.0.2
+    "@earendil-works/pi-tui": 1.0.2
 overrides:
   # These overrides force TRANSITIVE deps onto the catalog version — the
   # catalog alone only governs workspace package.json entries. Load-bearing:
-  # e.g. @effect/platform-node-shared@rc.118 peer-wants effect@^4.0.0-rc.118,
+  # e.g. @effect/platform-node-shared@4.0.1 peer-wants effect@^4.0.1,
   # which without the override would auto-install a second effect runtime;
   # electron-vite/vite-plus would similarly resolve their own vite/vitest.
   # @types/node stays on the catalog so workspace packages and tools share
@@ -148,6 +151,7 @@ allowBuilds:
   # works inside git worktrees); the package's own postinstall would just fail.
   simple-git-hooks: false
 patchedDependencies:
+  "@earendil-works/pi-coding-agent@1.0.2": patches/@earendil-works__pi-coding-agent@1.0.2.patch
   # react-scan fetches react-grab.com/api/version from `start()` with no way to
   # opt out — the renderer CSP blocks it and logs an error on every launch. The
   # patch makes that one function return early; nothing else. On a react-scan
@@ -155,7 +159,8 @@ patchedDependencies:
   # Headless Pi RPC. Keep extension UI components and pi-tui. Drop
   # InteractiveMode and highlight.js; inline builtin theme JSON.
   # Keep Bun sandbox setup, static dispatcher/builtin extension exports, and
-  # relocatable image worker/WASM paths. On bump, re-check every patched file
-  # and run the isolated server RPC bundle tests after rebuilding.
-  "@earendil-works/pi-coding-agent@0.87.1": patches/@earendil-works__pi-coding-agent@0.87.1.patch
+  # relocatable image worker/WASM paths. Also re-export getShellEnv,
+  # killProcessTree, waitForChildProcess, Type, bashSchema, and resolveSpawnContext for Pie's bash tool.
+  # On bump, re-check every patched file and run the isolated server RPC
+  # bundle tests after rebuilding.
   react-scan@0.5.7: patches/react-scan@0.5.7.patch

@@ -21,7 +21,7 @@ import { reservePort } from "../../src/daemon/port";
 import { readRecord, writeRecord } from "../../src/daemon/record";
 import * as Observability from "../../src/observability";
 
-const FAKE_SERVER = url.fileURLToPath(new URL("./fixtures/fake-server.mjs", import.meta.url));
+const FAKE_SERVER = url.fileURLToPath(new URL("./fixtures/fake-server.js", import.meta.url));
 
 // The daemon = this argv spawned detached. Point it at the fake server so the
 // launcher's attach-or-spawn/health/record orchestration is exercised without

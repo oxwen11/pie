@@ -66,6 +66,7 @@ export function AddSourceForm({
 }
 
 export function PackagesBrowse({
+  children,
   addSource,
   addingSource,
   items,
@@ -74,6 +75,7 @@ export function PackagesBrowse({
   onRemove,
   removingSource,
 }: {
+  children: ReactNode;
   addSource?: ReactNode;
   addingSource: string | undefined;
   items: ReadonlyArray<PackageItem>;
@@ -84,11 +86,14 @@ export function PackagesBrowse({
 }): ReactElement {
   return (
     <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 px-6 pt-6 pb-10">
-      <div className="min-w-0">
-        <h1 className="text-3xl font-semibold tracking-tight">Packages</h1>
-        <p className="text-muted-foreground mt-1 text-sm">
-          Work with Pie across your favorite tools
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-3xl font-semibold tracking-tight">Packages</h1>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Work with Pie across your favorite tools
+          </p>
+        </div>
+        {children}
       </div>
       {addSource}
       <Marketplace

@@ -4,9 +4,9 @@ The column beside chat (`ContentPanel`). One app-wide host; tabs are per session
 
 ## Sub-features
 
-- **Toggle** — shell-fixed button, `aria-label="Toggle content panel"`, `aria-pressed` when not hidden. Card header leaves a spacer so the button can sit on the chrome.
+- **Toggle** — titlebar button at the trailing edge, `aria-label="Toggle content panel"`, `aria-pressed` when not hidden.
 - **Empty body** — **Choose what to show alongside the chat.** plus ghost buttons for each openable type.
-- **Tab strip** — one strip for all open panels. **Open a panel** (`+`) adds another. **Close \<label\>**. **Maximize panel** / **Restore panel size**.
+- **Tab strip** — one strip for all open panels, rendered in the window titlebar above the panel column (`data-slot="shell-content-title"`), not inside the panel. **Open a panel** (`+`) adds another. **Close \<label\>**. **Maximize panel** / **Restore panel size**; maximized hides the session title.
 - **Files** — workspace tree, `aria-label="Project files"`. Clicking a file **replaces** the Files tab with a **File** family tab (label = basename, `title: "File"`) — one tab, not two. Empty-tree chrome may be Chinese (`打开文件`).
 - **Review** — git change set vs default base; toolbar **Compare mode**, **Reload review**. Needs a git repo.
 - **Terminal** — family of host PTYs (`features/terminal/`). Input is the xterm textarea named **zsh input**. Typed commands run in the session workspace. Hide keeps the shell; **Close \<label\>** kills it.

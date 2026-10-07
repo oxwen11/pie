@@ -41,7 +41,12 @@ gh pr checks "$PR" --repo oxwen11/pie --required --json name,state,bucket,link
 
 Every required check must be present, executed and successful for this version.
 Missing, pending, skipped, cancelled, failed or stale results block code review
-and verification. Do not weaken checks or rerun failures until green.
+and verification. Do not weaken checks, and do not retry until green. One retry
+is allowed only after the log shows an external infrastructure failure and that
+service has recovered. A later push cancels older runs for that PR; only the
+current head's checks count. Required checks that share a name are separate:
+each must succeed. When `gh` metadata disagrees with the REST commit or compare
+API, the REST SHAs are authoritative.
 
 **CI-only exception:** after inspecting the full diff, ordinary prose/comments,
 behavior-preserving formatting or additive isolated tests actually run by CI may
@@ -57,14 +62,16 @@ steps are not an exhaustive test plan. Reuse recipes and supplement missing cove
 
 Blocking findings, missing authorization or an unverifiable required outcome
 stop the workflow. Explain why and what is needed; do not fix-and-merge in the
-same review. After the author updates the PR, restart at CI for the new version.
+same review. The author of a version, including a repair made during review,
+cannot independently review or approve it. A blocked or unexecuted check is a
+gap, not a pass. After the author updates the PR, restart at CI for the new version.
 
 ## 3. Verify independently
 
 The reviewer runs the checks; the author's evidence cannot replace this step.
 
-- Use a clean reviewer-owned worktree pinned to the recorded head, not the
-  developer's checkout. Install locked dependencies and build affected artifacts
+- Create a dedicated, clean reviewer-owned worktree for each PR, pinned to its
+  recorded head. Install locked dependencies and build affected artifacts
   through Turbo. Confirm builds and running instances belong to this revision;
   reused artifacts or `launch --replace` alone do not prove freshness. Uncommitted
   source changes cannot serve as proof of the PR head.
@@ -79,9 +86,33 @@ The reviewer runs the checks; the author's evidence cannot replace this step.
   the user's app, development instance or real data. Full `HOME` isolation is not
   required. For affected shared state outside `PIE_HOME`, isolate it or obtain
   explicit authorization. A worktree is not a security sandbox.
-- One verification task per host at a time. Occupied resources or another task
-  block this run; never kill the owner. Clean up only this task's processes,
-  preserve evidence and keep credentials out of uploads.
+- Parallel verification requires separate worktrees, verification roots,
+  application data, sample Projects, browser/Electron profiles, sockets, ports
+  and evidence. Same-root lifecycle operations and same-worktree builds stay
+  serial. Bind every operation to its owned run; occupied resources block that
+  configuration, not unrelated isolated runs. Never adopt or kill another
+  task's processes. Shared Pi settings/auth/package mutations remain serial and
+  require authorization; this includes creating a Session with an explicit model
+  or changing its model, which persist Pi's global default. `PIE_HOME` does not
+  isolate those writes. If a run changes shared Pi settings, record that fact;
+  do not guess and restore a previous value. Preserve evidence and keep
+  credentials out of uploads.
+- Leave the primary checkout clean on `main`. Use one worktree per candidate,
+  pinned to the reviewed head; do not switch the primary branch. Merging one PR
+  moves `main` and invalidates every other candidate's base; restart those at CI.
+- Drive through the owned root's generated browser script. Bare `agent-browser`
+  is ambiguous when more than one surface is current. A shim refusal stops that
+  command; it does not authorize selecting, adopting, or killing another run.
+- Explicit cleanup addresses that run only. A missing, foreign, wrong-owner, or
+  corrupt target is refused before any process is stopped and must not fall back
+  to another current run. Cleanup is complete only when owned processes and ports
+  are gone, evidence remains, and foreign runs are untouched.
+- Real-model checks use the operator's existing Pi configuration and isolate
+  application state with `PIE_HOME` only. Launch refuses an overridden `HOME`
+  or an empty `PI_CODING_AGENT_DIR`.
+- Crop public evidence to the relevant UI. Omit local paths, run identifiers,
+  credentials, daemon records, and unrelated diagnostics. Before/after frames
+  show that drive, not a reconstructed baseline.
 
 ## 4. Record the outcome, then merge the verified version
 

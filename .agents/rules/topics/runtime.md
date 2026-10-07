@@ -5,7 +5,7 @@ pins come from `pnpm-workspace.yaml`; do not assume stable-library examples matc
 
 ## Compatibility constraints
 
-- Effect is 4.x RC: `Schema` comes from `effect`, services use `Context.Service`,
+- Effect is 4.x stable: `Schema` comes from `effect`, services use `Context.Service`,
   and CLI, HTTP, and process APIs live under `effect/cli`, `effect/http`, and
   `effect/process`.
 - oRPC uses a multiplexed WebSocket. Reconnect through the lazy factory so each

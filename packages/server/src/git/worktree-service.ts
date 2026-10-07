@@ -1,7 +1,7 @@
 import path from "node:path";
 
 import { Context, Crypto, Effect, FileSystem, Layer } from "effect";
-import { Hex } from "effect/encoding";
+import * as Hex from "effect/encoding/Hex";
 
 import { Paths } from "../config/paths";
 import {

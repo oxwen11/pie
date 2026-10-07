@@ -116,7 +116,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
               assert.equal(getModel("xai", "grok-4.6").provider, "xai");
               assert.ok(builtInExtensions.some((extension) => extension.name === "llama.cpp"));
               assert.equal(getPackageDir(), path.join(process.cwd(), "runtime"));
-              assert.equal(VERSION, "0.87.1");
+              assert.equal(VERSION, "1.0.2");
               for (const file of [getReadmePath(), path.join(getDocsPath(), "extensions.md"),
                 path.join(getExamplesPath(), "sdk/06-extensions.ts"),
                 path.join(getPackageDir(), "CHANGELOG.md")]) {
@@ -124,7 +124,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
               }
               const oauthProviders = builtinProviders().filter((provider) => provider.auth?.oauth);
               assert.deepEqual(oauthProviders.map((provider) => provider.id).sort(), [
-                "anthropic", "github-copilot", "kimi-coding", "meta", "openai-codex",
+                "anthropic", "github-copilot", "kimi-coding", "meta", "openai", "openai-codex",
                 "openrouter", "radius", "xai",
               ]);
               for (const provider of oauthProviders) {
@@ -243,6 +243,112 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
       }),
     );
   }
+
+  it.effect("runs codemode scripts in the bundled sandbox outside the bundle directory", () =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+      const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-rpc-codemode-" });
+      const runtimeDir = path.join(cwd, "runtime");
+      yield* fs.copy(path.dirname(bundle), runtimeDir);
+      yield* fs.copy(builtIsland, path.join(cwd, "fff"));
+      yield* fs.makeDirectory(path.join(cwd, "extensions"));
+      // codemode is registered inactive; MCP activates it in practice.
+      yield* fs.writeFileString(
+        path.join(cwd, "settings.json"),
+        JSON.stringify({ defaultTools: ["read", "codemode"] }),
+      );
+      // Calls codemode on the first request, then answers with text.
+      yield* fs.writeFileString(
+        path.join(cwd, "extensions/codemode-provider.ts"),
+        `import { createAssistantMessageEventStream } from "@earendil-works/pi-ai";
+        export default function (pi) {
+          pi.registerProvider("codemode-test", {
+            baseUrl: "http://127.0.0.1:1",
+            apiKey: "test-only",
+            api: "codemode-test",
+            models: [{ id: "model", name: "Codemode test", reasoning: false, input: ["text"],
+              cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+              contextWindow: 200000, maxTokens: 4096 }],
+            streamSimple(model, context) {
+              const stream = createAssistantMessageEventStream();
+              const call = context.messages.at(-1)?.role === "user";
+              const output = { role: "assistant", content: [], api: model.api,
+                provider: model.provider, model: model.id,
+                usage: { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, totalTokens: 2,
+                  cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+                stopReason: call ? "toolUse" : "stop", timestamp: Date.now() };
+              stream.push({ type: "start", partial: output });
+              if (call) {
+                const toolCall = { type: "toolCall", id: "call-1", name: "codemode",
+                  arguments: { code: "return 6 * 7" } };
+                output.content.push(toolCall);
+                stream.push({ type: "toolcall_start", contentIndex: 0, partial: output });
+                stream.push({ type: "toolcall_end", contentIndex: 0, toolCall, partial: output });
+              } else {
+                output.content.push({ type: "text", text: "done" });
+                stream.push({ type: "text_start", contentIndex: 0, partial: output });
+                stream.push({ type: "text_end", contentIndex: 0, content: "done", partial: output });
+              }
+              stream.push({ type: "done", reason: output.stopReason, message: output });
+              stream.end();
+              return stream;
+            },
+          });
+        }`,
+      );
+      const turnEnded = yield* Deferred.make<void>();
+      const child = yield* spawner.spawn(
+        ChildProcess.make(
+          "bun",
+          [
+            "--no-install",
+            path.join(runtimeDir, "pi-process.js"),
+            "--mode",
+            "rpc",
+            "--provider",
+            "codemode-test",
+            "--model",
+            "model",
+          ],
+          {
+            cwd,
+            env: { PATH: process.env.PATH, HOME: cwd, PI_CODING_AGENT_DIR: cwd, PI_OFFLINE: "1" },
+            // Keep stdin open until the turn finishes; EOF shuts the RPC child down.
+            stdin: Stream.make('{"type":"prompt","message":"run"}\n').pipe(
+              Stream.concat(Stream.fromEffect(Deferred.await(turnEnded)).pipe(Stream.drain)),
+              Stream.encodeText,
+            ),
+          },
+        ),
+      );
+      const lines = yield* child.stdout.pipe(
+        Stream.decodeText(),
+        Stream.splitLines,
+        Stream.tap((line) =>
+          line.includes('"type":"agent_end"')
+            ? Deferred.succeed(turnEnded, undefined)
+            : Effect.void,
+        ),
+        Stream.takeUntil((line) => line.includes('"type":"agent_end"')),
+        Stream.runCollect,
+      );
+      const result = Array.from(lines)
+        .map(
+          (line) =>
+            JSON.parse(line) as {
+              type?: string;
+              toolName?: string;
+              isError?: boolean;
+              result?: { content: Array<{ text?: string }> };
+            },
+        )
+        .find((event) => event.type === "tool_execution_end" && event.toolName === "codemode");
+      assert.ok(result, lines.join("\n"));
+      assert.equal(result.isError, false, JSON.stringify(result));
+      assert.equal(result.result?.content.at(-1)?.text, "42");
+    }),
+  );
 
   it.effect("routes queued RPC input through extension input handlers", () =>
     Effect.gen(function* () {

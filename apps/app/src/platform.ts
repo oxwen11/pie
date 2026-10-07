@@ -69,8 +69,12 @@ export type PlatformTailscale = {
   readonly disableServe: () => Promise<void>;
 };
 
-/** Browser or native capabilities supplied by the host entry point. */
-export type Platform = {
+export type WindowChrome = {
+  readonly titlebarHeight: number;
+  readonly toggleInset: number;
+};
+
+export type PlatformBase = {
   /** Native window visibility (including minimization), combined with Page Visibility. */
   visibility?: {
     getSnapshot: () => boolean;
@@ -78,12 +82,6 @@ export type Platform = {
   };
   /** Close the host application when that operation exists. */
   quit?: () => void;
-  /**
-   * The desktop host's OS, left unset by the browser entry point. macOS draws
-   * native traffic lights over the shell's top-left corner; everywhere else
-   * that corner is ours to fill — see `components/layout/shell-chrome.ts`.
-   */
-  os?: PlatformOs;
   /** Desktop host short hostname (e.g. `mac-mini`). Absent in the browser. */
   hostname?: string;
   /**
@@ -99,3 +97,9 @@ export type Platform = {
    */
   tailscale?: PlatformTailscale;
 };
+
+/** Browser or native capabilities supplied by the host entry point. */
+export type Platform =
+  | (PlatformBase & { os?: undefined })
+  | (PlatformBase & { os: Exclude<PlatformOs, "macos"> })
+  | (PlatformBase & { os: "macos"; windowChrome: WindowChrome });

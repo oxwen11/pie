@@ -4,14 +4,14 @@ import os from "node:os";
 import path from "node:path";
 import url from "node:url";
 
-import { DEFAULT_E2E_REPLY, e2ePiProcessEnv } from "../../../tools/testing/seed-e2e-pi-agent.mts";
+import { fakeGhPath } from "@getpie/test/paths";
+import { DEFAULT_E2E_REPLY, e2ePiProcessEnv } from "@getpie/test/seed-e2e-pi-agent";
 
 const fromHere = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
-const repoRoot = fromHere("../../..");
 const cliEntry = fromHere("../../../packages/pie/src/node/cli.ts");
 const sourceHook = fromHere("../../../tools/node/register-ts-hook.mjs");
-const fakeGh = path.join(repoRoot, "tools/testing/fake-gh.mjs");
+const fakeGh = fakeGhPath;
 
 const SAMPLE = "sample";
 const SAMPLE_GIT = "sample-git";

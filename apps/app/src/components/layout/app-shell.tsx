@@ -1,16 +1,28 @@
 import { SidebarProvider, useSidebar } from "@getpie/ui/components/sidebar";
 import { cn } from "@getpie/ui/lib/utils";
 import { LazyMotion, domMax } from "motion/react";
-import { createContext, type ReactNode, use, useCallback, useMemo } from "react";
+import {
+  createContext,
+  type ReactNode,
+  use,
+  useCallback,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
 
+import { AppRail } from "@/components/layout/app-rail";
+import { BrandMark } from "@/components/layout/brand-mark";
 import { useContentPanel, usePanelSnapshot } from "@/components/layout/content-panel/react/hooks";
 import { ContentPanelOutlet } from "@/components/layout/content-panel/react/outlet";
-import { shellProviderStyle } from "@/components/layout/shell-chrome";
+import { ContentPanelToggle } from "@/components/layout/content-panel/react/toggle";
 import { ShellContentPanel } from "@/components/layout/shell-content";
-import { ShellContentPanelToggle } from "@/components/layout/shell-content-panel-toggle";
 import { ShellSidebarPanel } from "@/components/layout/shell-sidebar";
 import { ShellSidebarToggle } from "@/components/layout/shell-sidebar-toggle";
 import { usePlatform } from "@/platform-context";
+import { isDesktopMacosHost } from "@/platform-host";
 
 interface AppShellContextValue {
   readonly contentPanel: {
@@ -20,10 +32,20 @@ interface AppShellContextValue {
     readonly maximized: boolean;
     /** Switch the content panel between maximized and docked presentation. */
     readonly setMaximized: (maximized: boolean) => void;
+    /** Titlebar slot above the content-panel column; hosts its tab strip. */
+    readonly titleTarget: HTMLDivElement | null;
   };
 }
 
 const AppShellContext = createContext<AppShellContextValue | null>(null);
+
+const ShellTitleContext = createContext<HTMLDivElement | null>(null);
+
+/** Route-owned title, placed in the window titlebar at the main column. */
+export function ShellTitle({ children }: { readonly children: ReactNode }): ReactNode {
+  const target = use(ShellTitleContext);
+  return target === null ? null : createPortal(children, target);
+}
 
 const useAppShell = (): AppShellContextValue => {
   const value = use(AppShellContext);
@@ -53,17 +75,8 @@ export interface AppShellMainProps {
 export function AppShellMain({ children }: AppShellMainProps) {
   const { contentPanel } = useAppShell();
   const fill = contentPanel.maximized;
-  const withContent = contentPanel.visible && !fill;
   return (
-    <div
-      className={cn(
-        "flex min-h-0 flex-col md:py-1",
-        fill ? "w-0 overflow-hidden" : "min-w-80 flex-1",
-        withContent
-          ? "md:[&_[data-slot=sidebar-inset]]:rounded-e-none md:[&_[data-slot=sidebar-inset]]:border-e-0"
-          : "md:pe-1",
-      )}
-    >
+    <div className={cn("flex min-h-0 flex-col", fill ? "w-0 overflow-hidden" : "min-w-80 flex-1")}>
       {children}
     </div>
   );
@@ -78,21 +91,12 @@ export interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const platform = usePlatform();
-
   return (
     // The provider is shell-owned: it supplies responsive/sidebar state and is
-    // also the viewport wrapper. Individual titlebar headers own draggable
-    // regions; h-svh keeps long transcripts scrolling inside the card.
-    <SidebarProvider
-      className="bg-sidebar h-svh overflow-hidden"
-      defaultOpen={readSidebarCookie()}
-      style={shellProviderStyle(platform)}
-    >
-      <LazyMotion features={domMax}>
-        {children}
-        <ShellSidebarToggle />
-      </LazyMotion>
+    // also the viewport wrapper. The shell titlebar is the window drag strip;
+    // h-svh keeps long transcripts scrolling inside the shell.
+    <SidebarProvider className="bg-sidebar h-svh overflow-hidden" defaultOpen={readSidebarCookie()}>
+      <LazyMotion features={domMax}>{children}</LazyMotion>
     </SidebarProvider>
   );
 }
@@ -110,21 +114,135 @@ export function AppShellBody({ children }: AppShellBodyProps) {
     (maximized: boolean) => session?.setPresentation(maximized ? "maximized" : "docked"),
     [session],
   );
+  const [contentTitleTarget, setContentTitleTarget] = useState<HTMLDivElement | null>(null);
   const context = useMemo(
     () => ({
       contentPanel: {
         visible: hasVisibleContentPanel,
         maximized: isContentPanelMaximized,
         setMaximized: setContentPanelMaximized,
+        titleTarget: contentTitleTarget,
       },
     }),
-    [hasVisibleContentPanel, isContentPanelMaximized, setContentPanelMaximized],
+    [hasVisibleContentPanel, isContentPanelMaximized, setContentPanelMaximized, contentTitleTarget],
   );
 
+  const platform = usePlatform();
+  const macos = isDesktopMacosHost(platform);
+  const { isMobile } = useSidebar();
+  const [titleTarget, setTitleTarget] = useState<HTMLDivElement | null>(null);
+  const shellRef = useRef<HTMLDivElement>(null);
+  const measure = useCallback((shell: HTMLDivElement) => {
+    const left = shell.getBoundingClientRect().left;
+    let leading = 0;
+    const toggle = shell.querySelector<HTMLElement>("[aria-label='Toggle Sidebar']");
+    if (toggle !== null) {
+      leading = toggle.getBoundingClientRect().right - left + 8;
+      shell.style.setProperty("--shell-leading", `${leading}px`);
+    }
+    // The content slot spans the panel column up to the trailing toggle. The
+    // toggle sits after the title's reserve margin, so zero the reserve before
+    // reading: one pass, no feedback loop with the value this writes.
+    shell.style.setProperty("--shell-content-reserve", "0px");
+    const column = shell.querySelector<HTMLElement>("[data-slot=content-panel-column]");
+    const trailing = shell.querySelector<HTMLElement>("[aria-label='Toggle content panel']");
+    const start = column?.getBoundingClientRect().left ?? 0;
+    // The strip never starts inside the leading controls (traffic lights,
+    // brand, sidebar toggle), even when a maximized column does.
+    const stripLeft = Math.max(start - left, leading);
+    const width =
+      column === null || trailing === null
+        ? 0
+        : Math.max(0, trailing.getBoundingClientRect().left - 8 - stripLeft);
+    shell.style.setProperty("--shell-content-left", `${stripLeft}px`);
+    shell.style.setProperty("--shell-content-width", `${width}px`);
+    shell.style.setProperty("--shell-content-reserve", width > 0 ? `${width + 8}px` : "0px");
+  }, []);
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    if (shell === null) return undefined;
+    const run = () => measure(shell);
+    run();
+    shell.style.setProperty("--shell-rail", isMobile ? "0px" : "3.25rem");
+    const observer = new ResizeObserver(run);
+    observer.observe(shell);
+    const column = shell.querySelector("[data-slot=content-panel-column]");
+    if (column !== null) observer.observe(column);
+    return () => observer.disconnect();
+  }, [isMobile, measure]);
   return (
     <AppShellContext value={context}>
-      <div className="flex min-h-0 w-full flex-1">{children}</div>
-      <ShellContentPanelToggle />
+      <ShellTitleContext value={titleTarget}>
+        <div className="flex min-h-0 w-full flex-1 flex-col" data-slot="shell" ref={shellRef}>
+          {/* One drag strip. Its split tracks the sidebar width, so resizing the
+              list moves the title. Routes portal a title into the main column. */}
+          <header
+            className={cn(
+              "group relative flex shrink-0 items-center gap-2 pe-4",
+              !macos && "h-10 ps-2",
+            )}
+            data-drag-region=""
+            style={
+              macos
+                ? {
+                    height: platform.windowChrome.titlebarHeight,
+                    paddingInlineStart: platform.windowChrome.toggleInset,
+                  }
+                : undefined
+            }
+          >
+            {macos ? null : <BrandMark />}
+            <ShellSidebarToggle />
+            <div
+              aria-hidden="true"
+              className="bg-border pointer-events-none absolute top-1/2 hidden h-5 w-px -translate-y-1/2 group-has-[[data-app-shell-titlebar-content]]:block"
+              style={{
+                left: "calc(var(--shell-rail, 0px) + var(--shell-sidebar-width, 0px))",
+                opacity: "var(--shell-sidebar-rule, 0)",
+              }}
+            />
+            <div
+              className={cn(
+                "flex h-full min-w-0 flex-1 items-center",
+                isContentPanelMaximized && "hidden",
+              )}
+              data-slot="shell-title"
+              ref={setTitleTarget}
+              style={{
+                marginInlineStart:
+                  "max(0px, calc(var(--shell-rail, 0px) + var(--shell-sidebar-width, 0px) + var(--shell-gutter, 0px) + 8px - var(--shell-leading, 0px)))",
+                marginInlineEnd: "var(--shell-content-reserve, 0px)",
+              }}
+            />
+            <div
+              className={cn(
+                // The rule continues the panel's column divider into the titlebar.
+                "before:bg-border absolute inset-y-0 flex min-w-0 items-center before:absolute before:top-1/2 before:-left-px before:h-5 before:w-px before:-translate-y-1/2",
+                !hasVisibleContentPanel && "hidden",
+                isContentPanelMaximized && "before:hidden",
+              )}
+              data-slot="shell-content-title"
+              ref={setContentTitleTarget}
+              style={{
+                left: "var(--shell-content-left, 0px)",
+                width: "var(--shell-content-width, 0px)",
+              }}
+            />
+            <ContentPanelToggle className="ms-auto" />
+          </header>
+          <div className={cn("flex min-h-0 w-full flex-1 md:py-1 md:pe-1", macos && "md:pt-0")}>
+            <AppRail />
+            {/* One persistent border encloses the session list, main and content
+                panel. Collapsing a column never moves or removes this frame. */}
+            <div
+              className="bg-card flex min-h-0 min-w-0 flex-1 overflow-hidden md:rounded-xl md:border md:border-black/10 md:shadow-[-4px_0_12px_-8px_--theme(--color-black/10%)] dark:md:border-white/8"
+              data-slot="shell-panel"
+            >
+              {children}
+            </div>
+          </div>
+        </div>
+      </ShellTitleContext>
     </AppShellContext>
   );
 }
@@ -139,7 +257,7 @@ export function AppShellSessionPanel(): ReactNode {
       maximized={contentPanel.maximized}
       sessionKey={sessionKey}
     >
-      <ContentPanelOutlet />
+      <ContentPanelOutlet tabStripTarget={contentPanel.titleTarget} />
     </ShellContentPanel>
   );
 }

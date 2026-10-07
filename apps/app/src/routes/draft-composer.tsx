@@ -1,6 +1,7 @@
-import type { CreateWorktreeInput, Project } from "@getpie/contract";
+import type { CreateWorktreeInput } from "@getpie/contract";
 import { PromptInputSubmit } from "@getpie/ui/ai-elements/prompt-input";
 import { CardFrameHeader } from "@getpie/ui/components/card";
+import type { ReactNode } from "react";
 import { toast } from "sonner";
 
 import { ModelSelectorPicker } from "@/components/model-selector/model-selector-picker";
@@ -14,37 +15,54 @@ import {
   type DraftWorkspaceMode,
 } from "@/features/projects/draft-workspace-select";
 import { DraftWorktreeBaseSelect } from "@/features/projects/draft-worktree-base-select";
-import { ProjectSelect } from "@/features/projects/project-select";
+import {
+  ProjectSelect,
+  type ProjectGroup,
+  type ProjectSelection,
+} from "@/features/projects/project-select";
 import { useDraftWorktree } from "@/features/projects/use-draft-worktree";
 
 export function DraftComposer({
   draftModel,
+  groups,
   models,
+  modelsPending = false,
+  modelsReady,
+  notice,
   onModelChange,
   onProjectChange,
   onStart,
-  projects,
+  requireProject = false,
   selected,
   startPending,
 }: {
   readonly draftModel: { provider: string; modelId: string } | undefined;
+  readonly groups: ReadonlyArray<ProjectGroup>;
   readonly models: Parameters<typeof ModelSelectorPicker>[0]["models"];
+  /** Catalog probe in flight. Submit shows a spinner and cannot send. */
+  readonly modelsPending?: boolean;
+  /** Confirmed non-empty catalog. Send stays blocked until this is true. */
+  readonly modelsReady: boolean;
+  readonly notice?: ReactNode;
   readonly onModelChange: (provider: string, modelId: string) => void;
-  readonly onProjectChange: (next: string | null) => void;
+  readonly onProjectChange: (next: ProjectSelection | null) => void;
   readonly onStart: (text: string, worktree?: CreateWorktreeInput) => void;
-  readonly projects: ReadonlyArray<Project>;
-  readonly selected: Project | null;
+  /** Linked host with no Project — do not allocate a chat folder there. */
+  readonly requireProject?: boolean;
+  readonly selected: ProjectSelection | null;
   readonly startPending: boolean;
 }) {
-  const draftWorktree = useDraftWorktree(selected);
-  const commandState = useSlashCommandState(selected?.id);
+  const draftWorktree = useDraftWorktree(selected?.project ?? null);
+  const commandState = useSlashCommandState(selected?.project.id);
   const controller = useChatComposerController({
     onSubmit: (text) => {
       if (draftWorktree.gitState === "workspace-unavailable") {
         toast.error("The selected project folder is unavailable.");
         return false;
       }
-      if (startPending) return false;
+      if (startPending || !modelsReady) return false;
+      // Linked host: nothing to send against until a Project is picked.
+      if (requireProject && selected === null) return false;
       if (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined) {
         toast.error("Pick a base branch for the worktree.");
         return false;
@@ -54,10 +72,11 @@ export function DraftComposer({
     },
   });
   const hasContent = useChatInputHasContent(controller);
-  const selectedId = selected?.id ?? null;
+  const selectedId = selected?.project.id ?? null;
 
   return (
-    <div className="flex h-full items-center justify-center p-4">
+    <div className="flex h-full flex-col items-center justify-center gap-4 overflow-y-auto p-4">
+      {notice}
       <ChatComposerFrame
         className="w-full max-w-2xl"
         controller={controller}
@@ -65,7 +84,15 @@ export function DraftComposer({
         header={
           <CardFrameHeader className="py-2">
             <div className="-mx-4 flex min-w-0 flex-wrap items-center gap-0">
-              <ProjectSelect onChange={onProjectChange} projects={projects} value={selectedId} />
+              <ProjectSelect
+                groups={groups}
+                onChange={onProjectChange}
+                value={
+                  selected === null
+                    ? null
+                    : { environmentId: selected.environmentId, projectId: selected.project.id }
+                }
+              />
               {draftWorktree.gitState === "not-repository" ? (
                 <span className="text-muted-foreground px-2 text-xs">Not a Git repository</span>
               ) : null}
@@ -84,11 +111,14 @@ export function DraftComposer({
         submit={
           <PromptInputSubmit
             disabled={
+              (requireProject && selectedId === null) ||
               !hasContent ||
+              !modelsReady ||
               draftWorktree.gitState === "workspace-unavailable" ||
               startPending ||
               (draftWorktree.mode === "worktree" && draftWorktree.worktree === undefined)
             }
+            loading={modelsPending}
           />
         }
         toolbar={

@@ -1,14 +1,14 @@
-const { execFileSync } = require("node:child_process");
-const crypto = require("node:crypto");
-const fs = require("node:fs");
-const os = require("node:os");
-const path = require("node:path");
+import childProcess from "node:child_process";
+import crypto from "node:crypto";
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 
-const { assertBuiltFffIsland } = require("./fff-island.cjs");
+import { assertBuiltFffIsland } from "./fff-island.js";
 
 const BUN_VERSION = "bun-v1.4.2";
 
-const VENDOR_DIR = path.join(__dirname, "..", "vendor");
+const VENDOR_DIR = path.join(import.meta.dirname, "..", "vendor");
 
 function bunDownloadName(platform, arch) {
   if (platform === "darwin" && arch === "arm64") return "bun-darwin-aarch64";
@@ -21,7 +21,7 @@ function bunDownloadName(platform, arch) {
 }
 
 const curl = (...args) =>
-  execFileSync("curl", ["-fsSL", "--retry", "3", "--retry-delay", "2", ...args], {
+  childProcess.execFileSync("curl", ["-fsSL", "--retry", "3", "--retry-delay", "2", ...args], {
     encoding: "utf8",
   });
 
@@ -48,7 +48,7 @@ function downloadBun(platform, arch) {
     if (!expected || actual !== expected)
       throw new Error(`Checksum verification failed for ${name}.zip`);
 
-    execFileSync("unzip", ["-o", zipPath, "-d", tmp], { stdio: "pipe" });
+    childProcess.execFileSync("unzip", ["-o", zipPath, "-d", tmp], { stdio: "pipe" });
     fs.copyFileSync(path.join(tmp, name, binary), dest);
     if (platform !== "win32") fs.chmodSync(dest, 0o755);
   } finally {
@@ -56,8 +56,8 @@ function downloadBun(platform, arch) {
   }
 }
 
-exports.default = function beforePack(context) {
+export default function beforePack(context) {
   assertBuiltFffIsland();
   const arch = ["ia32", "x64", "armv7l", "arm64", "universal"][context.arch];
   downloadBun(context.electronPlatformName, arch);
-};
+}

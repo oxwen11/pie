@@ -66,6 +66,20 @@ describe("import and draft", () => {
 });
 
 describe("composer and model picker", () => {
+  it("accepts draft text before the model catalog finishes", async () => {
+    await mountApp();
+    await waitForText(sample());
+    await page.getByTitle(`New chat in ${sample()}`).click();
+    const editor = page.getByRole("textbox").first();
+    await expect.element(editor, { timeout: 2_000 }).toBeVisible();
+    await editor.fill("typed before models");
+    const typedNode = await editor.element();
+    expect(typedNode.textContent ?? "").toContain("typed before models");
+    await expect.element(page.getSubmitButton(), { timeout: 20_000 }).toBeEnabled();
+    const keptNode = await editor.element();
+    expect(keptNode.textContent ?? "").toContain("typed before models");
+  });
+
   it("keeps the draft composer usable and opens the picker when models exist", async () => {
     await mountApp();
     await waitForText(sample());
@@ -88,7 +102,7 @@ describe("sidebar and content panel", () => {
   it("opens New chat and the per-project compose entry", async () => {
     await mountApp();
     await waitForText(sample());
-    await page.getByRole("link", { name: "New chat" }).click();
+    await page.getByTestId("sidebar").getByRole("link", { name: "New chat", exact: true }).click();
     await expect.poll(() => window.location.pathname).toBe("/draft");
     await waitForComposer();
 
@@ -100,7 +114,10 @@ describe("sidebar and content panel", () => {
   it("renames the session from the row menu", async () => {
     await mountApp();
     await waitForText(FIRST_PROMPT);
-    await page.getByText(FIRST_PROMPT, { exact: true }).first().click({ button: "right" });
+    await page
+      .getByTestId("sidebar")
+      .getByRole("button", { name: FIRST_PROMPT })
+      .click({ button: "right" });
     await page.getByRole("menuitem", { name: "Rename" }).click();
     await waitForText("Rename session");
     await page.getByLabelText("Title").fill(RENAMED);
@@ -136,7 +153,7 @@ describe("schedules and pull requests", () => {
     await mountApp();
     await page.getByRole("link", { name: "Scheduled" }).click();
     await waitForText("No schedules yet");
-    await page.getByRole("button", { name: "Create" }).click();
+    await page.getByRole("button", { name: "New task" }).click();
     await waitForText("Name");
     await page.getByLabelText("Name").fill("e2e nightly");
     await page.getByLabelText("Prompt").fill("e2e scheduled ping");
@@ -164,7 +181,7 @@ describe("git workspace and review", () => {
     await importFolder(sampleGit());
     await waitForText(sampleGit());
 
-    await page.getByRole("link", { name: "New chat" }).click();
+    await page.getByTestId("sidebar").getByRole("link", { name: "New chat", exact: true }).click();
     await openDraftForProject(sampleGit());
     await waitForText("Current directory", 20_000);
     await page.getByText("Current directory").first().click();
@@ -203,7 +220,10 @@ describe("session archive", () => {
     const projectId = new URL(window.location.href).searchParams.get("projectId");
     expect(projectId).toBeTruthy();
 
-    await page.getByText("e2e archive me", { exact: true }).first().click({ button: "right" });
+    await page
+      .getByTestId("sidebar")
+      .getByRole("button", { name: "e2e archive me" })
+      .click({ button: "right" });
     await page.getByRole("menuitem", { name: "Archive" }).click();
 
     await expect.poll(() => window.location.pathname, { timeout: 15_000 }).toBe("/draft");
@@ -238,7 +258,10 @@ describe("streaming queue", () => {
     await expect.element(page.getByText("queued while streaming")).toBeVisible();
 
     await page.getByRole("button", { name: "Steer queued message" }).click();
-    await waitForText("Steering", 10_000);
+    await expect
+      .element(page.getByRole("button", { name: "Steer queued message" }))
+      .not.toBeInTheDocument();
+    await expect.element(page.getByText("queued while streaming")).toBeVisible();
 
     // Optimistic UI updates before RPC — prove the server queue moved too.
     const sessionId = window.location.pathname.split("/").at(-1);

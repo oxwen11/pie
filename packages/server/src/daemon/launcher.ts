@@ -3,7 +3,7 @@ import fs from "node:fs";
 
 import type { DaemonCompatibilityKey } from "@getpie/core/compatibility";
 import { Clock, Crypto, Effect, FileSystem, type PlatformError } from "effect";
-import { Hex } from "effect/encoding";
+import * as Hex from "effect/encoding/Hex";
 
 import {
   daemonDirectory,

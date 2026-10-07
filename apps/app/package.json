@@ -43,7 +43,6 @@
     "react": "catalog:react",
     "react-dom": "catalog:react",
     "react-error-boundary": "catalog:",
-    "react-medium-image-zoom": "5.4.9",
     "react-resizable-panels": "^4.14.1",
     "sonner": "^2.0.8",
     "streamdown": "2.6.0",
@@ -54,6 +53,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
+    "@getpie/test": "workspace:*",
     "@getpie/typescript": "workspace:*",
     "@tailwindcss/vite": "catalog:tailwind",
     "@tanstack/router-plugin": "catalog:",

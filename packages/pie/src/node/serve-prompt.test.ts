@@ -6,7 +6,7 @@ import path from "node:path";
 import { createPieClient } from "@getpie/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-const cliBin = path.join(import.meta.dirname, "../../dist/cli.mjs");
+const cliBin = path.join(import.meta.dirname, "../../dist/cli.js");
 
 const FAKE = `#!/usr/bin/env node
 const bridge = process.env.PIE_SESSION_BRIDGE_URL;
@@ -29,6 +29,7 @@ const settle = (last) => { send({ type: "agent_end", messages: [last || assistan
 rl.on("line", (line) => {
   const msg = JSON.parse(line);
   if (msg.type === "get_state") { send({ id: msg.id, type: "response", command: "get_state", success: true, data: { sessionId } }); return; }
+  if (msg.type === "get_available_models") { send({ id: msg.id, type: "response", command: "get_available_models", success: true, data: { models: [{ provider: "xai", id: "grok-4.3", name: "Grok 4.3" }] } }); return; }
   if (msg.type !== "prompt") return;
   send({ id: msg.id, type: "response", command: "prompt", success: true, data: { started: true } });
   send({ type: "agent_start" });
@@ -86,7 +87,7 @@ describe("shipped pie serve prompt", () => {
     children.length = 0;
   });
 
-  it("listModels and pairing prompt work from dist/cli.mjs", { timeout: 30_000 }, async () => {
+  it("listModels and pairing prompt work from dist/cli.js", { timeout: 30_000 }, async () => {
     const fakeDir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-serve-"));
     const fakePi = path.join(fakeDir, "fake-pi.js");
     fs.writeFileSync(fakePi, FAKE);

@@ -1,6 +1,6 @@
 # Host persistence architecture
 
-Last audited: 2026-09-20.
+Last audited: 2026-10-05.
 
 This is the inventory of intentional writes made by Pie's shipped web, CLI,
 server, and Desktop surfaces. It covers first-party persistence, browser and
@@ -137,7 +137,7 @@ same `projects.json` write as import).
 | Retention     | Removing a Project still does not delete the folder. There is no uninstall cleanup of `~/Pie`                                                                                                           |
 
 Tests use `layerPaths(home)` so the chat root sits under the temp `$PIE_HOME`.
-Verify sets `HOME` under the run so `~/Pie` resolves inside that run.
+Verify sets `PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie` and leaves `HOME` unchanged.
 
 ### Session metadata
 
@@ -425,6 +425,37 @@ the whole run; it no longer probes the operator's home for a same-named legacy
 sample. Interrupted runs are retained with the rest of `$PIE_HOME` until normal
 Verify cleanup. Uninstall behavior is unchanged.
 
+## Parallel Verify ownership
+
+Parallel tasks use separate worktrees and the existing caller-selected roots:
+`VERIFY_PIE_ROOT` (Web), `VERIFY_PIE_CLI_ROOT`, or `VERIFY_PIE_DESKTOP_ROOT`.
+Each keeps the existing `<root>/runs/<run-id>/` layout, run-local `pie-home`,
+`meta.json`, logs, PID files, browser configuration and `<root>/current` pointer.
+Defaults, data formats, umask permissions, sensitivity and evidence retention
+are unchanged. No new registry, lock file, schema or migration is added.
+
+Web can bind a distinct explicit Vite port using `PIE_VITE_PORT`, forwarded to
+Vite's native CLI; its recorded port/app URL already exist in metadata. Each
+root's generated browser script binds that root, worktree, browser session and
+evidence directory, rather than resolving another task's ambient current run.
+Launch reuse/replacement and cleanup reject foreign roots/worktrees/surfaces
+or corrupt metadata. Explicit cleanup targets that run and cannot fall back to
+another current run. Canonical-path checks account for filesystem aliases and
+reject symlinks escaping the root. Run data is removed; evidence remains.
+
+One owner still serializes lifecycle commands per root and builds per worktree.
+There is no concurrent same-root launch protocol. Older versions can read the
+unchanged files but do not provide these binding/cleanup guarantees; finish the
+owned runs before downgrading the helper. Failed/corrupt runs are not silently
+adopted or reset and may require owner diagnosis. `HOME` and Pi configuration
+remain shared: normal inference can use existing credentials, but auth/settings/
+package mutations require separate authorization and serialization. In particular,
+`persistDefaultPiModel` writes the shared Pi default when creating a Session with
+an explicit model or changing its model. Those operations must be serial even
+when their `PIE_HOME` values differ; subsequent turns can run in parallel. Verify
+does not suppress that existing product behavior or promise settings isolation.
+No new uninstall or Pi-transcript deletion behavior is introduced.
+
 ## Development Electron installation
 
 Desktop `dev` and `preview` (including `pie-verify desktop launch`) invoke
@@ -467,7 +498,7 @@ managed socket trees with the run; no migration or separate uninstall is added.
 
 ## Verify automatic browser recording
 
-Web and Desktop Verify pin agent-browser 0.37.1. The run's shim starts recording
+Web and Desktop Verify pin agent-browser 0.38.1. The run's shim starts recording
 before its first browser command and retains the same take for later commands:
 
 ```text
@@ -533,6 +564,42 @@ writes which Pie intentionally does not own:
    when no transcript is found. It writes no transcript or Pie metadata in that
    case. Concurrent lookups use Pi's recursive mkdir; empty directories have no
    migration or cleanup and remain after Pie is downgraded or uninstalled.
+
+   **Daemon cold transcript open** is a Developer-approved exception: while a
+   Pie session holds no live Pi child and none is starting, that session may
+   call `SessionManager.findById` and then `SessionManager.open` in the daemon
+   process (`packages/server/src/harness/session.ts`). Pi still owns the file
+   format. `open` is not read-only. On Pi 0.99.1 and 1.0.2 it may rewrite the
+   transcript when repairing or migrating it. Pi 1.0.2's `open` matches 0.99.1:
+   `dist/core/session-manager.js` is byte-identical, as are the modules it
+   depends on (`dist/core/messages.js`, `dist/utils/paths.js`), and the
+   `config.js` exports it uses (`getAgentDir`, `getSessionsDir`, `APP_NAME`)
+   are unchanged, so 1.0.2 adds no `open` side effects:
+
+   | Property      | Current contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+   | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+   | Path          | The same Pi transcript file `findById` returns. Pie does not pass `--session-dir`. Lookup tries the canonical cwd (`realpath`) and, if that differs, the unresolved cwd. Default directory is `$PI_CODING_AGENT_DIR/sessions/--<encoded-cwd>--/` (`PI_CODING_AGENT_DIR` defaults to `~/.pi/agent`).                                                                                                                                                                                                                                   |
+   | Owner         | Pi owns the schema and the bytes. The Pie session is an approved caller of `findById` / `open` only while it does not hold a Pi child.                                                                                                                                                                                                                                                                                                                                                                                                |
+   | Trigger       | Cold `getMessages` or `getModelState` when no Pi process is held or starting. The first such read opens once; later cold reads on that Pie session reuse the in-memory `SessionManager`. `findById` still mkdir's a missing default session directory, same as copy-transcript-path, and writes no transcript if the id is absent.                                                                                                                                                                                                    |
+   | Repair writes | Only inside Pi's `open`, and only for these cases. A final parsed entry with no trailing newline is repaired by appending one `\n` (`appendFileSync`) after the header is validated. A header version below 3 (missing counts as 1) is migrated in memory and the whole file is rewritten by `_rewriteFile` (`openSync` with `"w"`, then one JSON line plus `\n` per entry). A zero-byte file is rewritten with a version-3 session header at that same path. A non-empty file that is not a Pi session throws and is left unchanged. |
+   | Atomicity     | Newline repair is one append. `_rewriteFile` truncates then rewrites; it is not temp-file plus rename. A crash during that rewrite can leave a short file.                                                                                                                                                                                                                                                                                                                                                                            |
+   | Concurrency   | One Pie session holds at most one daemon `SessionManager`. A held or still-starting Pi child is the only reader; the daemon does not `open` then. Starting or releasing the child drops the daemon handle first so the two do not both keep the file. There is no lock against another daemon or a user `pi` on the same file. A cold read that already opened may still fold its in-memory copy after the handle is dropped; it does not append.                                                                                     |
+   | Compatibility | Migrated files stay at version 3. Pie downgrade does not reverse the migration, the added newline, or a header written into a previously empty file. Older JSONL readers can still read the rewritten lines if they tolerate version 3. The comparison above covers Pi 1.0.2; it adds no `open` side effects. Further `open` side effects in a Pi newer than 1.0.2 need a new persistence decision.                                                                                                                                   |
+   | Retention     | Pie session delete and uninstall do not remove the transcript or directories `findById` created. Permissions follow the process umask. Transcripts may contain prompts and tool output; this path does not copy them into Pie logs.                                                                                                                                                                                                                                                                                                   |
+
+   **MCP OAuth credentials** are Pi-owned state in
+   `$PI_CODING_AGENT_DIR/mcp-auth.json` (`PI_CODING_AGENT_DIR` defaults to
+   `~/.pi/agent`). Pi 1.0 keys entries by server name and URL
+   (`mcp__<name>|<url>`, with `-` in the name replaced by `_`) instead of the
+   URL alone. The first time a server loads a legacy URL-only entry, Pi copies
+   it onto that server's name+URL key and deletes the URL-only key. Another
+   server with the same URL does not receive those credentials and must sign
+   in. The file holds OAuth client registration and tokens. Pi creates it mode
+   `0600` and rewrites it in place under its auth-file lock. Pie does not read,
+   migrate, or delete it, and uninstall does not remove it. A Pie or `pi` older
+   than 1.0 that uses the same agent directory, including after rollback, still
+   looks up the URL-only key, so those MCP servers must be signed in again.
+
 2. **Workspace mutation.** Agent tools and commands may create, edit, rename, or
    delete arbitrary files under the selected project/worktree and may invoke
    other host tools with their own state. The paths and data structures are
@@ -540,8 +607,18 @@ writes which Pie intentionally does not own:
    extension runtime; Pie transports those requests and responses.
 
 Pie session deletion does not delete Pi native data or undo workspace changes.
-Any design that starts depending on Pi's physical files rather than its public
-runtime behavior requires a new Developer-approved persistence decision.
+Daemon cold transcript open, above, is the approved dependence on Pi's session
+file. Any further design that depends on Pi's physical files rather than its
+public runtime behavior requires a new Developer-approved persistence decision.
+
+Background bash logs are OS temp, not a `$PIE_HOME` store:
+`os.tmpdir()/pie/<sessionId>/bash/<pid>.log`. Directories are `0700` and the
+file is `0600`. Creation `lstat`s the `pie` root and each component below it,
+refuses a symlink or a directory owned by another user, and creates the file
+with `O_CREAT|O_EXCL|O_NOFOLLOW`. A mismatch fails closed. A foreground
+command deletes its log when the tool result already contains the output. A
+background log stays until the OS cleans temp. Session deletion does not
+remove it. Aborting the turn backgrounds the command instead of killing it.
 
 ## Current retention and migration gaps
 
