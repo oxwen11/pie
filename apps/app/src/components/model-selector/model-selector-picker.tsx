@@ -13,7 +13,7 @@ import {
   ComboboxValue,
   useComboboxFilter,
 } from "@getpie/ui/components/combobox";
-import { SearchIcon } from "lucide-react";
+import { CircleAlertIcon, SearchIcon } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
 type ModelOption = {
@@ -33,6 +33,11 @@ export type ModelSelectorPickerProps = {
   modelId: string | undefined;
   onChange: (provider: string, modelId: string) => void;
   "aria-label"?: string;
+  /** Message from a model listing that failed after its retries. */
+  error?: string;
+  /** A retry of the listing is in flight. */
+  retrying?: boolean;
+  onRetry?: () => void;
 };
 
 function ProviderLogo({ provider }: { provider: string }) {
@@ -66,6 +71,9 @@ export function ModelSelectorPicker({
   modelId,
   onChange,
   "aria-label": ariaLabel,
+  error,
+  retrying = false,
+  onRetry,
 }: ModelSelectorPickerProps) {
   const filter = useComboboxFilter();
   const options = useMemo(
@@ -116,6 +124,12 @@ export function ModelSelectorPicker({
         data-slot="model-selector-trigger"
         render={<Button size="sm" variant="ghost" />}
       >
+        {error === undefined ? null : (
+          <>
+            <CircleAlertIcon aria-hidden className="text-destructive" />
+            <span className="sr-only">Models failed to load.</span>
+          </>
+        )}
         <ComboboxValue placeholder="Default">
           {(option: ModelOption | null) => (
             <span className="min-w-0 flex-1 truncate text-left">{option?.label ?? "Default"}</span>
@@ -133,7 +147,11 @@ export function ModelSelectorPicker({
             startAddon={<SearchIcon />}
           />
         </div>
-        <ComboboxEmpty>No matching models.</ComboboxEmpty>
+        {error === undefined ? (
+          <ComboboxEmpty>No matching models.</ComboboxEmpty>
+        ) : (
+          <ModelListError message={error} onRetry={onRetry} retrying={retrying} />
+        )}
         <ComboboxList>
           {(group: ModelGroup) => (
             <ComboboxGroup items={group.items} key={group.provider}>
@@ -153,5 +171,29 @@ export function ModelSelectorPicker({
         </ComboboxList>
       </ComboboxPopup>
     </Combobox>
+  );
+}
+
+function ModelListError({
+  message,
+  onRetry,
+  retrying,
+}: {
+  message: string;
+  onRetry: (() => void) | undefined;
+  retrying: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-start gap-2 border-b p-3" role="alert">
+      <p className="text-destructive text-sm font-medium">Couldn&apos;t load models</p>
+      <p className="text-muted-foreground max-h-24 overflow-y-auto text-xs break-words">
+        {message}
+      </p>
+      {onRetry ? (
+        <Button loading={retrying} onClick={onRetry} size="xs" variant="outline">
+          Retry
+        </Button>
+      ) : null}
+    </div>
   );
 }

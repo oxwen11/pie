@@ -27,6 +27,7 @@ describe("createEnvironmentOrpc", () => {
     expect(queryClient.getQueryDefaults(orpc.agent.session.list.key()).staleTime).toBe(30_000);
     expect(queryClient.getQueryDefaults(orpc.agent.listModels.key())).toMatchObject({
       refetchOnWindowFocus: false,
+      meta: { errorMode: "inline" },
     });
     expect(queryClient.getQueryDefaults(orpc.agent.commands.key())).toMatchObject({
       refetchOnWindowFocus: false,
