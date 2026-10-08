@@ -5,7 +5,6 @@ export {
   readDaemonRecord,
   redactDaemonRecord,
   resolveCompatKey,
-  spawnPie,
   stopRecordedDaemon,
 } from "./daemon.ts";
 export type { DaemonRecord } from "./daemon.ts";

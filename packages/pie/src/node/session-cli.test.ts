@@ -15,14 +15,16 @@ const fromModuleUrl = (relative: string) => url.fileURLToPath(new URL(relative, 
 
 const cliEntry = fromModuleUrl("./cli.ts");
 const sourceHook = fromModuleUrl("../../../../tools/node/register-ts-hook.mjs");
-const sourceCliArgs = (args: readonly string[]) => [
+const serverEntry = fromModuleUrl("../../../server/src/http/main.ts");
+const sourceArgs = (entry: string, args: readonly string[]) => [
   "--experimental-transform-types",
   "--disable-warning=ExperimentalWarning",
   "--import",
   sourceHook,
-  cliEntry,
+  entry,
   ...args,
 ];
+const sourceCliArgs = (args: readonly string[]) => sourceArgs(cliEntry, args);
 const fakePi = fakePiPath;
 const FAKE_REPLY = "CLI_FAKE_PI_REPLY";
 const TEST_KEY = "githash:00000000";
@@ -171,11 +173,11 @@ async function waitReady(child: childProcess.ChildProcess, timeoutMs = 30_000): 
   return new Promise((resolve, reject) => {
     let output = "";
     const timer = setTimeout(() => {
-      reject(new Error(`pie serve never became ready:\n${output}`));
+      reject(new Error(`server never became ready:\n${output}`));
     }, timeoutMs);
     const onExit = (code: number | null) => {
       clearTimeout(timer);
-      reject(new Error(`pie serve exited with ${code}:\n${output}`));
+      reject(new Error(`server exited with ${code}:\n${output}`));
     };
     const scan = (chunk: Buffer) => {
       output += chunk.toString();
@@ -210,7 +212,7 @@ async function waitFor(label: string, check: () => boolean, timeoutMs = 15_000):
   throw new Error(`timed out waiting for ${label}`);
 }
 
-describe("pie run against live serve", () => {
+describe("pie run against a live server", () => {
   let home: string;
   let workspace: string;
   let env: NodeJS.ProcessEnv;
@@ -226,7 +228,7 @@ describe("pie run against live serve", () => {
     home = fs.mkdtempSync(path.join(os.tmpdir(), "pie-cli-home-"));
     workspace = fs.mkdtempSync(path.join(os.tmpdir(), "pie-cli-ws-"));
     env = pieEnv(home);
-    serve = childProcess.spawn(process.execPath, sourceCliArgs(["serve"]), {
+    serve = childProcess.spawn(process.execPath, sourceArgs(serverEntry, []), {
       env,
       stdio: ["ignore", "pipe", "pipe"],
     });
@@ -497,7 +499,7 @@ describe("pie run against live serve", () => {
     expect(runCli(["project", "create", fresh, "-q", "--url", address], env).trim()).toBe(id);
   }, 60_000);
 
-  it("pie mcp refuses an unauthenticated serve", () => {
+  it("pie mcp refuses an unauthenticated server", () => {
     const result = runCliResult(["mcp", "--url", address], env);
     expect(result.status).toBe(1);
     expect(`${result.stdout}${result.stderr}`).toContain("authenticated daemon");

@@ -4,7 +4,6 @@ import type { SampleProject } from "./runtime/scaffold.ts";
 
 export type LaunchRequest = {
   replace: boolean;
-  mode?: "daemon" | "serve";
   seedProject?: boolean;
 };
 
@@ -64,21 +63,14 @@ export function expectLaunch<S extends SurfaceId>(
 
 export function parseLaunchArgs(
   args: string[],
-  options: { allowServe?: boolean; allowEmptyProjects?: boolean; usage: string },
+  options: { allowEmptyProjects?: boolean; usage: string },
 ): LaunchRequest {
   let replace = false;
-  let mode: "daemon" | "serve" = "daemon";
   let seedProject = options.allowEmptyProjects === true;
   for (const arg of args) {
     switch (arg) {
       case "--replace":
         replace = true;
-        break;
-      case "--serve":
-        if (options.allowServe !== true) {
-          throw new Error(`unknown arg ${arg}\n  usage: ${options.usage}`);
-        }
-        mode = "serve";
         break;
       case "--empty-projects":
         if (options.allowEmptyProjects !== true) {
@@ -90,6 +82,5 @@ export function parseLaunchArgs(
         throw new Error(`unknown arg ${arg}\n  usage: ${options.usage}`);
     }
   }
-  if (options.allowServe === true) return { replace, mode };
   return options.allowEmptyProjects === true ? { replace, seedProject } : { replace };
 }

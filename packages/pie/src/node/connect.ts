@@ -40,7 +40,7 @@ const START_HINT = "Start it with: pie daemon start\nCheck it with: pie status";
 /**
  * Explicit `--url` / `PIE_URL`: never spawn. Prefer `PIE_AUTH_TOKEN`, then the
  * live local daemon's token when the origins match (CLI attaching to the
- * desktop's daemon by address). Unauthenticated `pie serve` stays tokenless.
+ * desktop's daemon by address). A server without a token stays tokenless.
  */
 export const endpointFromExplicitUrl = (
   raw: string,

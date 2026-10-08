@@ -57,7 +57,7 @@ export function browserEnvForRun(identity: SurfaceIdentity, runDir: string): Bro
   switch (identity.id) {
     case "cli":
       throw new VerifyError(
-        `${identity.bin} has no browser — this surface is pie / pie daemon / pie serve. Drive UI with \`pie-verify web env\` or \`pie-verify desktop env\`.`,
+        `${identity.bin} has no browser — this surface is pie / pie daemon. Drive UI with \`pie-verify web env\` or \`pie-verify desktop env\`.`,
         2,
       );
     case "web": {
@@ -272,7 +272,7 @@ export function printEnv(surface: Surface, args: string[]): void {
   const { identity } = surface;
   if (identity.id === "cli") {
     throw new VerifyError(
-      `${identity.bin} has no browser — this surface is pie / pie daemon / pie serve. Drive UI with \`pie-verify web env\` or \`pie-verify desktop env\`.`,
+      `${identity.bin} has no browser — this surface is pie / pie daemon. Drive UI with \`pie-verify web env\` or \`pie-verify desktop env\`.`,
       2,
     );
   }

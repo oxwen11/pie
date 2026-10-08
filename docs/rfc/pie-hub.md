@@ -141,7 +141,7 @@ it may not read arbitrary Sessions, files, settings, credentials, or terminals.
 
 Proposed daemon RPCs: `hub.connect`, `hub.status`, `hub.refresh`, `hub.disconnect`. Every
 mutation carries `expectedEnvironmentId` and checks it against the actual daemon.
-They require authenticated daemon access; tokenless `pie serve` must reject them.
+They require authenticated daemon access; a tokenless dev server must reject them.
 Responses never expose a relationship credential or an enrollment token.
 
 CLI uses `packages/pie/src/node/connect.ts`: `--url` / `PIE_URL` is connect-only,

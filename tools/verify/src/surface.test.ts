@@ -18,21 +18,9 @@ describe("parseLaunchArgs", () => {
     });
   });
 
-  it("accepts --serve only when allowed", () => {
-    expect(
-      parseLaunchArgs(["--serve"], {
-        allowServe: true,
-        usage: "pie-verify cli launch [--replace] [--serve]",
-      }),
-    ).toEqual({ replace: false, mode: "serve" });
+  it("rejects --empty-projects where projects are not seeded", () => {
     expect(() =>
-      parseLaunchArgs(["--serve"], { usage: "pie-verify web launch [--replace]" }),
-    ).toThrow(/unknown arg --serve/);
-    expect(() =>
-      parseLaunchArgs(["--empty-projects"], {
-        allowServe: true,
-        usage: "pie-verify cli launch [--replace] [--serve]",
-      }),
+      parseLaunchArgs(["--empty-projects"], { usage: "pie-verify cli launch [--replace]" }),
     ).toThrow(/unknown arg --empty-projects/);
   });
 
@@ -50,7 +38,7 @@ describe("expectLaunch", () => {
       runDir: "/tmp/run",
       pieHome: "/tmp/pie-home",
       piePort: 4182,
-      request: { replace: false, mode: "daemon" },
+      request: { replace: false },
       env: {},
     } satisfies Extract<LaunchCtx, { surface: "cli" }>;
     expect(expectLaunch(ctx, "cli").pieHome).toBe("/tmp/pie-home");

@@ -19,9 +19,9 @@ and Vite proxies `/api` + `/ws/rpc` across so the browser stays same-origin.
 
 ```bash
 # The API server (run_in_background) — no prebuild needed:
-# workspace packages export src/*.ts directly. Node loads the source CLI
+# workspace packages export src/*.ts directly. Node loads the source server
 # through tools/node/register-ts-hook.mjs (Bundler resolution omits extensions).
-cd packages/pie && pnpm dev            # foreground `serve` on PIE_PORT=4180
+cd packages/pie && pnpm dev            # foreground server on PIE_PORT=4180
 
 # The app (run_in_background), in a second call:
 cd apps/app && pnpm dev                   # vite on 4190 (strict), proxying to 4180

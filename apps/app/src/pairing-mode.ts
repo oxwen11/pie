@@ -18,7 +18,7 @@ export function resolvePairingAccess(
 
 /**
  * GET /api/environment answers without a pairing side effect: 200 is
- * unauthenticated `pie serve`, 401 means the daemon has a token.
+ * an unauthenticated dev/test server, 401 means the daemon has a token.
  */
 export async function readPairingMode(fetchImpl: typeof fetch = fetch): Promise<PairingMode> {
   try {

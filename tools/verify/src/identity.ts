@@ -28,7 +28,6 @@ type IdentityBase = {
   warnTaken: number[];
   pidFiles: string[];
   build: "core" | "server";
-  allowServe: boolean;
   needsDisplay: boolean;
 };
 
@@ -73,7 +72,6 @@ export const WEB: WebIdentity = {
   warnTaken: [],
   pidFiles: ["pids/server.pid", "pids/vite.pid"],
   build: "core",
-  allowServe: false,
   needsDisplay: false,
   vitePort: envPort("PIE_VITE_PORT", VITE_PORT),
   sample: {
@@ -105,9 +103,8 @@ export const CLI: CliIdentity = {
   },
   takenHint: "Do not attach to a foreign daemon — refuse rather than hijack.",
   warnTaken: [],
-  pidFiles: ["pids/serve.pid"],
+  pidFiles: [],
   build: "core",
-  allowServe: true,
   needsDisplay: false,
 };
 
@@ -132,7 +129,6 @@ export const DESKTOP: DesktopIdentity = {
   warnTaken: [4000],
   pidFiles: ["pids/electron-vite.pid"],
   build: "server",
-  allowServe: false,
   needsDisplay: true,
   cdpDefault: DEFAULT_CDP_PORT,
   sample: {

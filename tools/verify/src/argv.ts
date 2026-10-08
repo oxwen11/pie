@@ -18,7 +18,7 @@ function surfaceLines(id: SurfaceId): string {
   pie-verify web evidence path|init|screenshot|snapshot|url|side-effects|note
   pie-verify web cleanup [run-dir]`;
     case "cli":
-      return `  pie-verify cli launch [--replace] [--serve]
+      return `  pie-verify cli launch [--replace]
   pie-verify cli doctor
   pie-verify cli run <pie argv…>
   pie-verify cli resources live|stall|restart|storage|disabled
