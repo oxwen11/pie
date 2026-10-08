@@ -8,7 +8,7 @@ import { attachRelay } from "@getpie/server/relay";
 import { afterEach, describe, expect, it } from "vitest";
 
 const relayBin = path.join(import.meta.dirname, "../../dist/relay.js");
-const cliBin = path.join(import.meta.dirname, "../../dist/cli.js");
+const distDir = path.join(import.meta.dirname, "../../dist");
 
 function spawnRelay(args: string[], env: NodeJS.ProcessEnv) {
   return childProcess.spawn(process.execPath, args, {
@@ -134,7 +134,11 @@ describe("pie-relay binary", () => {
     const source = fs.readFileSync(relayBin, "utf8");
     expect(source).not.toMatch(/from ["']\.\/relay-cli-/);
     const relay = fs.statSync(relayBin).size;
-    const cli = fs.statSync(cliBin).size;
+    // The CLI is `cli.js` plus the chunks it shares with `server.js`.
+    const cli = fs
+      .readdirSync(distDir)
+      .filter((name) => name.endsWith(".js") && name !== "relay.js")
+      .reduce((total, name) => total + fs.statSync(path.join(distDir, name)).size, 0);
     expect(relay).toBeGreaterThan(0);
     expect(relay).toBeLessThan(cli);
   });

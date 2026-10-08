@@ -1,17 +1,9 @@
-import type { ChildProcess } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import url from "node:url";
 
 import { readJson, readText, writeJson } from "./fs.ts";
-import {
-  type CommandResult,
-  killTree,
-  pidAlive,
-  runCommand,
-  spawnLogged,
-  waitDead,
-} from "./process.ts";
+import { type CommandResult, killTree, pidAlive, runCommand, waitDead } from "./process.ts";
 
 export type DaemonRecord = {
   pid: number;
@@ -120,18 +112,6 @@ export function invokePie(
     cwd,
     env,
     stdio: options.inherit === true ? "inherit" : "pipe",
-  });
-}
-
-export function spawnPie(
-  repo: string,
-  args: string[],
-  logPath: string,
-  env: NodeJS.ProcessEnv,
-): ChildProcess {
-  return spawnLogged(process.execPath, sourceCliArgs(repo, args), logPath, {
-    cwd: path.join(repo, "packages/pie"),
-    env,
   });
 }
 

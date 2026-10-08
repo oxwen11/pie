@@ -4,7 +4,7 @@ import "zod/compile";
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
 import { resolveDaemonDirectory, statusDaemon, stopDaemon } from "@getpie/server/daemon";
-import { daemonServeEnvironment, resolveServeConfig, serve, serveFlags } from "@getpie/server/http";
+import { daemonServeEnvironment, resolveServeConfig, serveFlags } from "@getpie/server/http";
 import { attachRelay, relayPublicBaseUrl } from "@getpie/server/relay";
 import { Effect, Option } from "effect";
 import { Command, Flag } from "effect/cli";
@@ -37,7 +37,7 @@ const daemonStartFlags = {
 // home use — that is what makes them address one daemon.
 const startDaemon = (input: DaemonStartInput) =>
   Effect.gen(function* () {
-    // Same flag > env > default port precedence as `pie serve`. CORS is not
+    // Same flag > env > default port precedence as the server. CORS is not
     // resolved here: the daemon's policy is static, and any extra origins are
     // inherited from the ambient PIE_CORS_ORIGINS by the spawned daemon.
     const config = yield* resolveServeConfig(input);
@@ -144,7 +144,7 @@ const relayAttachFlags = {
     Flag.withDescription("Control host:port printed by pie relay listen"),
   ),
   local: Flag.String("local").pipe(
-    Flag.withDescription("Foreground pie serve host:port instead of the running daemon"),
+    Flag.withDescription("Pie server host:port instead of the running daemon"),
     Flag.optional,
   ),
 };
@@ -228,12 +228,11 @@ const relay = Command.make("relay", {}, () =>
   Command.withSubcommands([relayListen, relayAttach]),
 );
 
-// `pie serve` stays the plain foreground server — the launcher spawns it
-// detached, and process managers / containers / the SSH runner use it directly.
-// Bare `pie` defaults to daemon startup.
+// There is no foreground server command: the daemon is the only way `pie`
+// runs a server. Bare `pie` defaults to daemon startup.
 const pie = Command.make("pie", serveFlags, startDaemon).pipe(
   Command.withDescription("Pie local server"),
-  Command.withSubcommands([serve, daemon, ...sessionWorkCommands, pairing, relay]),
+  Command.withSubcommands([daemon, ...sessionWorkCommands, pairing, relay]),
 );
 
 Command.run(pie, { version: pkg.version }).pipe(
