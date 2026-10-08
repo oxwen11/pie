@@ -69,6 +69,26 @@ export type PlatformTailscale = {
   readonly disableServe: () => Promise<void>;
 };
 
+/** The `pie` command a desktop build installs into `~/.local/bin`. */
+export type CliCommandStatus = {
+  /** `path` links to this app's command. */
+  readonly installed: boolean;
+  /** Display path, e.g. `~/.local/bin/pie`. */
+  readonly path: string;
+  /** Why Install would refuse to replace what is at `path`. */
+  readonly conflict: string | null;
+  /** New terminals find `path` (login PATH or the shell startup file). */
+  readonly onPath: boolean;
+  /** Another `pie` that comes first on the login PATH. */
+  readonly shadowedBy: string | null;
+};
+
+export type PlatformCli = {
+  readonly status: () => Promise<CliCommandStatus>;
+  readonly install: () => Promise<CliCommandStatus>;
+  readonly uninstall: () => Promise<CliCommandStatus>;
+};
+
 export type WindowChrome = {
   readonly titlebarHeight: number;
   readonly toggleInset: number;
@@ -96,6 +116,8 @@ export type PlatformBase = {
    * the browser. `client.available` is false when `tailscale` is not on PATH.
    */
   tailscale?: PlatformTailscale;
+  /** Desktop-only: install the bundled `pie` command. Absent in the browser and in builds without it. */
+  cli?: PlatformCli;
 };
 
 /** Browser or native capabilities supplied by the host entry point. */

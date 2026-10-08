@@ -12,6 +12,7 @@ import {
   type DesktopApplication,
   makeDesktopApplication,
 } from "../application/desktop-application";
+import { disabledDesktopCli } from "../cli/desktop-cli";
 import type { LocalServer } from "../server/local-server";
 import { disabledDesktopSsh } from "../ssh/desktop-ssh";
 import { disabledDesktopTailscale } from "../tailscale/desktop-tailscale";
@@ -66,6 +67,7 @@ function makeHarness(
     server,
     ssh: disabledDesktopSsh(),
     tailscale: disabledDesktopTailscale(),
+    cli: disabledDesktopCli(),
     quit: Effect.sync(() => {
       quits += 1;
     }),
@@ -162,6 +164,7 @@ describe("Desktop MessagePort RPC", () => {
         hostname: expect.any(String),
         sshClient: { available: true },
         tailscaleClient: { available: true },
+        cliAvailable: false,
         environments: {
           revision: 0,
           connecting: [],

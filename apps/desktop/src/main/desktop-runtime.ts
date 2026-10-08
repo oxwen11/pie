@@ -14,6 +14,7 @@ import { app, dialog, nativeTheme } from "electron";
 
 import icon from "../../resources/icon.png?asset";
 import { DesktopApplication } from "./application/desktop-application";
+import { DesktopCliLive } from "./cli/desktop-cli";
 import { DesktopConfig, makeDesktopConfigLive, startsDesktopInBackground } from "./desktop-config";
 import { DesktopApplicationLive, RendererChannelLive } from "./desktop-runtime-glue";
 import { registerAppProtocol, registerAppScheme } from "./electron/app-protocol";
@@ -100,6 +101,7 @@ function makeRuntime(devUrl: string | undefined) {
       Layer.provide(LocalServerLive),
       Layer.provide(DesktopSshLive),
       Layer.provide(DesktopTailscaleLive),
+      Layer.provide(DesktopCliLive),
       Layer.provide(LoginShellEnvironmentLive),
       Layer.provide(DesktopConfigLive),
       Layer.provide(ChildProcessSpawnerLive),

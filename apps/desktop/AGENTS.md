@@ -13,6 +13,7 @@ src/main/index.ts
        -> server
        -> ssh
        -> tailscale
+       -> cli
        -> rpc
        -> electron adapters
 ```
@@ -25,6 +26,7 @@ Allowed production dependencies:
 - `application/**` may depend on server interfaces (`LocalServer`, `DesktopSsh`, `DesktopTailscale`), shared desktop types, and Effect core. It must not import `@getpie/ssh` or `@getpie/tailscale` — consume them through those Tags (which re-export the types the application needs).
 - `ssh/desktop-ssh.ts` (`DesktopSsh` Tag): persist saved hosts and open/close tunnels via `@getpie/ssh`. May import `@getpie/ssh`, Effect platform, and `desktop-config`. Must not import Electron, oRPC, or application impls. Application may depend on this Tag.
 - `tailscale/` (`DesktopTailscale` Tag): probe the Tailscale CLI, list MagicDNS peers as SSH hosts, and opt-in Serve. May import `@getpie/tailscale`, Effect platform, and `desktop-config`. Must not import Electron, oRPC, or application impls. Application may depend on this Tag.
+- `cli/` (`DesktopCli` Tag): install and uninstall the bundled `pie` command under `~/.local/bin`. May import Effect platform, shared desktop types, `desktop-config`, and `LoginShellEnvironment`. Must not import Electron, oRPC, or application impls. Application may depend on this Tag.
 - `server/local-server.ts` may depend on Effect core and shared desktop types.
 - Server platform adapters (including `server/local-server-live.ts`) may depend on server-owned ports, `desktop-config.ts`, Effect platform, the CLI handshake, and `tailscale/allowed-hosts.ts` (MagicDNS → `PIE_ALLOWED_HOSTS`).
 - `rpc/**` may depend on the application interface, the shared contract, oRPC, and Effect core.

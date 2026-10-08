@@ -3,6 +3,7 @@ import os from "node:os";
 import { Context, Effect, Scope, Stream, SubscriptionRef } from "effect";
 
 import type {
+  CliCommandStatus,
   ConnectingSshHost,
   DesktopBootstrap,
   DesktopOs,
@@ -13,6 +14,7 @@ import type {
   SshRemoteEnvironment,
   TailscaleSnapshot,
 } from "../../shared/desktop-rpc";
+import type { CliInstallError, DesktopCli } from "../cli/desktop-cli";
 import type { LocalServer } from "../server/local-server";
 import {
   environmentLabel,
@@ -56,6 +58,9 @@ export class DesktopApplication extends Context.Service<
     readonly tailscaleSnapshot: Effect.Effect<TailscaleSnapshot>;
     readonly enableTailscaleServe: Effect.Effect<void, TailscaleEnvironmentError>;
     readonly disableTailscaleServe: Effect.Effect<void, TailscaleEnvironmentError>;
+    readonly cliStatus: Effect.Effect<CliCommandStatus>;
+    readonly installCli: Effect.Effect<CliCommandStatus, CliInstallError>;
+    readonly uninstallCli: Effect.Effect<CliCommandStatus, CliInstallError>;
     readonly quit: Effect.Effect<void>;
   }
 >()("desktop/DesktopApplication") {}
@@ -64,6 +69,7 @@ export type DesktopApplicationDependencies = {
   readonly server: LocalServer["Service"];
   readonly ssh: DesktopSsh["Service"];
   readonly tailscale: DesktopTailscale["Service"];
+  readonly cli: DesktopCli["Service"];
   readonly quit: Effect.Effect<void>;
   /** Layer scope. SSH close-watchers outlive the RPC handler that started them. */
   readonly scope: Scope.Scope;
@@ -81,6 +87,7 @@ export function makeDesktopApplication({
   server,
   ssh,
   tailscale,
+  cli,
   quit,
   scope,
 }: DesktopApplicationDependencies): DesktopApplication["Service"] {
@@ -160,6 +167,7 @@ export function makeDesktopApplication({
         hostname: hostname.split(".")[0] || hostname,
         sshClient: ssh.client,
         tailscaleClient: tailscale.client,
+        cliAvailable: cli.available,
         environments,
       };
     }),
@@ -232,6 +240,9 @@ export function makeDesktopApplication({
       }
     }),
     disableTailscaleServe: tailscale.disableServe,
+    cliStatus: cli.status,
+    installCli: cli.install,
+    uninstallCli: cli.uninstall,
     quit,
   } satisfies DesktopApplication["Service"];
 }
