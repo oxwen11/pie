@@ -69,12 +69,14 @@ export type DesktopApplicationDependencies = {
   readonly scope: Scope.Scope;
 };
 
-function emptySnapshot(): EnvironmentSnapshot {
-  return {
+function emptySnapshot(hostsError?: string): EnvironmentSnapshot {
+  const snapshot = {
     revision: 0,
     connecting: [],
     remotes: [],
   };
+  if (hostsError === undefined) return snapshot;
+  return { ...snapshot, hostsError };
 }
 
 export function makeDesktopApplication({
@@ -85,17 +87,21 @@ export function makeDesktopApplication({
   scope,
 }: DesktopApplicationDependencies): DesktopApplication["Service"] {
   const environmentsRef = Effect.runSync(
-    SubscriptionRef.make<EnvironmentSnapshot>(emptySnapshot()),
+    SubscriptionRef.make<EnvironmentSnapshot>(emptySnapshot(ssh.savedHostsMessage)),
   );
   const visible = Effect.runSync(SubscriptionRef.make(false));
 
   const updateEnvironments = (
     updater: (current: EnvironmentSnapshot) => Omit<EnvironmentSnapshot, "revision">,
   ): Effect.Effect<EnvironmentSnapshot> =>
-    SubscriptionRef.updateAndGet(environmentsRef, (current) => ({
-      ...updater(current),
-      revision: current.revision + 1,
-    }));
+    SubscriptionRef.updateAndGet(environmentsRef, (current) => {
+      const next = {
+        ...updater(current),
+        revision: current.revision + 1,
+      };
+      if (current.hostsError === undefined) return next;
+      return { ...next, hostsError: current.hostsError };
+    });
 
   const dropRemoteIfCurrent = (remote: SshRemoteEnvironment) =>
     SubscriptionRef.updateAndGet(environmentsRef, (current) => {
@@ -103,11 +109,13 @@ export function makeDesktopApplication({
       if (existing === undefined || existing.connection !== remote.connection) {
         return current;
       }
-      return {
+      const next = {
         connecting: current.connecting,
         remotes: current.remotes.filter((entry) => entry.id !== remote.id),
         revision: current.revision + 1,
       };
+      if (current.hostsError === undefined) return next;
+      return { ...next, hostsError: current.hostsError };
     });
 
   const connectSsh = (target: string, options?: { readonly background?: boolean }) =>

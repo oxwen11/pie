@@ -22,6 +22,7 @@ export type EnvironmentSnapshot = {
   readonly revision: number;
   readonly connecting: readonly ConnectingSshHost[];
   readonly remotes: readonly SshRemoteEnvironment[];
+  readonly hostsError?: string;
 };
 
 export type DiscoveredSshHost = {

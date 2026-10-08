@@ -1,7 +1,11 @@
-import { Deferred, Effect, Option, Scope, Stream, SubscriptionRef } from "effect";
+import { Deferred, Effect, Option, Schema, Scope, Stream, SubscriptionRef } from "effect";
 import { describe, expect, it } from "vitest";
 
-import type { ServerConnection, ServerStatusSnapshot } from "../../shared/desktop-rpc";
+import {
+  EnvironmentSnapshotSchema,
+  type ServerConnection,
+  type ServerStatusSnapshot,
+} from "../../shared/desktop-rpc";
 import type { LocalServer } from "../server/local-server";
 import { disabledDesktopSsh, SshHostDiscoveryError } from "../ssh/desktop-ssh";
 import { disabledDesktopTailscale } from "../tailscale/desktop-tailscale";
@@ -162,7 +166,8 @@ describe("DesktopApplication", () => {
     await expect(Effect.runPromise(h.application.serverConnection)).resolves.toEqual(
       localConnection,
     );
-    await expect(Effect.runPromise(h.application.environmentSnapshot)).resolves.toMatchObject({
+    const snapshot = await Effect.runPromise(h.application.environmentSnapshot);
+    expect(snapshot).toMatchObject({
       connecting: [],
       remotes: [
         {
@@ -172,6 +177,7 @@ describe("DesktopApplication", () => {
         },
       ],
     });
+    expect(Schema.encodeSync(EnvironmentSnapshotSchema)(snapshot)).not.toHaveProperty("hostsError");
   });
 
   it("reports a missing OpenSSH client on bootstrap", async () => {
