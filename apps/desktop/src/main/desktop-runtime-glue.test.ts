@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { ServerStatusSnapshot } from "../shared/desktop-rpc";
 import { DesktopApplication } from "./application/desktop-application";
+import { DesktopCli, disabledDesktopCli } from "./cli/desktop-cli";
 import { DesktopApplicationLive } from "./desktop-runtime-glue";
 import { LocalServer } from "./server/local-server";
 import { DesktopSsh, disabledDesktopSsh } from "./ssh/desktop-ssh";
@@ -35,6 +36,7 @@ describe("DesktopApplicationLive", () => {
         Layer.provide(fakeLocalServerLive),
         Layer.provide(fakeSshLive),
         Layer.provide(fakeTailscaleLive),
+        Layer.provide(Layer.succeed(DesktopCli, disabledDesktopCli())),
       ),
     );
 

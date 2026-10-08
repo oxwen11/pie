@@ -20,6 +20,10 @@ files:
   # here would ship an empty tree (and this glob would also strip the island's
   # own fff-bin).
   - "!**/node_modules/@ff-labs/fff-bin-*/**"
+  # The bundled `pie` command needs only the CLI's JavaScript: its daemon runs
+  # the app's own @getpie/server entry, so skip the CLI's copies of the server
+  # runtime and the web UI.
+  - "!**/node_modules/@getpie/cli/dist/{client,pi-process,fff,resources}/**"
 asarUnpack:
   - resources/**
   - "**/node_modules/node-pty/**"
@@ -33,6 +37,8 @@ asarUnpack:
 beforePack: scripts/before-pack.js
 extraResources:
   - vendor
+  - from: bin/pie
+    to: bin/pie
   - from: ../../packages/server/dist/resources
     to: resources
 icon: resources/icon.png

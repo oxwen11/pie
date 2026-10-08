@@ -2,6 +2,7 @@ import { Deferred, Effect, Option, Scope, Stream, SubscriptionRef } from "effect
 import { describe, expect, it } from "vitest";
 
 import type { ServerConnection, ServerStatusSnapshot } from "../../shared/desktop-rpc";
+import { disabledDesktopCli } from "../cli/desktop-cli";
 import type { LocalServer } from "../server/local-server";
 import { disabledDesktopSsh, SshHostDiscoveryError } from "../ssh/desktop-ssh";
 import { disabledDesktopTailscale } from "../tailscale/desktop-tailscale";
@@ -43,6 +44,7 @@ function makeHarness(
     server,
     ssh,
     tailscale,
+    cli: disabledDesktopCli(),
     quit: Effect.sync(() => {
       quits += 1;
     }),
@@ -79,6 +81,7 @@ describe("DesktopApplication", () => {
       hostname: expect.any(String),
       sshClient: { available: true },
       tailscaleClient: { available: true },
+      cliAvailable: false,
       environments: {
         revision: 0,
         connecting: [],

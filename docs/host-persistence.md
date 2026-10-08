@@ -539,6 +539,23 @@ profile locks. Pie does not define schemas, migrations, size bounds, or normal
 cleanup for this tree. The remote-debug temporary profile is not explicitly
 removed by Desktop.
 
+## Desktop `pie` command
+
+Packaged macOS Desktop ships `Contents/Resources/bin/pie`, a shell script that
+runs the app's own CLI (`Pie Helper` as Node, `@getpie/cli/dist/cli.js` in
+`app.asar`) with `PIE_SERVER_ENTRY` pointing at the app's `server.js`. It never
+writes on launch. **Settings → Command line → Install** is the only writer:
+
+| Property      | Current contract                                                                                                                                                                                                                                                                                                     |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `~/.local/bin/pie` (from `os.homedir()`; no override). `~/.local/bin` is created if missing.                                                                                                                                                                                                                         |
+| Owner         | `DesktopCli` (`apps/desktop/src/main/cli/desktop-cli.ts`), on an explicit Install or Uninstall only.                                                                                                                                                                                                                 |
+| Data          | A symlink to this app's `Contents/Resources/bin/pie`. No token, path list, or other state.                                                                                                                                                                                                                           |
+| Write points  | Install: symlink to a sibling temporary name, then `rename` over the target. Refuses when the target exists and is not a symlink, or when the app runs from `/Volumes/` or an App Translocation path. Another symlink is replaced.                                                                                   |
+| Shell profile | Only when `~/.local/bin` is not on the login shell's PATH and the file does not already mention `.local/bin`: appends `# Added by Pie Desktop for the pie command` and one line to `~/.zshrc`, `~/.bash_profile`, or `~/.config/fish/config.fish` by `$SHELL`. Other shells are not edited; Settings shows the line. |
+| Retention     | Uninstall removes the symlink only when it points at this app. The shell profile line stays: other tools use `~/.local/bin`. Deleting or moving Pie.app leaves a dangling link; `pie` then fails until Install runs again.                                                                                           |
+| Compatibility | The link targets a script inside the app, so app updates take effect without reinstalling. The CLI and the desktop daemon share one build and compatibility key.                                                                                                                                                     |
+
 ## Pi-owned and workspace writes
 
 Pie launches its `pie-pi-process` child (`dist/pi-process/pi-process.js`, Bun)

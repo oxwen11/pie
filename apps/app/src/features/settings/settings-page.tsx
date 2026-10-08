@@ -9,13 +9,16 @@ import {
   useSidebar,
 } from "@getpie/ui/components/sidebar";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Palette } from "lucide-react";
+import { Palette, SquareTerminal } from "lucide-react";
 import type { ReactElement } from "react";
 
 import { PageSidebar } from "@/components/layout/page-sidebar";
 import { useLocalOrpc } from "@/lib/environment-orpc";
+import { usePlatform } from "@/platform-context";
 import { isThemePreference } from "@/theme";
 import { useTheme } from "@/theme-provider";
+
+import { CommandLineSettings } from "./command-line-settings";
 
 const THEME_OPTIONS: ReadonlyArray<{ readonly value: ThemePreference; readonly label: string }> = [
   { value: "system", label: "System" },
@@ -25,6 +28,7 @@ const THEME_OPTIONS: ReadonlyArray<{ readonly value: ThemePreference; readonly l
 
 export function SettingsPage(): ReactElement {
   const { setOpenMobile } = useSidebar();
+  const { cli } = usePlatform();
   const orpcQueryUtils = useLocalOrpc();
   const queryClient = useQueryClient();
   const { setTheme, theme } = useTheme();
@@ -59,6 +63,17 @@ export function SettingsPage(): ReactElement {
                 <span>Appearance</span>
               </SidebarMenuButton>
             </SidebarMenuItem>
+            {cli === undefined ? null : (
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  onClick={() => setOpenMobile(false)}
+                  render={<a aria-label="Command line" href="#command-line" />}
+                >
+                  <SquareTerminal />
+                  <span>Command line</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )}
           </SidebarMenu>
         </SidebarGroup>
       </PageSidebar>
@@ -86,6 +101,7 @@ export function SettingsPage(): ReactElement {
             ))}
           </RadioGroup>
         </section>
+        {cli === undefined ? null : <CommandLineSettings cli={cli} />}
       </div>
     </>
   );

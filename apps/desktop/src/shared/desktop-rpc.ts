@@ -75,6 +75,21 @@ export const TailscaleSnapshotSchema = Schema.Struct({
 });
 export type TailscaleSnapshot = typeof TailscaleSnapshotSchema.Type;
 
+/** Settings → Command line: the `pie` command this app installs into `~/.local/bin`. */
+export const CliCommandStatusSchema = Schema.Struct({
+  /** `path` is a symlink to this app's `pie`. */
+  installed: Schema.Boolean,
+  /** Display path, e.g. `~/.local/bin/pie`. */
+  path: Schema.String,
+  /** Why Install would refuse to replace what is at `path`. */
+  conflict: Schema.NullOr(Schema.String),
+  /** `~/.local/bin` is on the login PATH or added by the shell startup file. */
+  onPath: Schema.Boolean,
+  /** Another `pie` the login PATH reaches first. */
+  shadowedBy: Schema.NullOr(Schema.String),
+});
+export type CliCommandStatus = typeof CliCommandStatusSchema.Type;
+
 export const DesktopBootstrapSchema = Schema.Struct({
   status: ServerStatusSchema,
   statusRevision: Schema.Natural,
@@ -82,6 +97,8 @@ export const DesktopBootstrapSchema = Schema.Struct({
   hostname: Schema.NonEmptyString,
   sshClient: SshClientAvailabilitySchema,
   tailscaleClient: TailscaleClientAvailabilitySchema,
+  /** This build ships the `pie` command (packaged macOS app). */
+  cliAvailable: Schema.Boolean,
   environments: EnvironmentSnapshotSchema,
 });
 export type DesktopBootstrap = typeof DesktopBootstrapSchema.Type;
@@ -117,6 +134,11 @@ export const desktopContract = {
     snapshot: oc.output(TailscaleSnapshotSchema),
     enableServe: oc.output(Schema.Void),
     disableServe: oc.output(Schema.Void),
+  },
+  cli: {
+    status: oc.output(CliCommandStatusSchema),
+    install: oc.output(CliCommandStatusSchema),
+    uninstall: oc.output(CliCommandStatusSchema),
   },
   app: {
     quit: oc.output(Schema.Void),

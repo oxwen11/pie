@@ -1,0 +1,32 @@
+#!/bin/sh
+# The `pie` command shipped inside Pie.app (Contents/Resources/bin/pie).
+# Settings symlinks ~/.local/bin/pie here, so it runs this app's own CLI and
+# shares the desktop daemon: same build, same compatibility key.
+set -eu
+
+script=$0
+while [ -L "$script" ]; do
+  dir=$(CDPATH= cd -- "$(dirname -- "$script")" && pwd)
+  target=$(readlink -- "$script")
+  case $target in
+    /*) script=$target ;;
+    *) script=$dir/$target ;;
+  esac
+done
+
+resources=$(CDPATH= cd -- "$(dirname -- "$script")/.." && pwd)
+contents=$(dirname -- "$resources")
+helper="$contents/Frameworks/Pie Helper.app/Contents/MacOS/Pie Helper"
+modules="$resources/app.asar/node_modules/@getpie"
+
+if [ ! -x "$helper" ]; then
+  echo "pie: Pie Desktop is missing at ${contents%/Contents}. Reinstall the command from Pie Settings." >&2
+  exit 1
+fi
+
+# Same runtime as the desktop daemon: the Helper as Node, with the bundled Bun
+# on PATH for pie-pi-process.
+export ELECTRON_RUN_AS_NODE=1
+export PATH="$resources/vendor:$PATH"
+export PIE_SERVER_ENTRY="$modules/server/dist/server.js"
+exec "$helper" "$modules/cli/dist/cli.js" "$@"
