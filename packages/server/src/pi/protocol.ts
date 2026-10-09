@@ -1,7 +1,7 @@
 import type {
   AgentToolResult,
   JsonAgentSessionEvent,
-  RpcCommand,
+  RpcCommand as UpstreamRpcCommand,
   RpcExtensionUIRequest,
   RpcExtensionUIResponse,
   RpcSessionState,
@@ -28,13 +28,19 @@ export type AgentSessionEvent =
   | (Omit<ToolExecutionEndEvent, "result"> & { readonly result: AgentToolResult<unknown> });
 
 export type {
-  RpcCommand,
   RpcExtensionUIRequest,
   RpcExtensionUIResponse,
   RpcSessionState,
   SessionEntry,
   SessionMessageEntry,
 };
+
+/** Commands the vendored command table (`pi/rpc/rpc-types.ts`) adds on top of
+ *  the published pin. Keep in sync with that table. */
+type PieRpcCommand = { readonly id?: string; readonly type: "reload" };
+
+/** The wire command vocabulary: the published pin's table plus Pie's own. */
+export type RpcCommand = UpstreamRpcCommand | PieRpcCommand;
 
 /** `get_entries` response data: the session's whole entry tree plus its leaf. */
 export type SessionEntries = {

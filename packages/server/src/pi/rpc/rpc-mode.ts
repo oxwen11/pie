@@ -582,6 +582,23 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
       }
 
       // =================================================================
+      // Reload
+      // =================================================================
+
+      case "reload": {
+        // Mirrors the TUI's /reload guards: rebuilding the runtime under a
+        // live turn would yank tools out from under the in-flight request.
+        if (session.isStreaming) {
+          return error(id, "reload", "Wait for the current response to finish before reloading.");
+        }
+        if (session.isCompacting) {
+          return error(id, "reload", "Wait for compaction to finish before reloading.");
+        }
+        await session.reload();
+        return success(id, "reload");
+      }
+
+      // =================================================================
       // Retry
       // =================================================================
 

@@ -1,9 +1,11 @@
+import type { PieClientContext } from "@getpie/client";
 import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
 } from "@getpie/ui/components/sidebar";
+import type { ClientLink } from "@orpc/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   createMemoryHistory,
@@ -21,17 +23,18 @@ import "@/index.css";
 
 import { SessionActionsMenu } from "./session-actions-menu";
 
-it("hides Archive after mouse selection leaves the row, but keeps it available to keyboard focus", async () => {
-  await page.viewport(1280, 800);
+const unexpectedLink: ClientLink<PieClientContext> = {
+  call: async () => {
+    throw new Error("Unexpected RPC call");
+  },
+};
+
+async function renderMenu(localLink = unexpectedLink) {
   const queryClient = new QueryClient();
   const environmentRpc = createEnvironmentRpc({
     localId: "local",
     queryClient,
-    localLink: {
-      call: async () => {
-        throw new Error("Unexpected RPC call");
-      },
-    },
+    localLink,
     resolveRemote: () => undefined,
   });
   const context = { localEnvironmentId: "local", environmentRpc };
@@ -68,6 +71,37 @@ it("hides Archive after mouse selection leaves the row, but keeps it available t
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+  return { queryClient, orpc: environmentRpc.for("local") };
+}
+
+it("Reload calls session.reload and invalidates Pi-derived queries", async () => {
+  const calls: Array<ReadonlyArray<string>> = [];
+  const { queryClient, orpc } = await renderMenu({
+    call: async (path) => {
+      calls.push(path);
+      return undefined;
+    },
+  });
+  const modelsKey = orpc.agent.listModels.queryOptions({
+    input: { projectId: "project" },
+  }).queryKey;
+  const commandsKey = orpc.agent.commands.queryOptions({
+    input: { projectId: "project" },
+  }).queryKey;
+  queryClient.setQueryData(modelsKey, { models: [] });
+  queryClient.setQueryData(commandsKey, []);
+
+  await page.getByRole("button", { name: "First session", exact: true }).click({ button: "right" });
+  await page.getByRole("menuitem", { name: "Reload" }).click();
+
+  await expect.poll(() => calls).toContainEqual(["session", "reload"]);
+  await expect.poll(() => queryClient.getQueryState(modelsKey)?.isInvalidated).toBe(true);
+  await expect.poll(() => queryClient.getQueryState(commandsKey)?.isInvalidated).toBe(true);
+});
+
+it("hides Archive after mouse selection leaves the row, but keeps it available to keyboard focus", async () => {
+  await page.viewport(1280, 800);
+  await renderMenu();
 
   const row = page.getByRole("button", { name: "First session", exact: true });
   const archive = page.getByRole("button", { name: "Archive", exact: true });

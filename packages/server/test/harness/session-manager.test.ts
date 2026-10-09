@@ -84,6 +84,7 @@ const makeFixture = Effect.gen(function* () {
             return { turnId: "turn-1", started: true };
           }),
         interrupt: Effect.void,
+        reload: Effect.void,
         replaceQueue: () => Effect.void,
         respondToAgentRequest: () => Effect.void,
         getCapabilities: Effect.succeed({
