@@ -500,6 +500,22 @@ layer(NodePlatformLayer)("PiAgentSessionService", (it) => {
     }),
   );
 
+  it.effect("reload succeeds with nothing running instead of starting an agent", () =>
+    Effect.gen(function* () {
+      const result = yield* run({}, (fixture) =>
+        Effect.gen(function* () {
+          const { ref } = yield* createSession(fixture);
+          yield* fixture.service.close(ref);
+          yield* fixture.service.reload(ref);
+          return fixture.spy.resume;
+        }),
+      );
+      // An idle session reads fresh settings on its next spawn; reloading it
+      // must not start a process for it.
+      assert.deepEqual(result, []);
+    }),
+  );
+
   it.effect("replaceQueue with empty arrays succeeds with nothing running", () =>
     Effect.gen(function* () {
       const result = yield* run({}, (fixture) =>

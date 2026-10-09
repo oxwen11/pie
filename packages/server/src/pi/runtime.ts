@@ -268,6 +268,12 @@ export const makePiAgentRuntime = (
             .setModel(sessionId, model)
             .pipe(Effect.mapError((cause) => operationError(sessionId, "set-model", cause)));
         }),
+      reload: Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        return yield* process.session
+          .reload(sessionId)
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "reload", cause)));
+      }),
       close,
     } satisfies PiAgentRuntime;
   });

@@ -370,6 +370,18 @@ export const sessionRouter = orpc.router({
   wait: orpc.wait.effect(waitHandler),
   send: orpc.send.effect(sendHandler),
   interrupt: orpc.interrupt.effect(interruptHandler),
+  reload: orpc.reload.effect(function* ({ input, errors }) {
+    const sessions = yield* PiAgentSessionService;
+    yield* sessions.reload(input.ref).pipe(
+      Effect.catchTags({
+        SessionNotFound: (e) =>
+          Effect.fail(errors.NOT_FOUND({ message: `session ${e.sessionId} not found` })),
+        SessionClosed: (e) =>
+          Effect.fail(errors.SESSION_NOT_ACTIVE({ message: `session ${e.sessionId} is closed` })),
+        AgentOperationError: (e) => Effect.fail(errors.INTERNAL({ message: e.message })),
+      }),
+    );
+  }),
   queue: orpc.queue.effect(function* ({ input, errors }) {
     const sessions = yield* PiAgentSessionService;
     yield* sessions.replaceQueue(input).pipe(

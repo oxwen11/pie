@@ -75,6 +75,8 @@ export type PiAgentRuntime = {
     readonly provider: string;
     readonly modelId: string;
   }) => Effect.Effect<AgentModelState, SessionClosed | AgentOperationError>;
+  /** Re-read settings/extensions/resources in the live child. */
+  readonly reload: Effect.Effect<void, SessionClosed | AgentOperationError>;
   readonly close: Effect.Effect<void>;
 };
 

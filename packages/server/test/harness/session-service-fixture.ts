@@ -187,6 +187,7 @@ export const run = <A, E>(
             });
           })),
       interrupt: Effect.void,
+      reload: Effect.void,
       replaceQueue: () => Effect.void,
       respondToAgentRequest: () => Effect.void,
       getCapabilities: Effect.succeed({
