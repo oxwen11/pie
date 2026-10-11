@@ -18,6 +18,7 @@ Dependencies flow from app/runtime packages toward shared leaves, not back:
 | `packages/tailscale` | Discovery/Serve integration; no Electron, renderer, or oRPC; never log CLI stderr |
 | `apps/app` | SPA, also mounted by Desktop through its public root exports |
 | `apps/desktop` | Electron host; read its [AGENTS.md](../../../apps/desktop/AGENTS.md) before editing |
+| `packages/hub` | Pie Hub (RFC [pie-hub](../../../docs/rfc/pie-hub.md)): SQLite store now; host, HTTP and WebSocket later. Depends on `contract` and `core` only; the daemon never imports it |
 | `packages/pie` | Product CLI (`pie`); delegates runtime to the server |
 | `tools/` | Build, lint, and verification tooling, not product runtime |
 
