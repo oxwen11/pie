@@ -36,19 +36,15 @@ The [web dev recipe](../../skills/verify/SKILL.md) covers the two-process local 
   did not execute, including a sandbox or socket failure, is a gap. Verify's
   run-local sample Project is approved except for Import project: launch with
   `--replace --empty-projects` and drive the real import flow.
-- Public screenshots and video show the relevant UI only. Crop or redact local
-  paths, identifiers, credentials, daemon records, and unrelated diagnostics
-  before upload. Before/after frames are that drive, not a simulated older baseline.
+- Public screenshots and video show the relevant UI only. Omit local paths,
+  identifiers, credentials, daemon records, and unrelated diagnostics. Use
+  `tools/pr/redact-evidence` before upload. Before/after frames are that drive,
+  not a simulated older baseline.
 
 ## Capture and delivery
 
-- Screenshots: `pnpm exec pie-verify web evidence screenshot <name>`; use
-  `desktop` for Electron. Names should identify the behavior and before/after state.
-- The Verify shim automatically starts and retains a 60 fps browser recording.
-  Start each additional validation with `evidence init` to rotate clips. Do not
-  call `record start`, `restart`, or `stop`; normal cleanup flushes the video.
-- Use `evidence note` to describe what each `recording-<NNN>.webm` demonstrates.
-  `evidence path` locates the retained `.agents/skills/verify-pie{,-desktop}/evidence/<run-id>/` directory.
-- Attach screenshots **and** video to the UI issue, PR, or comment with
-  `gh pr|issue create|edit|comment --attach <png> --attach <webm>`.
-  Evidence is gitignored: never commit it or expose credentials in uploads.
+- Capture screenshots, notes, and recordings with `pie-verify` evidence
+  commands. Names should identify the behavior and the before/after state.
+  See [tools/verify/README.md](../../../tools/verify/README.md).
+- Attach screenshots and video to the UI issue or pull request.
+  Evidence is gitignored: never commit it or include credentials in uploads.

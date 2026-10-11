@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Print head, required checks, mergeability, and commits behind the base.
+set -euo pipefail
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: pr-status <number> [--repo OWNER/REPO]
+
+Print the pull request head and base SHAs, required checks, MERGEABLE, and
+how many commits the head is behind its base. Exit 0 when it is open, not a
+draft, MERGEABLE, up to date with its base, free of CHANGES_REQUESTED, and
+every required check passed (bucket pass, state SUCCESS). Otherwise exit 1.
+EOF
+}
+
+pr_init
+need_cmd gh
+need_cmd jq
+NUMBER=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --repo)
+      shift
+      [ $# -gt 0 ] || die "--repo needs OWNER/REPO"
+      set_repo "$1"
+      shift
+      ;;
+    --) shift; break ;;
+    -*) die "unknown option: $1" ;;
+    *)
+      [ -z "$NUMBER" ] || die "unexpected argument: $1"
+      NUMBER=$1
+      shift
+      ;;
+  esac
+done
+[ $# -eq 0 ] || die "unexpected argument"
+require_number "$NUMBER"
+default_repo
+load_pull_request "$NUMBER"
+print_report | scrub
+if pr_ready; then
+  exit 0
+fi
+exit 1

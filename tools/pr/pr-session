@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Find Pie sessions whose stored pull request number matches.
+set -euo pipefail
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: pr-session <number> [--home PATH]...
+
+Print one JSON object per Session whose data.pullRequests[].ref.number or
+legacy data.pullRequestRefs[].number is <number>. Homes: each --home, or
+$PIE_HOME when set, or else ~/.pie and ~/.pie_*. Reads {version,data} files
+under storage/sessions. Does not print snapshots or credentials.
+EOF
+}
+
+JQ_PROGRAM='
+.data as $d
+| (
+    [($d.pullRequests // [])[] | select(.ref.number == $n) | {
+      number: .ref.number, host: .ref.host, owner: .ref.owner,
+      repository: .ref.repository, source: .source, excluded: .excluded,
+      linkedAt: .linkedAt
+    }]
+    + [($d.pullRequestRefs // [])[] | select(.number == $n) | {
+      number: .number, host: .host, owner: .owner,
+      repository: .repository, source: "pullRequestRefs", excluded: false,
+      linkedAt: null
+    }]
+  )[]
+| {
+    home: $home, file: $file,
+    sessionId: ($d.sessionId // null), projectId: ($d.projectId // null),
+    title: ($d.title // null), cwd: ($d.cwd // null)
+  } + .
+'
+
+need_cmd jq
+NUMBER=""
+HOMES=()
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --home)
+      shift
+      [ $# -gt 0 ] || die "--home needs a path"
+      HOMES+=("$1")
+      shift
+      ;;
+    --) shift; break ;;
+    -*) die "unknown option: $1" ;;
+    *)
+      [ -z "$NUMBER" ] || die "unexpected argument: $1"
+      NUMBER=$1
+      shift
+      ;;
+  esac
+done
+[ $# -eq 0 ] || die "unexpected argument"
+require_number "$NUMBER"
+
+if [ "${#HOMES[@]}" -eq 0 ]; then
+  if [ -n "${PIE_HOME:-}" ]; then
+    HOMES=("$PIE_HOME")
+  else
+    if [ -d "$HOME/.pie" ]; then
+      HOMES+=("$HOME/.pie")
+    fi
+    for dir in "$HOME"/.pie_*; do
+      [ -d "$dir" ] || continue
+      HOMES+=("$dir")
+    done
+  fi
+fi
+[ "${#HOMES[@]}" -gt 0 ] || die "no Pie home; set PIE_HOME or pass --home"
+
+seen_dir=0
+for home in "${HOMES[@]}"; do
+  [ -d "$home" ] || die "not a directory: $home"
+  sessions="$home/storage/sessions"
+  if [ ! -d "$sessions" ]; then
+    printf 'pr: no sessions directory in %s\n' "$home" >&2
+    continue
+  fi
+  seen_dir=1
+  while IFS= read -r -d '' file; do
+    jq -c --argjson n "$NUMBER" --arg home "$home" --arg file "$file" "$JQ_PROGRAM" "$file" 2>/dev/null \
+      | scrub || printf 'pr: skip unreadable %s\n' "$file" >&2
+  done < <(find "$sessions" -type f -name '*.json' -print0)
+done
+[ "$seen_dir" -eq 1 ] || die "no storage/sessions directory"

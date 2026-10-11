@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+# Update a pull request branch with expected_head_sha.
+set -euo pipefail
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: pr-sync <number> --sha <expected-head> [--repo OWNER/REPO]
+
+Merge the base into the pull request through GitHub's update-branch API,
+sending expected_head_sha. Refuses when the current head is not --sha.
+Does nothing when the head is already up to date. Polls until the head SHA
+changes. Exit 2 means the result is unverified and may still be running.
+A new head starts checks; review that head from CI.
+
+PR_POLL_ATTEMPTS (default 30) and PR_POLL_INTERVAL seconds (default 1) bound
+the wait.
+EOF
+}
+
+pr_init
+need_cmd gh
+need_cmd jq
+NUMBER=""
+EXPECTED=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --repo)
+      shift
+      [ $# -gt 0 ] || die "--repo needs OWNER/REPO"
+      set_repo "$1"
+      shift
+      ;;
+    --sha)
+      shift
+      [ $# -gt 0 ] || die "--sha needs a commit SHA"
+      EXPECTED=$1
+      shift
+      ;;
+    --) shift; break ;;
+    -*) die "unknown option: $1" ;;
+    *)
+      [ -z "$NUMBER" ] || die "unexpected argument: $1"
+      NUMBER=$1
+      shift
+      ;;
+  esac
+done
+[ $# -eq 0 ] || die "unexpected argument"
+require_number "$NUMBER"
+require_sha "$EXPECTED"
+default_repo
+load_view "$NUMBER"
+sha_eq "$PR_HEAD" "$EXPECTED" || die "head is $PR_HEAD, expected $EXPECTED"
+if [ "$PR_STATE" != "OPEN" ]; then
+  die "state is $PR_STATE"
+fi
+load_behind
+if [ "$PR_BEHIND" -eq 0 ]; then
+  printf 'up to date: %s\n' "$PR_HEAD"
+  exit 0
+fi
+
+gh_run api --method PUT "repos/${API_REPO}/pulls/${NUMBER}/update-branch" \
+  -f "expected_head_sha=${PR_HEAD}"
+if [ "$GH_STATUS" -ne 0 ]; then
+  show_gh_err
+  unverified "update-branch was not accepted"
+fi
+
+old=$PR_HEAD
+tries=0
+limit="${PR_POLL_ATTEMPTS:-30}"
+while [ "$tries" -lt "$limit" ]; do
+  if [ "$tries" -gt 0 ]; then
+    sleep "${PR_POLL_INTERVAL:-1}"
+  fi
+  gh_run pr view "$NUMBER" --repo "$REPO" --json headRefOid,state
+  if [ "$GH_STATUS" -eq 0 ] && json_object "$GH_STDOUT_FILE"; then
+    new=$(jq -r '.headRefOid // empty' "$GH_STDOUT_FILE")
+    if is_sha "$new" && ! sha_eq "$new" "$old"; then
+      printf 'head: %s\n' "$new"
+      exit 0
+    fi
+  else
+    show_gh_err
+  fi
+  tries=$((tries + 1))
+done
+unverified "head is still $old"

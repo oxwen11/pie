@@ -108,6 +108,21 @@ jobs:
           exit 1
         shell: bash
 
+      - name: PR tools harness
+        run: |
+          # tools/pr scripts need jq; the harness fakes gh, magick, and ffmpeg.
+          if ! command -v jq >/dev/null; then
+            if command -v apt-get >/dev/null && sudo -n true 2>/dev/null; then
+              sudo apt-get update -qq
+              sudo apt-get install -y --no-install-recommends jq
+            else
+              echo "tools/pr/test.sh needs jq on PATH." >&2
+              exit 1
+            fi
+          fi
+          bash tools/pr/test.sh
+        shell: bash
+
       - name: Ensure Xvfb (Desktop e2e)
         run: |
           if command -v xvfb-run >/dev/null && command -v xauth >/dev/null; then

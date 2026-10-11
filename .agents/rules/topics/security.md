@@ -16,6 +16,9 @@ do not turn unrelated tasks into a product-wide security audit.
   symlinks. For process execution, keep data separate from shell syntax and check
   how the invoked program interprets arguments. Follow the host-write approval
   gate in [persistence.md](persistence.md).
+- Registering a Project trusts it: Pie-owned Pi children for that Project
+  (session and short-lived listing children) start with `--approve` and run its
+  extensions. The daemon does not load extensions.
 - Keep credentials and sensitive content out of unauthorized responses, logs,
   telemetry, commits, and evidence uploads. Do not weaken transport/origin checks
   or expose an authenticated local service through an unprotected route.

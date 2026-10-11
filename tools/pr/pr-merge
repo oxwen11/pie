@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# Squash-merge one reviewed SHA. Stacked pull requests use merge-async.
+set -euo pipefail
+. "$(cd "$(dirname "$0")" && pwd)/lib.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: pr-merge <number> --sha <reviewed-head> [--repo OWNER/REPO]
+
+Recheck the pr-status gates and that the head is still --sha, then squash-merge
+that commit. A stacked pull request uses merge-async (sha and merge_method=squash)
+and only when it is the lowest open layer: open downstack pull requests would
+merge with it. Does not pass --admin, --auto, or bypass_rules. After GitHub
+shows the pull request merged, comment the merge commit. Exit 2 means the
+result is not confirmed; inspect GitHub before retrying.
+
+PR_POLL_ATTEMPTS (default 30) and PR_POLL_INTERVAL seconds (default 1) bound
+the wait.
+EOF
+}
+
+async_merged() {
+  local status sha
+  jq -e 'type == "object"' "$1" >/dev/null 2>/dev/null || unverified "invalid merge-async response"
+  status=$(jq -r '.status // empty' "$1")
+  sha=$(jq -r '.details.sha // empty' "$1")
+  case "$status" in
+    failed|error) die "merge-async failed" ;;
+    enqueued) unverified "merge was enqueued, not merged" ;;
+  esac
+  if [ "$status" = "merged" ] || [ -n "$sha" ]; then
+    return 0
+  fi
+  return 1
+}
+
+merge_async() {
+  local uuid tries limit
+  gh_run api --method PUT "repos/${API_REPO}/pulls/${NUMBER}/merge-async" \
+    -f "sha=${PR_HEAD}" \
+    -f merge_method=squash
+  if [ "$GH_STATUS" -ne 0 ]; then
+    show_gh_err
+    unverified "merge-async was not accepted"
+  fi
+  if async_merged "$GH_STDOUT_FILE"; then
+    return 0
+  fi
+  uuid=$(jq -r '.uuid // .details.uuid // empty' "$GH_STDOUT_FILE")
+  printf '%s\n' "$uuid" | grep -Eq '^[A-Za-z0-9_-]+$' \
+    || unverified "merge-async response had no uuid"
+  tries=0
+  limit="${PR_POLL_ATTEMPTS:-30}"
+  while [ "$tries" -lt "$limit" ]; do
+    if [ "$tries" -gt 0 ]; then
+      sleep "${PR_POLL_INTERVAL:-1}"
+    fi
+    gh_run api "repos/${API_REPO}/pulls/${NUMBER}/merge-async/${uuid}"
+    if [ "$GH_STATUS" -ne 0 ]; then
+      show_gh_err
+      unverified "merge-async poll failed"
+    fi
+    if async_merged "$GH_STDOUT_FILE"; then
+      return 0
+    fi
+    tries=$((tries + 1))
+  done
+  unverified "merge-async still pending"
+}
+
+plain_merge() {
+  gh_run pr merge "$NUMBER" --repo "$REPO" --squash --match-head-commit "$PR_HEAD"
+  if [ "$GH_STATUS" -ne 0 ]; then
+    show_gh_err
+    # Refused or unknown: never fall through to a merge record.
+    unverified "gh pr merge failed; nothing recorded. Inspect GitHub before retrying."
+  fi
+}
+
+poll_merged() {
+  local tries limit state oid head
+  tries=0
+  limit="${PR_POLL_ATTEMPTS:-30}"
+  while [ "$tries" -lt "$limit" ]; do
+    if [ "$tries" -gt 0 ]; then
+      sleep "${PR_POLL_INTERVAL:-1}"
+    fi
+    gh_run pr view "$NUMBER" --repo "$REPO" --json state,mergeCommit,url,headRefOid
+    if [ "$GH_STATUS" -eq 0 ] && json_object "$GH_STDOUT_FILE"; then
+      state=$(jq -r '.state // empty' "$GH_STDOUT_FILE")
+      oid=$(jq -r '.mergeCommit.oid // empty' "$GH_STDOUT_FILE")
+      head=$(jq -r '.headRefOid // empty' "$GH_STDOUT_FILE")
+      if [ "$state" = "MERGED" ] && ! sha_eq "$head" "$EXPECTED"; then
+        die "merged at head $head, not $EXPECTED; nothing recorded"
+      fi
+      if [ "$state" = "MERGED" ] && is_sha "$oid"; then
+        PR_MERGE_OID=$oid
+        return 0
+      fi
+    else
+      show_gh_err
+    fi
+    tries=$((tries + 1))
+  done
+  return 1
+}
+
+confirm_and_comment() {
+  if poll_merged; then
+    gh_run pr comment "$NUMBER" --repo "$REPO" --body "Merged as ${PR_MERGE_OID}."
+    if [ "$GH_STATUS" -ne 0 ]; then
+      show_gh_err
+      printf 'pr: merged as %s; comment failed; do not merge again\n' "$PR_MERGE_OID" >&2
+      exit 1
+    fi
+    printf 'merged: %s\n' "$PR_MERGE_OID"
+    return 0
+  fi
+  unverified "merge is not confirmed. Inspect GitHub before retrying."
+}
+
+pr_init
+need_cmd gh
+need_cmd jq
+NUMBER=""
+EXPECTED=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -h|--help) usage; exit 0 ;;
+    --repo)
+      shift
+      [ $# -gt 0 ] || die "--repo needs OWNER/REPO"
+      set_repo "$1"
+      shift
+      ;;
+    --sha)
+      shift
+      [ $# -gt 0 ] || die "--sha needs a commit SHA"
+      EXPECTED=$1
+      shift
+      ;;
+    --) shift; break ;;
+    -*) die "unknown option: $1" ;;
+    *)
+      [ -z "$NUMBER" ] || die "unexpected argument: $1"
+      NUMBER=$1
+      shift
+      ;;
+  esac
+done
+[ $# -eq 0 ] || die "unexpected argument"
+require_number "$NUMBER"
+require_sha "$EXPECTED"
+default_repo
+require_ready_sha
+detect_stack
+if [ "$STACKED" -eq 1 ]; then
+  merge_async
+else
+  plain_merge
+fi
+confirm_and_comment
