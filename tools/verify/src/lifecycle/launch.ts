@@ -32,11 +32,11 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   assertOperatorPiConfig();
   const { identity } = surface;
   const request = parseLaunchArgs(args, {
-    allowServe: identity.allowServe,
     allowEmptyProjects: identity.id !== "cli",
-    usage: identity.allowServe
-      ? `${identity.bin} launch [--replace] [--serve]`
-      : `${identity.bin} launch [--replace] [--empty-projects]`,
+    usage:
+      identity.id === "cli"
+        ? `${identity.bin} launch [--replace]`
+        : `${identity.bin} launch [--replace] [--empty-projects]`,
   });
   const repo = findRepoRoot();
   if (
@@ -52,7 +52,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   switch (identity.build) {
     case "core":
       ensureCoreBuilt(repo);
-      // pie serve loads TypeScript, but availability stats the bun-built
+      // The source server loads TypeScript, but availability stats the bun-built
       // pie-pi-process entry under @getpie/server/pi-process.
       ensureServerBuilt(repo);
       break;
@@ -69,7 +69,7 @@ export async function launch(surface: Surface, args: string[]): Promise<void> {
   const existing = currentRun(identity.currentLink);
   if (existing !== undefined) {
     const meta = readOwnedRunMeta(identity, existing);
-    const kind = await classifyRun(surface, existing, meta, request.mode);
+    const kind = await classifyRun(surface, existing, meta);
     switch (kind) {
       case "reuse":
         writeBrowserEnvFile(identity, existing);
@@ -153,12 +153,8 @@ async function classifyRun(
   surface: Surface,
   runDir: string,
   meta: RunMeta | undefined,
-  mode: "daemon" | "serve" | undefined,
 ): Promise<"reuse" | "live" | "stale"> {
-  const reusable =
-    meta !== undefined &&
-    meta.surface === surface.identity.id &&
-    (meta.surface !== "cli" || mode === undefined || meta.mode === mode);
+  const reusable = meta !== undefined && meta.surface === surface.identity.id;
   if (reusable && meta !== undefined) {
     try {
       const probe = await surface.probe(runDir, meta);

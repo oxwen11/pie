@@ -6,9 +6,10 @@ use `pie --help` and each command's `--help` for the implemented surface.
 
 ## Current baseline
 
-[`packages/pie`](../../packages/pie/) already provides daemon lifecycle, `serve`,
+[`packages/pie`](../../packages/pie/) already provides daemon lifecycle,
 `run` / `wait` / `logs` / `send` / `respond` / `interrupt`, pairing, and relay
-commands. Session work is implemented in
+commands. There is no foreground `serve` command; the daemon runs the server entry.
+Session work is implemented in
 [`session-cli.ts`](../../packages/pie/src/node/session-cli.ts).
 `logs` supports `--tail`, not `--before-cursor`; pagination requires a contract
 change before a CLI flag. This RFC does not change existing output or exit codes.

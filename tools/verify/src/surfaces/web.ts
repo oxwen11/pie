@@ -45,10 +45,10 @@ async function startWeb(ctx: LaunchCtx): Promise<void> {
     },
   );
   if (server.pid === undefined) {
-    throw new Error("failed to spawn pie serve");
+    throw new Error("failed to spawn the dev server");
   }
   writePidFile(path.join(web.runDir, "pids/server.pid"), server.pid);
-  await waitUntil(`pie serve on ${web.piePort}`, () => healthOk(web.piePort), 60);
+  await waitUntil(`dev server on ${web.piePort}`, () => healthOk(web.piePort), 60);
 
   const serverLog = path.join(web.runDir, "logs/server.log");
   if (fs.existsSync(serverLog) && !readText(serverLog).includes("pie:ready ")) {
@@ -124,7 +124,7 @@ async function inspectWeb(runDir: string, meta: RunMeta): Promise<ProbeOk> {
   const major = Number(process.versions.node.split(".")[0]);
   const warn =
     major < 24
-      ? `\n${WEB.logPrefix} doctor: WARN — current shell Node is v${process.versions.node}; pie serve wants >= 24.`
+      ? `\n${WEB.logPrefix} doctor: WARN — current shell Node is v${process.versions.node}; the dev server wants >= 24.`
       : "";
   return {
     pids: [serverPid, vitePid],

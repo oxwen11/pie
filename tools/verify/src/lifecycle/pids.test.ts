@@ -22,12 +22,11 @@ describe("recordedPids", () => {
     const runDir = fs.mkdtempSync(path.join(os.tmpdir(), "pie-verify-pids-"));
     fs.mkdirSync(path.join(runDir, "pids"));
     fs.mkdirSync(path.join(runDir, "pie-home/daemon"), { recursive: true });
-    writePidFile(path.join(runDir, "pids/serve.pid"), 333);
     writeJson(path.join(runDir, "pie-home/daemon/daemon.pid"), {
       pid: 444,
       address: "http://127.0.0.1:4182",
       token: "secret",
     });
-    expect(recordedPids(CLI, runDir)).toEqual([333, 444]);
+    expect(recordedPids(CLI, runDir)).toEqual([444]);
   });
 });

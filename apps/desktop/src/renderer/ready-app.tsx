@@ -18,38 +18,23 @@ export function ReadyApp({
   status: ServerStatusFeed;
   onReady: () => void;
 }): ReactElement {
-  use(server);
-  return <KeyedApp load={refresh} status={status} onReady={onReady} />;
-}
-
-function KeyedApp({
-  load,
-  status,
-  onReady,
-}: {
-  load: () => Promise<ServerConnection>;
-  status: ServerStatusFeed;
-  onReady: () => void;
-}): ReactElement {
-  // One promise per mount. A new promise every render would re-suspend `use`.
-  const promise = useRef<Promise<ServerConnection> | null>(null);
-  /* oxlint-disable react/refs */
-  // react-doctor-disable-next-line no-ref-current-in-render
-  promise.current ??= load();
-  const initial = use(promise.current);
-  /* oxlint-enable react/refs */
+  // `server` is the host's one cached promise. Never start a request during
+  // render: an uncommitted mount loses its refs on every suspend, so each
+  // retry would mint another request (#473).
+  const initial = use(server);
   const [connection, setConnection] = useState(initial);
   const tokenHolder = useRef(initial.token ?? "");
 
   // The daemon mints a fresh token on every respawn, so the startup connection
-  // dies with the first server restart. The feed only emits transitions, so
-  // every "ready" it delivers means a restart just completed — re-fetch then,
-  // keeping the old object identity when nothing actually changed.
+  // dies with the first server restart. The feed replays transitions after the
+  // bootstrap revision, so every "ready" it delivers may be a completed
+  // restart — re-fetch then, keeping the old object identity when nothing
+  // actually changed.
   useEffect(() => {
     let cancelled = false;
     const unsubscribe = status.subscribe((next) => {
       if (next !== "ready") return;
-      void load()
+      void refresh()
         .then((fresh) => {
           if (!cancelled) {
             tokenHolder.current = fresh.token ?? "";
@@ -65,7 +50,7 @@ function KeyedApp({
       cancelled = true;
       unsubscribe();
     };
-  }, [status, load]);
+  }, [status, refresh]);
 
   use(startupAnimation);
   useEffect(onReady, [onReady]);

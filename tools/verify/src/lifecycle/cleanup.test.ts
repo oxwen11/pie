@@ -31,7 +31,6 @@ function fixture() {
     const dir = path.join(root, "runs", name);
     writeRunMeta(path.join(dir, "meta.json"), {
       surface: "cli",
-      mode: "serve",
       repo: findRepoRoot(),
       runId: name,
       pieHome: path.join(dir, "pie-home"),
