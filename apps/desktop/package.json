@@ -27,6 +27,7 @@
     "@getpie/cli": "workspace:*",
     "@getpie/contract": "workspace:*",
     "@getpie/core": "workspace:*",
+    "@getpie/effect-json-store": "workspace:*",
     "@getpie/server": "workspace:*",
     "@getpie/ssh": "workspace:*",
     "@getpie/tailscale": "workspace:*",

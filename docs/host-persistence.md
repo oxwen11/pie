@@ -50,7 +50,8 @@ $PIE_HOME/
 ├── storage/
 │   ├── projects.json
 │   ├── sessions/<projectId>/<sessionId>.json
-│   └── schedules/<scheduleId>.json
+│   ├── schedules/<scheduleId>.json
+│   └── ssh-environments.json
 ├── worktrees/<repository-basename>/<four-character-key>/
 ├── logs/
 │   ├── pie.log
@@ -117,6 +118,20 @@ Renderer `localStorage pie:theme` remains a FOUC cache of `appearance.theme` (se
 
 `path` is an absolute registered workspace path and is the only persisted
 `projectId -> path` mapping.
+
+### Saved SSH hosts
+
+| Property      | Current contract                                                                                                                                                                                                                                                                                                                                               |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Path          | `$PIE_HOME/storage/ssh-environments.json`                                                                                                                                                                                                                                                                                                                      |
+| Owner         | Desktop `DesktopSsh`. The path is declared in `paths.ts`; the CLI does not read or write it.                                                                                                                                                                                                                                                                   |
+| Data          | Version 1 `{ environments: [{ id, alias, hostname, username, port }] }`. Saved targets only. No token, no live tunnel.                                                                                                                                                                                                                                         |
+| Write points  | Missing file is not created at startup. Connect and remove write the array. A fully valid pre-envelope file is rewritten as version 1 on first read.                                                                                                                                                                                                           |
+| Compatibility | A pre-envelope file is adopted only when every entry validates. `activeId` is dropped. One invalid entry aborts adoption and leaves the file byte-for-byte unchanged. Corrupt JSON, a version-1 file that fails the schema, a newer version, or an aborted adoption is left untouched. Desktop still starts; SSH hosts are unavailable and show a fixed error. |
+| Extension     | Stay on version 1 until a field change requires an explicit migration.                                                                                                                                                                                                                                                                                         |
+| Retention     | Retained with `$PIE_HOME`. Remove deletes one array entry. No uninstall cleanup.                                                                                                                                                                                                                                                                               |
+| Permissions   | `0600` after a write (adoption or mutation). A read of the current envelope does not change the file.                                                                                                                                                                                                                                                          |
+| Atomicity     | `makeJsonDocument`: sibling temp file, then rename. Process-local write lock. Missing files are not seeded.                                                                                                                                                                                                                                                    |
 
 ### Allocated project folders
 

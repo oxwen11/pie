@@ -45,6 +45,7 @@ export const EnvironmentSnapshotSchema = Schema.Struct({
   revision: Schema.Natural,
   connecting: Schema.Array(ConnectingSshHostSchema),
   remotes: Schema.Array(SshRemoteEnvironmentSchema),
+  hostsError: Schema.optionalKey(Schema.String),
 });
 export type EnvironmentSnapshot = typeof EnvironmentSnapshotSchema.Type;
 
