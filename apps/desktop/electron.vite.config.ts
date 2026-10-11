@@ -70,6 +70,7 @@ export default defineConfig({
         exclude: [
           "@getpie/contract",
           "@getpie/core",
+          "@getpie/effect-json-store",
           "@getpie/server",
           "@getpie/ssh",
           "@getpie/tailscale",
