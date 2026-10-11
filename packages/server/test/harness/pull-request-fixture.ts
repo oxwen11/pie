@@ -65,6 +65,7 @@ export const makeFixture = Effect.gen(function* () {
           events: Stream.never,
           prompt: () => Effect.succeed({ turnId: "turn", started: true }),
           interrupt: Effect.void,
+          reload: Effect.void,
           replaceQueue: () => Effect.void,
           respondToAgentRequest: () => Effect.void,
           getCapabilities: Effect.succeed({
