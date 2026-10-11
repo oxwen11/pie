@@ -43,6 +43,7 @@ const makeFakeProcess = Effect.gen(function* () {
       abort: () => Ref.update(abortCalls, (count) => count + 1),
       getModelState: () => unexpected(),
       setModel: () => unexpected(),
+      reload: () => unexpected(),
     },
   };
 

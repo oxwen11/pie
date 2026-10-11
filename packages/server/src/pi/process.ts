@@ -168,6 +168,11 @@ export interface PiProcess {
       sessionId: string,
       model: { readonly provider: string; readonly modelId: string },
     ) => Effect.Effect<AgentModelState, HarnessSessionNotFound | PiTransportFailure>;
+    /** Re-read settings/extensions/resources of a live child (`reload`). No
+     * spawn: like getEntries, the caller guarantees the session is open. */
+    readonly reload: (
+      sessionId: string,
+    ) => Effect.Effect<void, HarnessSessionNotFound | PiTransportFailure>;
   };
 }
 
@@ -708,6 +713,10 @@ export const makePiProcessWithDependencies = <R>(
               ),
             ),
             Effect.map(toAgentModel),
+          ),
+        reload: (sessionId) =>
+          getSession(sessionId).pipe(
+            Effect.flatMap((session) => session.transport.command({ type: "reload" })),
           ),
       },
     } satisfies PiProcess;
