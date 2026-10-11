@@ -1,13 +1,13 @@
 ---
 name: verify-pie
-description: Isolated launch/doctor/drive/cleanup for the Pie web chat UI (Vite 4190 + pie serve 4180) via agent-browser. Use when proving a pie UI change at runtime.
+description: Isolated launch/doctor/drive/cleanup for the Pie web chat UI (Vite 4190 + dev server 4180) via agent-browser. Use when proving a pie UI change at runtime.
 ---
 
 # Verify pie (web)
 
-Pie's primary user surface is the **web chat SPA** in `apps/app`. A local Node server (`packages/pie` → `pie serve`) owns Projects, Sessions, and the oRPC WebSocket. Vite on **4190** proxies `/api` and `/ws/rpc` to the server on **4180**. Desktop (`apps/desktop`) is a second host of the same SPA — do not drive it with this skill; use `.cursor/skills/verify-pie-desktop`. The CLI daemon is `.cursor/skills/verify-pie-cli`.
+Pie's primary user surface is the **web chat SPA** in `apps/app`. A local Node server (`packages/pie` → `pnpm dev`, the server entry in the foreground) owns Projects, Sessions, and the oRPC WebSocket. Vite on **4190** proxies `/api` and `/ws/rpc` to the server on **4180**. Desktop (`apps/desktop`) is a second host of the same SPA — do not drive it with this skill; use `.cursor/skills/verify-pie-desktop`. The CLI daemon is `.cursor/skills/verify-pie-cli`.
 
-This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify web`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash.** The helper `pie-verify` is Node 24. Source `pie serve` is Node (`node --experimental-transform-types --import ../../tools/node/register-ts-hook.mjs src/node/cli.ts` from `packages/pie`).
+This file is for the next agent, cold. Follow **Launch → Doctor → Drive (feature map) → Evidence → Cleanup**. Canonical path: `.agents/skills/verify-pie`. Cursor / Claude / Codex see the same tree via symlink. The helper is **`pnpm exec pie-verify web`** from the root-installed workspace package `@getpie/verify` (`tools/verify`, Node >= 24). Do not add skill-local TypeScript. **Not Bash.** The helper `pie-verify` is Node 24. The source server is Node (`node --experimental-transform-types --import ../../tools/node/register-ts-hook.mjs ../server/src/http/main.ts` from `packages/pie`).
 
 ## Launch
 
@@ -24,7 +24,7 @@ pnpm exec pie-verify web launch
 Ready when both answer `ok`:
 
 ```bash
-curl -fsS http://127.0.0.1:4180/api/health    # pie serve (IPv4)
+curl -fsS http://127.0.0.1:4180/api/health    # dev server (IPv4)
 curl -fsS http://localhost:4190/api/health    # Vite proxy (listens on [::1]:4190)
 ```
 
@@ -37,9 +37,9 @@ Server stdout also prints `pie:ready {"port":4180}` then `pie listening on http:
 What launch also does:
 
 - Requires **Node >= 24** (`packages/pie` engines). Uses `nvm use 24` when nvm is present, and prepends `NVM_BIN` so a leftover `/exec-daemon/node` (Node 22) does not win.
-- Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.js` is missing. Also builds `@getpie/server` when `dist/pi-process/pi-process.js` is missing — `pie serve` loads TypeScript, but availability still stats that bun-built entry. Other workspace packages export `src/*.ts`.
+- Builds `@getpie/core` via `turbo run build --filter=@getpie/core` when `packages/core/dist/compatibility.js` is missing. Also builds `@getpie/server` when `dist/pi-process/pi-process.js` is missing — the source server loads TypeScript, but availability still stats that bun-built entry. Other workspace packages export `src/*.ts`.
 - Sets `PIE_HOME=/tmp/pie-verify-web/runs/<id>/pie-home` so the run does not touch `~/.pie` or `~/.pie_*`.
-- Starts **foreground `pie serve`** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
+- Starts the **foreground server entry** (`cd packages/pie && pnpm dev`), not `pie` / `pie daemon`. The daemon binds **4000** and gates `/api/ws-ticket` with `PIE_AUTH_TOKEN`.
 - Starts Vite (`cd apps/app && pnpm dev`) with the same `PIE_PORT`.
 - Creates and registers `$PIE_HOME/workspace/verify-pie-sample` (marked `.verify-pie-scaffold`) so ordinary verification starts on a usable draft. `--empty-projects` skips registration only for import-flow and Choose project proofs. The picker stays confined to `$PIE_HOME/workspace` and cannot escape through `..` or symlinks. Sets `PIE_CHAT_PROJECTS_DIR=$PIE_HOME/Pie` so allocate stays in the run. Does not change `HOME` or `~/.pi/agent`.
 - Hits the Vite origin once via `node:http` (`127.0.0.1` / `localhost` / `[::1]`) so TanStack Router can regenerate `routeTree.gen.ts` (the Vite plugin, not `typecheck`, writes that file). Do not use global `fetch` for that warmup.
@@ -169,7 +169,7 @@ One executable for every verify skill: `pie-verify` (`@getpie/verify`, root `dev
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm exec pie-verify web launch` | Isolated serve + Vite. Writes `agent-browser.env` and `/tmp/pie-verify-web/bin/agent-browser`. |
+| `pnpm exec pie-verify web launch` | Isolated dev server + Vite. Writes `agent-browser.env` and `/tmp/pie-verify-web/bin/agent-browser`. |
 | `pnpm exec pie-verify web doctor` | Read-only worth-driving check. |
 | `pnpm exec pie-verify web env [--export]` | Optional dump of the same isolation the shim loads. |
 | `pnpm exec agent-browser` / `agent-browser` | Repo shim: load current run, exec mise `agent-browser`. |
@@ -196,5 +196,5 @@ If 4180/4190 belong to another run, **do not adopt or stop it**. Use another wor
 ## Sibling surfaces
 
 - **Desktop Electron** — `.cursor/skills/verify-pie-desktop` (token daemon, isolated from 4180/4190).
-- **CLI daemon / serve** — `.cursor/skills/verify-pie-cli` (`pie` / `pie daemon` / `pie serve`).
+- **CLI daemon** — `.cursor/skills/verify-pie-cli` (`pie` / `pie daemon`).
 - **Library** — `@getpie/app` mounted by Desktop. No separate UI.

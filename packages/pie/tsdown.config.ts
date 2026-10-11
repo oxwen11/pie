@@ -24,7 +24,9 @@ const shared = {
 export default defineConfig([
   {
     ...shared,
-    entry: ["src/node/cli.ts"],
+    // `server.js` is what the daemon runs; one build lets it share chunks with
+    // `cli.js` instead of shipping a second copy of the server.
+    entry: { cli: "src/node/cli.ts", server: "../server/src/http/main.ts" },
     clean: true,
     // `@getpie/cli#build` waits for `@getpie/app#build`; ship every runtime
     // artifact beside the final CLI so lookup never depends on a repo.

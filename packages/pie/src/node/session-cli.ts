@@ -1328,7 +1328,7 @@ export const mcpCommand = Command.make("mcp", { ...outputFlags }, (input) =>
       endpoint.token ??
       (yield* Effect.fail(
         new Error(
-          "MCP needs the authenticated daemon; `pie serve` has no credential to derive one from",
+          "MCP needs the authenticated daemon; a server without PIE_AUTH_TOKEN has no credential to derive one from",
         ),
       ));
     const url = new URL(MCP_PATH, endpoint.address).href;

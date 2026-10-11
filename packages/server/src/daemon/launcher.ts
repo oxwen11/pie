@@ -43,7 +43,7 @@ export type ResolveDaemonOptions = {
   readonly requiredCompatibilityKey: DaemonCompatibilityKey;
   /**
    * argv that launches the plain foreground server, e.g.
-   * `[process.execPath, ...process.execArgv, cliEntry, "serve"]`. The daemon is
+   * `[process.execPath, ...process.execArgv, serverEntry]`. The daemon is
    * just this command spawned detached — the server stays daemon-unaware.
    */
   readonly serverArgv: readonly string[];
@@ -411,7 +411,7 @@ function openStdioLog(home: string): number {
  * redirected to a log fd — the exact opposite of a supervised
  * `ChildProcessSpawner` child (piped stdio, killed when its scope closes).
  * The daemon must outlive this launcher, so this stays raw `node:child_process`
- * — the local `nohup pie serve > log`.
+ * — the local `nohup node server.js > log`.
  */
 function spawnDetached(options: ResolveDaemonOptions, port: number, token: string): number {
   const { home } = options;

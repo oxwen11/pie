@@ -496,9 +496,6 @@ function summarize(snapshot: SourceSnapshot) {
 }
 
 function daemonPid(meta: ReturnType<typeof readRunMeta>, runDir: string): number {
-  if (meta.surface === "cli" && meta.mode === "serve") {
-    return runtimeListenPid(meta.piePort, readPidFile(path.join(runDir, "pids", "serve.pid")));
-  }
   if (meta.surface === "web") {
     return runtimeListenPid(meta.piePort, readPidFile(path.join(runDir, "pids", "server.pid")));
   }

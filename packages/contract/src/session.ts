@@ -132,6 +132,7 @@ export const sessionContract = {
   interrupt: base
     .meta(mcp.tool({ name: "session_interrupt", description: "Interrupt the in-flight turn" }))
     .input(RefInputSchema),
+  reload: base.input(RefInputSchema),
   respond: base.input(RespondToAgentRequestInputSchema),
   getStatus: base.input(RefInputSchema).output(SessionStatusSchema),
   getSnapshot: base.input(RefInputSchema).output(type<SessionRuntimeSnapshot>()),

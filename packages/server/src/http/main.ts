@@ -10,8 +10,8 @@ import pkg from "../../package.json" with { type: "json" };
 import { runServe, serveFlags } from "./serve";
 
 // The forkable server entry (`dist/server.js`). The desktop supervisor and the
-// local daemon launcher spawn this args-free with config in the environment; it
-// runs the same foreground `serve` body the `pie serve` CLI command does.
+// CLI's daemon launcher spawn this args-free with config in the environment.
+// Development and tests run it directly as a foreground server.
 const server = Command.make("pie-server", serveFlags, runServe).pipe(
   Command.withDescription("Pie server"),
 );

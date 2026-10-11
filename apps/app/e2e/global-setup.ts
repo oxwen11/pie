@@ -9,7 +9,7 @@ import { DEFAULT_E2E_REPLY, e2ePiProcessEnv } from "@getpie/test/seed-e2e-pi-age
 
 const fromHere = (relative: string) => url.fileURLToPath(new URL(relative, import.meta.url));
 
-const cliEntry = fromHere("../../../packages/pie/src/node/cli.ts");
+const serverEntry = fromHere("../../../packages/server/src/http/main.ts");
 const sourceHook = fromHere("../../../tools/node/register-ts-hook.mjs");
 const fakeGh = fakeGhPath;
 
@@ -39,11 +39,11 @@ function waitReady(child: childProcess.ChildProcess, timeoutMs = 45_000): Promis
   return new Promise((resolve, reject) => {
     let output = "";
     const timer = setTimeout(() => {
-      reject(new Error(`pie serve never became ready:\n${output}`));
+      reject(new Error(`server never became ready:\n${output}`));
     }, timeoutMs);
     const onExit = (code: number | null) => {
       clearTimeout(timer);
-      reject(new Error(`pie serve exited with ${code}:\n${output}`));
+      reject(new Error(`server exited with ${code}:\n${output}`));
     };
     const scan = (chunk: Buffer) => {
       output += chunk.toString();
@@ -97,8 +97,7 @@ export default async function setup({
       "--disable-warning=ExperimentalWarning",
       "--import",
       sourceHook,
-      cliEntry,
-      "serve",
+      serverEntry,
     ],
     {
       env,

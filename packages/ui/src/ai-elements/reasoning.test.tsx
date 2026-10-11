@@ -64,7 +64,9 @@ describe("Reasoning trigger", () => {
     );
     expect(node.querySelector(".lucide-chevron-down")).toBeNull();
 
-    await trigger.click();
+    // In-page click: a provider click needs ~25 CDP round trips through the shared Vitest
+    // process, which stalls for seconds while the app projects start on CI (#444).
+    node.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await expect.element(trigger).toHaveAttribute("aria-expanded", "true");
   });
 

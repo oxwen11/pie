@@ -23,7 +23,6 @@ export type WebRunMeta = RunMetaBase & {
 
 export type CliRunMeta = RunMetaBase & {
   surface: "cli";
-  mode: "daemon" | "serve";
   address?: string;
   daemonPid?: number;
 };
@@ -144,7 +143,6 @@ export function initialMeta(ctx: LaunchCtx): RunMeta {
       return {
         ...base,
         surface: "cli",
-        mode: ctx.request.mode ?? "daemon",
       };
     case "desktop":
       return {
@@ -175,14 +173,9 @@ function parseWeb(data: Record<string, unknown>, file: string): WebRunMeta {
 }
 
 function parseCli(data: Record<string, unknown>, file: string): CliRunMeta {
-  const mode = str(data, "mode", file);
-  if (mode !== "daemon" && mode !== "serve") {
-    throw new TypeError(`invalid mode in ${file}`);
-  }
   return {
     ...parseBase(data, file),
     surface: "cli",
-    mode,
     address: optStr(data, "address", file),
     daemonPid: optInt(data, "daemonPid", file),
   };
