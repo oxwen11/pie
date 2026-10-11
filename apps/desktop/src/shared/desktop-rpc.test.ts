@@ -45,6 +45,7 @@ describe("desktop RPC schemas", () => {
         hostname: "mac-mini",
         sshClient: { available: true },
         tailscaleClient: { available: true },
+        cliAvailable: false,
         environments: {
           revision: 0,
           connecting: [],
@@ -58,6 +59,7 @@ describe("desktop RPC schemas", () => {
       hostname: "mac-mini",
       sshClient: { available: true },
       tailscaleClient: { available: true },
+      cliAvailable: false,
       environments: {
         revision: 0,
         connecting: [],
