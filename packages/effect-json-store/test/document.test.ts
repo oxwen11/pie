@@ -23,6 +23,25 @@ it.effect("seeds a missing file with defaults immediately, creating parent direc
   ),
 );
 
+it.effect("does not create a missing file when seeding is disabled", () =>
+  withTmp((dir) =>
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const file = path.join(dir, "config.json");
+      const store = yield* makeJsonDocument({
+        path: file,
+        schema,
+        defaults,
+        seedMissing: false,
+      });
+      assert.deepEqual(yield* store.get, defaults);
+      assert.equal(yield* fs.exists(file), false);
+      yield* store.set({ theme: "dark", count: 1 });
+      assert.equal(yield* fs.exists(file), true);
+    }),
+  ),
+);
+
 it.effect("set persists atomically and a reopened store reads the value back", () =>
   withTmp((dir) =>
     Effect.gen(function* () {

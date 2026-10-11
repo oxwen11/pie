@@ -63,6 +63,7 @@ export const makeFileCodec = (
   schema: AnySchema,
   migrations: ReadonlyArray<MigrationStep<AnySchema>>,
   legacy?: MigrationStep<AnySchema>,
+  mode?: number,
 ): FileCodec => {
   const latestVersion = migrations.length + 1;
 
@@ -77,7 +78,7 @@ export const makeFileCodec = (
         try: () => `${JSON.stringify(envelope, null, 2)}\n`,
         catch: (cause) => cause,
       });
-      yield* writeFileAtomic(fs, file, text);
+      yield* writeFileAtomic(fs, file, text, mode === undefined ? undefined : { mode });
     },
     (effect, file) =>
       effect.pipe(Effect.mapError((cause) => new JsonStoreWriteError({ file, cause }))),

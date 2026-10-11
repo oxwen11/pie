@@ -104,7 +104,12 @@ export function ConnectionSwitcher(): ReactElement | null {
               {environments.remotes.length > 0 || environments.connecting.length > 0 ? (
                 <MenuSeparator />
               ) : null}
-              {launch.available ? (
+              {environments.hostsError === undefined ? null : (
+                <MenuItem disabled title={environments.hostsError}>
+                  <span>{environments.hostsError}</span>
+                </MenuItem>
+              )}
+              {environments.hostsError !== undefined ? null : launch.available ? (
                 <MenuItem
                   disabled={blocking}
                   onClick={() => {
