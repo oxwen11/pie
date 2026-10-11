@@ -63,6 +63,43 @@ describe("DesktopCli", () => {
     expect(fs.existsSync(path.join(home, ".zshrc"))).toBe(false);
   });
 
+  it("appends to the bash login file that already exists", async () => {
+    const profileOnly = setup({ shell: "/bin/bash" });
+    fs.writeFileSync(path.join(profileOnly.home, ".profile"), "echo from-profile\n");
+    await profileOnly.run(profileOnly.cli.install);
+    expect(fs.existsSync(path.join(profileOnly.home, ".bash_profile"))).toBe(false);
+    expect(fs.existsSync(path.join(profileOnly.home, ".bash_login"))).toBe(false);
+    expect(fs.readFileSync(path.join(profileOnly.home, ".profile"), "utf8")).toBe(
+      'echo from-profile\n\n# Added by Pie Desktop for the pie command\nexport PATH="$HOME/.local/bin:$PATH"\n',
+    );
+
+    const loginOnly = setup({ shell: "/bin/bash" });
+    fs.writeFileSync(path.join(loginOnly.home, ".bash_login"), "echo from-login\n");
+    await loginOnly.run(loginOnly.cli.install);
+    expect(fs.existsSync(path.join(loginOnly.home, ".bash_profile"))).toBe(false);
+    expect(fs.readFileSync(path.join(loginOnly.home, ".bash_login"), "utf8")).toContain(
+      "# Added by Pie Desktop for the pie command",
+    );
+
+    const profileFirst = setup({ shell: "/bin/bash" });
+    fs.writeFileSync(path.join(profileFirst.home, ".bash_profile"), "echo from-bash-profile\n");
+    fs.writeFileSync(path.join(profileFirst.home, ".profile"), "echo from-profile\n");
+    await profileFirst.run(profileFirst.cli.install);
+    expect(fs.readFileSync(path.join(profileFirst.home, ".bash_profile"), "utf8")).toContain(
+      "# Added by Pie Desktop for the pie command",
+    );
+    expect(fs.readFileSync(path.join(profileFirst.home, ".profile"), "utf8")).toBe(
+      "echo from-profile\n",
+    );
+
+    const none = setup({ shell: "/bin/bash" });
+    await none.run(none.cli.install);
+    expect(fs.readFileSync(path.join(none.home, ".bash_profile"), "utf8")).toContain(
+      "# Added by Pie Desktop for the pie command",
+    );
+    expect(fs.existsSync(path.join(none.home, ".profile"))).toBe(false);
+  });
+
   it("writes fish's config and reports an unknown shell as not on PATH", async () => {
     const fish = setup({ shell: "/opt/homebrew/bin/fish" });
     await fish.run(fish.cli.install);

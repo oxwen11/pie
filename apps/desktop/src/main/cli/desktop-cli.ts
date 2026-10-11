@@ -46,19 +46,29 @@ export function disabledDesktopCli(): DesktopCli["Service"] {
 const PATH_LINE = 'export PATH="$HOME/.local/bin:$PATH"';
 const LOCAL_BIN = ".local/bin";
 
-/** The startup file Install edits for each supported login shell. */
+/**
+ * Startup files Install may edit, in the order a login shell reads them.
+ * The first file that exists is the one that gets the PATH line. Bash lists
+ * `~/.bash_profile`, `~/.bash_login`, then `~/.profile`: a login shell reads
+ * only the first of those that exists, so creating `~/.bash_profile` when
+ * one of the later files is already there would stop that file from loading.
+ * When none of them exist, Install creates the first.
+ */
 export function shellProfile(
   shell: string | undefined,
   home: string,
-): { readonly file: string; readonly line: string } | undefined {
+): { readonly files: readonly string[]; readonly line: string } | undefined {
   switch (path.basename(shell ?? "")) {
     case "zsh":
-      return { file: path.join(home, ".zshrc"), line: PATH_LINE };
+      return { files: [path.join(home, ".zshrc")], line: PATH_LINE };
     case "bash":
-      return { file: path.join(home, ".bash_profile"), line: PATH_LINE };
+      return {
+        files: [".bash_profile", ".bash_login", ".profile"].map((name) => path.join(home, name)),
+        line: PATH_LINE,
+      };
     case "fish":
       return {
-        file: path.join(home, ".config", "fish", "config.fish"),
+        files: [path.join(home, ".config", "fish", "config.fish")],
         line: "fish_add_path $HOME/.local/bin",
       };
     default:
@@ -80,6 +90,16 @@ export function makeDesktopCli(input: {
     const link = path.join(binDir, "pie");
     const pathDirs = (input.env.PATH ?? "").split(path.delimiter).filter((dir) => dir !== "");
     const profile = shellProfile(input.env.SHELL, home);
+    const resolvedProfile = Effect.gen(function* () {
+      if (profile === undefined) return undefined;
+      for (const file of profile.files) {
+        if (yield* fs.exists(file).pipe(Effect.orElseSucceed(() => false))) {
+          return { file, line: profile.line };
+        }
+      }
+      const file = profile.files[0];
+      return file === undefined ? undefined : { file, line: profile.line };
+    });
     const tilde = (pathname: string) =>
       pathname.startsWith(`${home}/`) ? `~${pathname.slice(home.length)}` : pathname;
     const conflictMessage = `${tilde(link)} already exists and is not a symlink. Remove it, then install again.`;
@@ -99,13 +119,16 @@ export function makeDesktopCli(input: {
       ),
     );
 
-    const profileMentionsBin =
-      profile === undefined
-        ? Effect.succeed(false)
-        : fs.readFileString(profile.file).pipe(
-            Effect.map((content) => content.includes(LOCAL_BIN)),
-            Effect.orElseSucceed(() => false),
-          );
+    const profileMentionsBin = resolvedProfile.pipe(
+      Effect.flatMap((chosen) =>
+        chosen === undefined
+          ? Effect.succeed(false)
+          : fs.readFileString(chosen.file).pipe(
+              Effect.map((content) => content.includes(LOCAL_BIN)),
+              Effect.orElseSucceed(() => false),
+            ),
+      ),
+    );
 
     /** Another `pie` that the login PATH reaches before `~/.local/bin`. */
     const shadowingPie = Effect.gen(function* () {
@@ -152,14 +175,15 @@ export function makeDesktopCli(input: {
       yield* fs.symlink(script, temporary);
       yield* fs.rename(temporary, link);
 
-      if (profile !== undefined && !pathDirs.includes(binDir)) {
-        const content = yield* fs.readFileString(profile.file).pipe(Effect.orElseSucceed(() => ""));
+      const chosen = yield* resolvedProfile;
+      if (chosen !== undefined && !pathDirs.includes(binDir)) {
+        const content = yield* fs.readFileString(chosen.file).pipe(Effect.orElseSucceed(() => ""));
         if (!content.includes(LOCAL_BIN)) {
-          yield* fs.makeDirectory(path.dirname(profile.file), { recursive: true });
+          yield* fs.makeDirectory(path.dirname(chosen.file), { recursive: true });
           const separator = content === "" || content.endsWith("\n") ? "" : "\n";
           yield* fs.writeFileString(
-            profile.file,
-            `${separator}\n# Added by Pie Desktop for the pie command\n${profile.line}\n`,
+            chosen.file,
+            `${separator}\n# Added by Pie Desktop for the pie command\n${chosen.line}\n`,
             { flag: "a" },
           );
         }
