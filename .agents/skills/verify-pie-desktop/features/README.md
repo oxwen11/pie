@@ -10,5 +10,6 @@ Primary surface: Electron window hosting `@getpie/app`. Harness: Playwright e2e 
 | Import a local folder | [import-project.md](import-project.md) | `launch --replace --empty-projects` → empty draft **Import project** |
 | Server status overlay | [server-status-overlay.md](server-status-overlay.md) | Daemon dies or reconnects |
 | Attach to an existing daemon | [daemon-attach.md](daemon-attach.md) | Second desktop / CLI with the same `PIE_HOME` |
+| Install the pie command | [pie-command.md](pie-command.md) | Packaged build → Settings → **Command line** |
 
 Web-only Vite proofs belong in `.cursor/skills/verify-pie`. CLI-only daemon proofs belong in `.cursor/skills/verify-pie-cli`.

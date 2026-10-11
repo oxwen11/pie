@@ -2,6 +2,7 @@ import { Effect, Layer, Scope } from "effect";
 import { app } from "electron";
 
 import { DesktopApplication, makeDesktopApplication } from "./application/desktop-application";
+import { DesktopCli } from "./cli/desktop-cli";
 import { RendererChannel, makeRendererChannel } from "./electron/renderer-channel";
 import { makeDesktopRpcServer } from "./rpc/desktop-rpc-server";
 import { LocalServer } from "./server/local-server";
@@ -20,12 +21,14 @@ export const DesktopApplicationLive = Layer.effect(
     const server = yield* LocalServer;
     const ssh = yield* DesktopSsh;
     const tailscale = yield* DesktopTailscale;
+    const cli = yield* DesktopCli;
     const savedRemotes = yield* ssh.listSaved;
     const scope = yield* Scope.Scope;
     const application = makeDesktopApplication({
       server,
       ssh,
       tailscale,
+      cli,
       quit: Effect.sync(() => {
         setTimeout(() => app.quit(), 0);
       }),

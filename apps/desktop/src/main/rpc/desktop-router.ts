@@ -77,6 +77,17 @@ export function makeDesktopRouter(application: DesktopApplication["Service"]) {
         yield* application.disableTailscaleServe.pipe(Effect.mapError(rpcUserError));
       }),
     },
+    cli: {
+      status: orpc.cli.status.effect(function* () {
+        return yield* application.cliStatus;
+      }),
+      install: orpc.cli.install.effect(function* () {
+        return yield* application.installCli.pipe(Effect.mapError(rpcUserError));
+      }),
+      uninstall: orpc.cli.uninstall.effect(function* () {
+        return yield* application.uninstallCli.pipe(Effect.mapError(rpcUserError));
+      }),
+    },
     app: {
       quit: orpc.app.quit.effect(function* () {
         yield* application.quit;
