@@ -133,6 +133,15 @@ export function createDesktopHost(
       enableServe: () => client.tailscale.enableServe(),
       disableServe: () => client.tailscale.disableServe(),
     },
+    ...(bootstrap.cliAvailable
+      ? {
+          cli: {
+            status: () => client.cli.status(),
+            install: () => client.cli.install(),
+            uninstall: () => client.cli.uninstall(),
+          },
+        }
+      : undefined),
   };
   const platform: Platform =
     bootstrap.os === "macos"

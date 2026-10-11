@@ -1,5 +1,5 @@
 import { Cause, Context, Effect, Option, Redacted, Scope } from "effect";
-import { Command, Flag } from "effect/cli";
+import { Flag } from "effect/cli";
 
 import {
   npmPackageVersion,
@@ -251,7 +251,3 @@ const serveWith = (input: ServeInput) =>
 
     return yield* Effect.never;
   });
-
-export const serve = Command.make("serve", serveFlags, runServe).pipe(
-  Command.withDescription("Start the pie local server"),
-);

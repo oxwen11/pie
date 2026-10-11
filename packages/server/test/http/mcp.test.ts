@@ -276,7 +276,7 @@ describe("external MCP door", () => {
     expect(afterRun.map((session) => session.sessionId)).toContain(ran.ref.sessionId);
   }, 60_000);
 
-  it("under pie serve (no daemon token) accepts only a per-process token", async () => {
+  it("without a daemon token accepts only a per-process token", async () => {
     process.env.PIE_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "pie-home-mcp-serve-"));
     const { createServer } = await import("../../src/http/server");
     const started = await createServer({

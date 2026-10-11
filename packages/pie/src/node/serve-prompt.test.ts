@@ -6,7 +6,7 @@ import path from "node:path";
 import { createPieClient } from "@getpie/client";
 import { afterEach, describe, expect, it } from "vitest";
 
-const cliBin = path.join(import.meta.dirname, "../../dist/cli.js");
+const serverBin = path.join(import.meta.dirname, "../../dist/server.js");
 
 const FAKE = `#!/usr/bin/env node
 const bridge = process.env.PIE_SESSION_BRIDGE_URL;
@@ -54,12 +54,12 @@ async function waitForReady(child: childProcess.ChildProcess): Promise<number> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     const timer = setTimeout(() => {
-      reject(new Error(`pie serve did not start: ${Buffer.concat(chunks).toString("utf8")}`));
+      reject(new Error(`server.js did not start: ${Buffer.concat(chunks).toString("utf8")}`));
     }, 15000);
     const onExit = (code: number | null) => {
       clearTimeout(timer);
       reject(
-        new Error(`pie serve exited ${String(code)}: ${Buffer.concat(chunks).toString("utf8")}`),
+        new Error(`server.js exited ${String(code)}: ${Buffer.concat(chunks).toString("utf8")}`),
       );
     };
     const onData = (data: Buffer) => {
@@ -79,7 +79,7 @@ async function waitForReady(child: childProcess.ChildProcess): Promise<number> {
   });
 }
 
-describe("shipped pie serve prompt", () => {
+describe("shipped server prompt", () => {
   const children: childProcess.ChildProcess[] = [];
 
   afterEach(() => {
@@ -87,7 +87,7 @@ describe("shipped pie serve prompt", () => {
     children.length = 0;
   });
 
-  it("listModels and pairing prompt work from dist/cli.js", { timeout: 30_000 }, async () => {
+  it("listModels and pairing prompt work from dist/server.js", { timeout: 30_000 }, async () => {
     const fakeDir = fs.mkdtempSync(path.join(os.tmpdir(), "fake-pi-serve-"));
     const fakePi = path.join(fakeDir, "fake-pi.js");
     fs.writeFileSync(fakePi, FAKE);
@@ -97,7 +97,7 @@ describe("shipped pie serve prompt", () => {
     const token = "serve-token-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const child = childProcess.spawn(
       process.execPath,
-      [cliBin, "serve", "--port", "0", "--host", "127.0.0.1"],
+      [serverBin, "--port", "0", "--host", "127.0.0.1"],
       {
         env: {
           PATH: process.env.PATH,

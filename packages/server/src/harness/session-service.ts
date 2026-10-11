@@ -147,6 +147,9 @@ export type PiAgentSessionServiceShape = {
   readonly interrupt: (
     ref: SessionRef,
   ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
+  readonly reload: (
+    ref: SessionRef,
+  ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
   readonly replaceQueue: (
     input: ReplaceQueueInput,
   ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
@@ -699,6 +702,15 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         readMetadata(ref).pipe(
           Effect.andThen(manager.peek(ref)),
           Effect.flatMap((runtime) => runtime?.interrupt ?? Effect.void),
+          inSession(ref),
+        ),
+
+      reload: (ref: SessionRef) =>
+        readMetadata(ref).pipe(
+          Effect.andThen(manager.peek(ref)),
+          // Nothing live reads fresh settings on its next spawn anyway, so an
+          // idle session reloads as a no-op instead of starting a process.
+          Effect.flatMap((runtime) => runtime?.reload ?? Effect.void),
           inSession(ref),
         ),
 

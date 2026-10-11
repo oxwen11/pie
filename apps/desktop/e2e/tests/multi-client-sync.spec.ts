@@ -11,7 +11,7 @@ import { PROJECT_ID, seedProject } from "./fixtures.js";
 
 /**
  * Browser-mode multi-client session sync. Unlike the Electron spec, this
- * drives `pie serve` (the daemon's foreground form) plus two ordinary
+ * drives the server entry in the foreground plus two ordinary
  * browser pages on the same session — the shape multi-client sync exists for.
  *
  * Turns go through the real pie-pi-process with the seeded e2e provider
@@ -47,8 +47,7 @@ test.beforeAll(async ({}, testInfo) => {
       "--disable-warning=ExperimentalWarning",
       "--import",
       path.join(repoRoot, "tools/node/register-ts-hook.mjs"),
-      path.join(repoRoot, "packages/pie/src/node/cli.ts"),
-      "serve",
+      path.join(repoRoot, "packages/server/src/http/main.ts"),
     ],
     {
       env: {
@@ -65,7 +64,7 @@ test.beforeAll(async ({}, testInfo) => {
   baseUrl = await new Promise<string>((resolve, reject) => {
     let output = "";
     const timeout = setTimeout(
-      () => reject(new Error(`pie serve never became ready:\n${output}`)),
+      () => reject(new Error(`server never became ready:\n${output}`)),
       30_000,
     );
     const scan = (chunk: Buffer) => {
@@ -81,7 +80,7 @@ test.beforeAll(async ({}, testInfo) => {
     server?.stderr.on("data", scan);
     server?.once("exit", (code) => {
       clearTimeout(timeout);
-      reject(new Error(`pie serve exited with ${code}:\n${output}`));
+      reject(new Error(`server exited with ${code}:\n${output}`));
     });
   });
 });

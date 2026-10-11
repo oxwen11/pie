@@ -35,7 +35,7 @@ export type RequestAppOptions = {
   readonly registerElectron: ((registration: ElectronRegistration) => void) | undefined;
   /**
    * MCP door, always mounted. `token` is the bearer derived from the daemon
-   * token for `pie mcp`; it is undefined without one (`pie serve`), where only
+   * token for `pie mcp`; it is undefined without one (a dev/test server), where only
    * the per-process tokens issued to in-process Pi are accepted.
    */
   readonly mcp: { readonly token: string | undefined; readonly context: RpcContext };

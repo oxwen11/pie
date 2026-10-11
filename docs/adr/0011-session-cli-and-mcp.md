@@ -27,7 +27,7 @@ pull-request services. Neither door owns a store.
   deleted through CLI, oRPC, or MCP; archive is the only way to put one away.
 - `pie mcp` prints a bearer derived from the daemon token. It is not the daemon
   credential, so it opens `/mcp` and nothing under `/api/`.
-  Under `pie serve` there is no daemon token: `/mcp` is still mounted but accepts only the
+  A server started without `PIE_AUTH_TOKEN` (development and tests) has no daemon token: `/mcp` is still mounted but accepts only the
   per-process tokens issued to in-process Pi, and `pie mcp` has nothing to derive.
 - `tools/list` publishes each tool's input schema (Effect Schema through
   `EffectSchemaToJsonSchemaConverter`). A model has no other way to learn the arguments.
@@ -97,7 +97,7 @@ transcript text.
   They also cover the binding: a bearer issued to a spawned Pi child links PRs to
   that Session without a `ref`, and cannot link, exclude or list for another.
 - Extend `packages/pie/src/node/session-cli.test.ts`, which already starts
-  isolated `pie serve` with `PIE_E2E_PI_EXECUTABLE` pointing at
+  an isolated foreground server with `PIE_E2E_PI_EXECUTABLE` pointing at
   `tools/test/fake-pi.js`. Cover `--from`, delivery, queue replace, `pie ls`,
   archive and unarchive, PR link, schedule run, and project
   create. Run `pnpm --filter @getpie/cli test` for that file.
