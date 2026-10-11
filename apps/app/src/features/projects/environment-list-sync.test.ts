@@ -22,11 +22,11 @@ function fakeLink(calls: Call[], subscriptions: Subscription[]): ClientLink<PieC
     call: async (path, _input, options) => {
       const joined = path.join(".");
       calls.push({ environmentId: options.context?.environmentId, path: joined });
-      if (joined === "project.list") {
+      if (joined === "project.ls") {
         return [{ id: "project-1", name: "Pie", path: "/tmp/pie" }];
       }
-      if (joined === "agent.session.list") return [];
-      if (joined === "agent.session.subscribe") {
+      if (joined === "session.ls") return [];
+      if (joined === "session.subscribe") {
         subscriptions.push({
           environmentId: options.context?.environmentId,
           signal: options.signal,
@@ -69,10 +69,10 @@ describe("createEnvironmentListSync", () => {
     await vi.waitFor(() => {
       expect(calls).toEqual(
         expect.arrayContaining([
-          { environmentId: "env-local", path: "project.list" },
-          { environmentId: "env-local", path: "agent.session.list" },
-          { environmentId: "env-remote", path: "project.list" },
-          { environmentId: "env-remote", path: "agent.session.list" },
+          { environmentId: "env-local", path: "project.ls" },
+          { environmentId: "env-local", path: "session.ls" },
+          { environmentId: "env-remote", path: "project.ls" },
+          { environmentId: "env-remote", path: "session.ls" },
         ]),
       );
     });

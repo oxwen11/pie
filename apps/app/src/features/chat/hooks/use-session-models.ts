@@ -11,16 +11,16 @@ export function useSessionModels(ref: SessionRef) {
     orpcQueryUtils.agent.listModels.queryOptions({ input: { projectId: ref.projectId } }),
   );
   const stateQuery = useQuery(
-    orpcQueryUtils.agent.session.getModelState.queryOptions({ input: { ref } }),
+    orpcQueryUtils.session.getModelState.queryOptions({ input: { ref } }),
   );
 
   const setModel = useMutation({
-    mutationKey: orpcQueryUtils.agent.session.setModel.key(),
+    mutationKey: orpcQueryUtils.session.model.key(),
     mutationFn: ({ provider, modelId }: { provider: string; modelId: string }) =>
-      orpcQueryUtils.agent.session.setModel.call({ ref, provider, modelId }),
+      orpcQueryUtils.session.model.call({ ref, provider, modelId }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
-        queryKey: orpcQueryUtils.agent.session.getModelState.key({ input: { ref } }),
+        queryKey: orpcQueryUtils.session.getModelState.key({ input: { ref } }),
       });
       void queryClient.invalidateQueries({
         queryKey: orpcQueryUtils.agent.listModels.queryOptions({

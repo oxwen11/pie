@@ -25,7 +25,7 @@ import { useCatalogOrpc } from "@/lib/environment-orpc";
  *
  * The server publishes `session.renamed` only after the title is durable. Both
  * the global subscriber and this initiating mutation invalidate the lists, so
- * `session.list` remains the single source of truth.
+ * `session.ls` remains the single source of truth.
  */
 export function RenameSessionDialog({
   session,
@@ -42,9 +42,9 @@ export function RenameSessionDialog({
   const title = draft.trim();
 
   const rename = useMutation({
-    mutationKey: orpcQueryUtils.agent.session.rename.key(),
+    mutationKey: orpcQueryUtils.session.rename.key(),
     mutationFn: (nextTitle: string) =>
-      orpcQueryUtils.agent.session.rename.call({
+      orpcQueryUtils.session.rename.call({
         ref: {
           projectId: session.projectId,
           sessionId: session.sessionId,
@@ -53,7 +53,7 @@ export function RenameSessionDialog({
       }),
     onSuccess: (_result, nextTitle) => {
       for (const archived of [false, true]) {
-        const queryKey = orpcQueryUtils.agent.session.list.queryOptions({
+        const queryKey = orpcQueryUtils.session.ls.queryOptions({
           input: { projectId: session.projectId, archived },
         }).queryKey;
         queryClient.setQueryData<ReadonlyArray<SessionSummary>>(queryKey, (previous) =>

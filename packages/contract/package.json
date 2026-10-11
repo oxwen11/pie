@@ -34,6 +34,7 @@
     "@orpc/experimental-effect": "catalog:orpc",
     "ai": "catalog:",
     "effect": "catalog:effect",
+    "orpc-mcp": "0.1.3",
     "zod": "catalog:"
   },
   "devDependencies": {

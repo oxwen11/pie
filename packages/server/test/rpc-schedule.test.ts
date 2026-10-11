@@ -32,13 +32,13 @@ describe("schedule router", () => {
       const paused = await h.client.schedule.update({ id: created.id, enabled: false });
       expect(paused.enabled).toBe(false);
 
-      const fired = await h.client.schedule.runNow({ id: created.id });
+      const fired = await h.client.schedule.run({ id: created.id });
       expect(fired.ref?.projectId).toBe(project.id);
       expect(["running", "succeeded"]).toContain(fired.schedule.lastRunStatus);
       expect(fired.schedule.runs[0]?.reason).toBe("manual");
       expect(fired.schedule.runs[0]?.snapshot?.prompt).toBe("Summarize what changed yesterday.");
 
-      const sessions = await h.client.agent.session.list({
+      const sessions = await h.client.session.ls({
         projectId: project.id,
         archived: false,
       });
@@ -73,10 +73,10 @@ describe("schedule router", () => {
       expect(modeled.provider).toBe("anthropic");
       expect(modeled.modelId).toBe("claude-sonnet-4-5");
 
-      await h.client.schedule.delete({ id: created.id });
+      await h.client.schedule.rm({ id: created.id });
       await expect(h.client.schedule.list()).resolves.toEqual([]);
       if (fired.ref !== undefined) {
-        await h.client.agent.session.close({ ref: fired.ref });
+        await h.client.session.close({ ref: fired.ref });
       }
     } finally {
       await h.dispose();
@@ -101,14 +101,14 @@ describe("schedule router", () => {
       expect(created.firedCount).toBe(1);
       expect(created.pauseReason).toBe("max_runs");
       expect(created.enabled).toBe(false);
-      const sessions = await h.client.agent.session.list({
+      const sessions = await h.client.session.ls({
         projectId: project.id,
         archived: false,
       });
       expect(sessions).toHaveLength(1);
       expect(created.lastSessionId).toBe(sessions[0]?.sessionId);
       if (created.lastSessionId !== undefined) {
-        await h.client.agent.session.close({
+        await h.client.session.close({
           ref: { projectId: project.id, sessionId: created.lastSessionId },
         });
       }

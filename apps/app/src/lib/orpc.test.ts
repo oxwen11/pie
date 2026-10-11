@@ -19,12 +19,12 @@ describe("createEnvironmentOrpc", () => {
   it("keeps cache policy on the query client instead of per-query options", () => {
     const { queryClient, orpc } = createTestOrpc();
 
-    expect(orpc.project.list.key()[0]).toBe("env-a");
+    expect(orpc.project.ls.key()[0]).toBe("env-a");
     expect(queryClient.getDefaultOptions().queries).toMatchObject({
       staleTime: Infinity,
       refetchOnWindowFocus: "always",
     });
-    expect(queryClient.getQueryDefaults(orpc.agent.session.list.key()).staleTime).toBe(30_000);
+    expect(queryClient.getQueryDefaults(orpc.session.ls.key()).staleTime).toBe(30_000);
     expect(queryClient.getQueryDefaults(orpc.agent.listModels.key())).toMatchObject({
       refetchOnWindowFocus: false,
       meta: { errorMode: "inline" },
@@ -43,9 +43,7 @@ describe("createEnvironmentOrpc", () => {
     expect(queryClient.getQueryDefaults(orpc.pullRequest.diff.key())).toMatchObject(
       pullRequestDefaults,
     );
-    expect(queryClient.getQueryDefaults(orpc.pullRequest.statuses.key())).toMatchObject(
-      pullRequestDefaults,
-    );
+    expect(queryClient.getQueryDefaults(orpc.pr.ls.key())).toMatchObject(pullRequestDefaults);
     expect(queryClient.getQueryDefaults(orpc.pullRequest.list.key())).toMatchObject(
       pullRequestDefaults,
     );
@@ -69,6 +67,6 @@ describe("createEnvironmentOrpc", () => {
       retry: false,
       meta: { errorMode: "inline" },
     });
-    expect(queryClient.getQueryDefaults(orpc.project.list.key()).meta).toBeUndefined();
+    expect(queryClient.getQueryDefaults(orpc.project.ls.key()).meta).toBeUndefined();
   });
 });

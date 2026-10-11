@@ -26,8 +26,8 @@ EnvironmentRpc
 ```ts
 const orpc = environmentRpc.for(environmentId);
 
-await orpc.agent.session.prepare.call({ ref });
-useQuery(orpc.project.list.queryOptions());
+await orpc.session.prepare.call({ ref });
+useQuery(orpc.project.ls.queryOptions());
 ```
 
 Each cached oRPC proxy is stateless. Its client interceptor adds the immutable `environmentId` to every direct, query, mutation, and streaming call. `DynamicLink` reads that operation-local context and resolves the current WebSocket link. TanStack's native `prefix: environmentId` isolates identical procedures in the shared cache.
@@ -49,8 +49,8 @@ The daemon UUID—not SSH alias, hostname, project, or session—is the routing 
 
 Each connected Environment owns one worker. It opens the global session stream before fetching the baseline, then:
 
-1. fetches `project.list`;
-2. fetches active `agent.session.list` for every project;
+1. fetches `project.ls`;
+2. fetches active `session.ls` for every project;
 3. applies session events to that Environment's prefixed list keys;
 4. retries the stream with backoff until removed.
 
@@ -68,6 +68,14 @@ Non-React consumers use the same registry directly:
 - list synchronization: one worker per connected Environment.
 
 Provider remounting is not a routing mechanism. The global `QueryClient` never changes.
+
+## Compatibility
+
+The procedure names above follow [ADR 0011](0011-session-cli-and-mcp.md), which renamed
+the session, project and schedule procedures with no aliases. A Desktop and a remote
+daemon on opposite sides of that rename cannot talk to each other: every renamed call
+fails. SSH environments run the `pie` on the remote PATH without a version check, so a
+remote must be upgraded together with the Desktop. This break is accepted.
 
 ## Verification
 

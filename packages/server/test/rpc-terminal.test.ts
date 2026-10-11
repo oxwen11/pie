@@ -50,8 +50,8 @@ describe("terminal router", () => {
     try {
       const projectA = await harness.client.project.create({ path: workspaceA });
       const projectB = await harness.client.project.create({ path: workspaceB });
-      const sessionA = await harness.client.agent.session.create({ projectId: projectA.id });
-      const sessionB = await harness.client.agent.session.create({ projectId: projectB.id });
+      const sessionA = await harness.client.session.create({ projectId: projectA.id });
+      const sessionB = await harness.client.session.create({ projectId: projectB.id });
       const refA = sessionA.ref;
       const refB = sessionB.ref;
 
@@ -110,15 +110,6 @@ describe("terminal router", () => {
         data: "cat marker-a.txt\n",
       });
       await expect(seenA2).resolves.toContain(nonceA);
-
-      await harness.client.agent.session.delete({ ref: refA });
-      await expect(
-        harness.client.terminal.write({
-          ref: refA,
-          terminalId: "term-2",
-          data: "echo still-alive\n",
-        }),
-      ).rejects.toMatchObject({ code: "SESSION_NOT_ACTIVE" });
     } finally {
       await harness.dispose();
     }

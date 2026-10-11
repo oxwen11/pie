@@ -1,7 +1,7 @@
-import { Effect, Option, type FileSystem } from "effect";
+import { Effect, type FileSystem } from "effect";
 
 import { AgentUnavailable } from "../harness/errors";
-import { PiSessionTools, type PiAgentShape, type SessionInfoResult } from "../harness/pi-port";
+import type { PiAgentShape, SessionInfoResult } from "../harness/pi-port";
 import type { PiProcess } from "./process";
 import { persistDefaultPiModel } from "./resolve-default-model";
 import { checkPiAvailability } from "./resolve-executable";
@@ -22,21 +22,10 @@ export const makePiAgent = (
       : new AgentUnavailable({ reason: checked.reason ?? "Unavailable" });
     const gate = <A, E, R>(body: Effect.Effect<A, E, R>) =>
       blocked === undefined ? body : Effect.fail(blocked);
-    const tools = Effect.serviceOption(PiSessionTools).pipe(Effect.map(Option.getOrUndefined));
 
     return {
-      create: (input) =>
-        gate(
-          Effect.flatMap(tools, (sessionTools) =>
-            createPiAgentRuntime(piProcess, input, sessionTools),
-          ),
-        ),
-      resume: (input) =>
-        gate(
-          Effect.flatMap(tools, (sessionTools) =>
-            resumePiAgentRuntime(piProcess, input, sessionTools),
-          ),
-        ),
+      create: (input) => gate(createPiAgentRuntime(piProcess, input)),
+      resume: (input) => gate(resumePiAgentRuntime(piProcess, input)),
       readSession: (agentSessionId, cwd) => readPiSessionFile(agentSessionId, cwd),
       setDefaultModel: (provider, modelId) =>
         Effect.tryPromise({

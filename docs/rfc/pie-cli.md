@@ -6,9 +6,10 @@ use `pie --help` and each command's `--help` for the implemented surface.
 
 ## Current baseline
 
-[`packages/pie`](../../packages/pie/) already provides daemon lifecycle, `serve`,
+[`packages/pie`](../../packages/pie/) already provides daemon lifecycle,
 `run` / `wait` / `logs` / `send` / `respond` / `interrupt`, pairing, and relay
-commands. Session work is implemented in
+commands. There is no foreground `serve` command; the daemon runs the server entry.
+Session work is implemented in
 [`session-cli.ts`](../../packages/pie/src/node/session-cli.ts).
 `logs` supports `--tail`, not `--before-cursor`; pagination requires a contract
 change before a CLI flag. This RFC does not change existing output or exit codes.
@@ -17,15 +18,12 @@ change before a CLI flag. This RFC does not change existing output or exit codes
 
 Proposed syntax, not available commands:
 
+Session listing, rename, model, archive, project list/create, and Schedule verbs are [ADR 0011](../adr/0011-session-cli-and-mcp.md). `pie ls`, not `pie session ls`. Still proposed here:
+
 ```text
-pie session ls [--project-id ID|path] [--all]
 pie session show <session-id>
 pie session status <session-id>
-pie session archive|rm <session-id> [--yes]
-pie session model <session-id> --provider NAME --model-id ID
 
-pie project ls
-pie project create [path]
 pie project show <id|path>
 pie project rm <id> [--yes]
 ```
@@ -37,16 +35,15 @@ not a CLI-owned store. Any missing procedure must land in the same stack.
 
 ## Schedule, Hub, and terminal commands
 
+Schedule commands are [ADR 0011](../adr/0011-session-cli-and-mcp.md). They match `scheduleContract` and do not add pause, resume, or logs.
+
 ```text
-pie schedule ls|create|update|pause|resume|run|rm|logs …
 pie hub connect <hub-origin> --expected-environment-id UUID --token-stdin [--url DAEMON]
 pie hub status|refresh [--url DAEMON]
 pie hub disconnect --expected-environment-id UUID --yes [--url DAEMON]
 pie terminal ls|create|send|capture|close …
 ```
 
-- Schedule flags mirror contract specs (`cron` / `every` / `once` / `manual`)
-  and session policies (`isolated` / `owned` / `existing`).
 - Hub commands configure the selected Environment through daemon RPC. `--url` /
   `PIE_URL` retains existing connect-only behavior; otherwise use the local daemon.
   The public Hub is a separate binary, never `pie hub serve`. Noninteractive

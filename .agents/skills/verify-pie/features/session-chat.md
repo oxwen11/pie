@@ -1,6 +1,6 @@
 # Session chat
 
-`/session/<sessionId>` is transcript + composer. No header bar on the route itself — the window titlebar heading is the session title, aligned to the main column (it moves with the sidebar width). The loader runs `agent.session.prepare` (validates the ref, backfills cwd, does **not** start Pi). A missing session toasts and redirects to `/draft`.
+`/session/<sessionId>` is transcript + composer. No header bar on the route itself — the window titlebar heading is the session title, aligned to the main column (it moves with the sidebar width). The loader runs `session.prepare` (validates the ref, backfills cwd, does **not** start Pi). A missing session toasts and redirects to `/draft`.
 
 ## Sub-features
 

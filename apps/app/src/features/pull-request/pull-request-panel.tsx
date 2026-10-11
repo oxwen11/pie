@@ -48,7 +48,7 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
   const orpc = useEnvironmentOrpc();
   const queryClient = useQueryClient();
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const options = orpc.pullRequest.statuses.queryOptions({
+  const options = orpc.pr.ls.queryOptions({
     input: { refs: [sessionRef] },
   });
   const statuses = useQuery({ ...options, enabled: visible, select: selectStatus });
@@ -61,16 +61,16 @@ function PullRequestPanelView({ instance }: { instance: PanelHandle<void> }) {
     mutationFn: () => orpc.pullRequest.refresh.call({ ref: sessionRef }),
     onSuccess: (status) => {
       queryClient.setQueryData(options.queryKey, [status]);
-      void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.statuses.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.pr.ls.key() });
       void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.detail.key() });
     },
     retry: false,
   });
   const exclude = useMutation({
     mutationFn: (pullRequest: PullRequestRef) =>
-      orpc.pullRequest.exclude.call({ ref: sessionRef, pullRequest }),
+      orpc.pr.exclude.call({ ref: sessionRef, pullRequest }),
     onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: orpc.pullRequest.statuses.key() });
+      void queryClient.invalidateQueries({ queryKey: orpc.pr.ls.key() });
     },
     retry: false,
   });

@@ -280,7 +280,7 @@ describe("streaming queue", () => {
       await expect
         .poll(
           async () => {
-            const snapshot = await client.agent.session.getSnapshot({
+            const snapshot = await client.session.getSnapshot({
               ref: { projectId, sessionId },
             });
             return snapshot.pendingPrompt;

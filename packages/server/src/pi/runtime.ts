@@ -11,7 +11,7 @@ import {
   TurnAlreadyRunning,
 } from "../harness/errors";
 import type { SessionEnvelopeDraft, SessionEvent } from "../harness/events/framework";
-import type { PiAgentRuntime, PiSessionToolsShape } from "../harness/pi-port";
+import type { PiAgentRuntime } from "../harness/pi-port";
 import { streamFromQueueOne } from "../harness/queue-stream";
 import type {
   CreateSessionInput,
@@ -268,6 +268,12 @@ export const makePiAgentRuntime = (
             .setModel(sessionId, model)
             .pipe(Effect.mapError((cause) => operationError(sessionId, "set-model", cause)));
         }),
+      reload: Effect.gen(function* () {
+        if (yield* Ref.get(closed)) return yield* new SessionClosed({ sessionId });
+        return yield* process.session
+          .reload(sessionId)
+          .pipe(Effect.mapError((cause) => operationError(sessionId, "reload", cause)));
+      }),
       close,
     } satisfies PiAgentRuntime;
   });
@@ -275,12 +281,10 @@ export const makePiAgentRuntime = (
 export const createPiAgentRuntime = (
   process: PiProcess,
   input: CreateSessionInput,
-  tools?: PiSessionToolsShape,
 ): Effect.Effect<PiAgentRuntime, AgentOpenError, Scope.Scope> =>
   process.session
     .create({
       cwd: input.cwd,
-      ...(tools ? { tools } : undefined),
       ...(input.provider ? { provider: input.provider } : undefined),
       ...(input.modelId ? { modelId: input.modelId } : undefined),
     })
@@ -292,13 +296,10 @@ export const createPiAgentRuntime = (
 export const resumePiAgentRuntime = (
   process: PiProcess,
   input: ResumeSessionInput,
-  tools?: PiSessionToolsShape,
 ): Effect.Effect<PiAgentRuntime, SessionNotResumable | AgentOpenError, Scope.Scope> =>
-  process.session
-    .resume({ sessionId: input.sessionId, cwd: input.cwd, ...(tools ? { tools } : undefined) })
-    .pipe(
-      Effect.mapError((cause) =>
-        cause instanceof SessionNotResumable ? cause : new AgentOpenError({ cause }),
-      ),
-      Effect.flatMap(({ sessionId }) => makePiAgentRuntime(process, sessionId)),
-    );
+  process.session.resume({ sessionId: input.sessionId, cwd: input.cwd }).pipe(
+    Effect.mapError((cause) =>
+      cause instanceof SessionNotResumable ? cause : new AgentOpenError({ cause }),
+    ),
+    Effect.flatMap(({ sessionId }) => makePiAgentRuntime(process, sessionId)),
+  );

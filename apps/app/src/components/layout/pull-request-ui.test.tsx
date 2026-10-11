@@ -167,14 +167,16 @@ const procedure = (fn: (...args: never[]) => Promise<unknown>) => ({
 
 async function render(children: ReactNode) {
   const orpc = mockEnvironmentOrpc({
+    pr: {
+      ls: procedure(api.statuses),
+      exclude: procedure(api.exclude),
+    },
     pullRequest: {
       demand: procedure(api.demand),
-      statuses: procedure(api.statuses),
       detail: procedure(api.detail),
       diff: procedure(api.diff),
       current: procedure(api.current),
       refresh: procedure(api.refresh),
-      exclude: procedure(api.exclude),
       stackPreview: procedure(api.stackPreview),
       runStackAction: procedure(api.runStackAction),
       runAction: procedure(api.runAction),

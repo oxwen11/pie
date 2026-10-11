@@ -17,7 +17,7 @@ export type EnvironmentOrpc = ReturnType<typeof createTanstackQueryUtils<PieClie
 
 /**
  * App-wide query policy. Call sites should not repeat these; override only
- * when a key has writers we do not drive (`agent.session.list`) or when a
+ * when a key has writers we do not drive (`session.ls`) or when a
  * probe must fail fast (draft git availability).
  */
 const queryDefaults = {
@@ -94,7 +94,7 @@ export function createEnvironmentOrpc(
   const orpc = createTanstackQueryUtils(client, { prefix: environmentId });
 
   // Draft seeds optimistic rows; the session event stream invalidates this list.
-  queryClient.setQueryDefaults(orpc.agent.session.list.key(), {
+  queryClient.setQueryDefaults(orpc.session.ls.key(), {
     staleTime: 30_000,
   });
   // App default refetches on focus, which would spawn a Pi process each time.
@@ -113,7 +113,7 @@ export function createEnvironmentOrpc(
   };
   queryClient.setQueryDefaults(orpc.pullRequest.current.key(), pullRequestDefaults);
   queryClient.setQueryDefaults(orpc.pullRequest.diff.key(), pullRequestDefaults);
-  queryClient.setQueryDefaults(orpc.pullRequest.statuses.key(), pullRequestDefaults);
+  queryClient.setQueryDefaults(orpc.pr.ls.key(), pullRequestDefaults);
   queryClient.setQueryDefaults(orpc.pullRequest.list.key(), pullRequestDefaults);
   queryClient.setQueryDefaults(orpc.pullRequest.detail.key(), pullRequestDefaults);
 

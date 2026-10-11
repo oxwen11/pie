@@ -52,7 +52,7 @@ export const Route = createFileRoute("/session/$sessionId")({
   }): Promise<PrepareSessionOutput & { environmentId: string }> => {
     const environmentId = deps.environmentId ?? context.localEnvironmentId;
     const orpc = context.environmentRpc.for(environmentId);
-    const { session } = orpc.agent;
+    const { session } = orpc;
     const prepareSession = (ref: SessionRef) => {
       void context.environmentRpc.queryClient.prefetchQuery({
         ...orpc.git.branch.queryOptions({ input: { ref } }),

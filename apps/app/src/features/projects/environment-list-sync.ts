@@ -27,17 +27,17 @@ export function createEnvironmentListSync(environmentRpc: EnvironmentRpc): Envir
     workers.set(environmentId, abort);
 
     const listKeyFor = (projectId: string, archived: boolean) =>
-      orpc.agent.session.list.queryOptions({ input: { projectId, archived } }).queryKey;
+      orpc.session.ls.queryOptions({ input: { projectId, archived } }).queryKey;
 
     const hydrate = async (): Promise<void> => {
       const projects = await environmentRpc.queryClient.query({
-        ...orpc.project.list.queryOptions(),
+        ...orpc.project.ls.queryOptions(),
         staleTime: 0,
       });
       await Promise.all(
         projects.map((project: Project) =>
           environmentRpc.queryClient.query({
-            ...orpc.agent.session.list.queryOptions({
+            ...orpc.session.ls.queryOptions({
               input: { projectId: project.id, archived: false },
             }),
             staleTime: 0,
@@ -53,7 +53,7 @@ export function createEnvironmentListSync(environmentRpc: EnvironmentRpc): Envir
         abort.signal.addEventListener("abort", abortAttempt, { once: true });
         try {
           // Subscribe before the baseline fetch so events racing hydration stay buffered.
-          const stream = await orpc.agent.session.subscribe.call(
+          const stream = await orpc.session.subscribe.call(
             { scope: { kind: "global" } },
             { signal: attempt.signal },
           );

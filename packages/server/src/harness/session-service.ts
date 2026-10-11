@@ -49,7 +49,7 @@ import {
   SessionNotResumable,
   type TurnAlreadyRunning,
 } from "./errors";
-import { PiAgent, PiSessionTools, type PiAgentRuntime, type SessionInfoResult } from "./pi-port";
+import { PiAgent, PiSessionIdentity, type PiAgentRuntime, type SessionInfoResult } from "./pi-port";
 import { inSession } from "./session-identity";
 import type { PromptReceipt, RuntimePromptReceipt, UserInput } from "./session-io";
 import { SessionMetadataLocks, SessionMetadataLocksLayer } from "./session-locks";
@@ -145,6 +145,9 @@ export type PiAgentSessionServiceShape = {
     | AgentOperationError
   >;
   readonly interrupt: (
+    ref: SessionRef,
+  ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
+  readonly reload: (
     ref: SessionRef,
   ) => Effect.Effect<void, SessionNotFound | StoreReadError | SessionClosed | AgentOperationError>;
   readonly replaceQueue: (
@@ -389,12 +392,8 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           yield* changedPullRequests(ref);
         }),
       );
-    const withSessionTools = (ref: SessionRef) =>
-      Effect.provideService(PiSessionTools, {
-        list: readMetadata(ref).pipe(Effect.map(linksFor)),
-        register: (pullRequest, restore) => registerPullRequest(ref, pullRequest, "agent", restore),
-        exclude: (pullRequest) => excludePullRequest(ref, pullRequest),
-      });
+    const withSessionIdentity = (ref: SessionRef) =>
+      Effect.provideService(PiSessionIdentity, { ref });
 
     const ensureRuntimeForPrompt = (
       ref: SessionRef,
@@ -437,7 +436,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
           { sessionId: metadata.agentSessionId, cwd: metadata.cwd },
           ref,
         );
-      }).pipe(withSessionTools(ref));
+      }).pipe(withSessionIdentity(ref));
 
     const deliverPrompt = (
       ref: SessionRef,
@@ -481,7 +480,7 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
     ): Effect.Effect<A, ResumeSessionError | SessionClosed | AgentOperationError | E> =>
       manager
         .ensureRuntime(runtimeInput(agentSessionId, cwd), ref)
-        .pipe(withSessionTools(ref), Effect.flatMap(run));
+        .pipe(withSessionIdentity(ref), Effect.flatMap(run));
 
     const prompt = Effect.fn("PiAgentSessionService.prompt")(function* (input: PromptInput) {
       const userInput = yield* toUserInput(input.parts, input.delivery);
@@ -703,6 +702,15 @@ export const PiAgentSessionServiceCoreLayer: Layer.Layer<
         readMetadata(ref).pipe(
           Effect.andThen(manager.peek(ref)),
           Effect.flatMap((runtime) => runtime?.interrupt ?? Effect.void),
+          inSession(ref),
+        ),
+
+      reload: (ref: SessionRef) =>
+        readMetadata(ref).pipe(
+          Effect.andThen(manager.peek(ref)),
+          // Nothing live reads fresh settings on its next spawn anyway, so an
+          // idle session reloads as a no-op instead of starting a process.
+          Effect.flatMap((runtime) => runtime?.reload ?? Effect.void),
           inSession(ref),
         ),
 

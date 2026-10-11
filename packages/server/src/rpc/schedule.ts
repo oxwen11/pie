@@ -43,7 +43,7 @@ export const scheduleRouter = orpc.router({
       }),
     );
   }),
-  delete: orpc.delete.effect(function* ({ input, errors }) {
+  rm: orpc.rm.effect(function* ({ input, errors }) {
     const schedules = yield* ScheduleService;
     yield* schedules.delete(input.id).pipe(
       Effect.catchTags({
@@ -52,7 +52,7 @@ export const scheduleRouter = orpc.router({
       }),
     );
   }),
-  runNow: orpc.runNow.effect(function* ({ input, errors }) {
+  run: orpc.run.effect(function* ({ input, errors }) {
     const schedules = yield* ScheduleService;
     return yield* schedules.runNow(input.id).pipe(
       Effect.catchTags({

@@ -18,7 +18,7 @@ vi.mock("@tanstack/react-router", () => ({
   useRouteContext: () => ({
     localEnvironmentId: "local",
     environmentRpc: {
-      for: () => ({ agent: { session: { list: { queryOptions: mocks.queryOptions } } } }),
+      for: () => ({ session: { ls: { queryOptions: mocks.queryOptions } } }),
     },
   }),
 }));
@@ -58,7 +58,7 @@ const renderSession = async (
 ): Promise<void> => {
   mocks.queryOptions.mockImplementation(
     ({ input }: { input: { projectId: string; archived: boolean } }) => ({
-      queryKey: ["session.list", input],
+      queryKey: ["session.ls", input],
       queryFn: async () => {
         fetches.push(input.archived);
         return input.archived ? archived : active;

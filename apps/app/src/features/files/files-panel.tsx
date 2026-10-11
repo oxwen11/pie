@@ -27,7 +27,7 @@ function FilesPanelView({ instance }: { instance: PanelHandle<void> }) {
   const orpcQueryUtils = useEnvironmentOrpc();
   const projectId = instance.sessionRef.ref.projectId;
   const { data: projectName } = useQuery({
-    ...orpcQueryUtils.project.list.queryOptions(),
+    ...orpcQueryUtils.project.ls.queryOptions(),
     // `select` closes over `projectId` — memoised so the query stays stable.
     select: useCallback(
       (projects: ReadonlyArray<Project>) =>

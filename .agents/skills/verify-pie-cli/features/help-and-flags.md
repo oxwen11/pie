@@ -1,6 +1,6 @@
 # Help and flags
 
-The CLI is Effect `Command`. `--help` / `-h` and `--version` must work without a daemon. `--port`, `--cors-origin`, and `--allowed-host` are the same flags on `pie`, `pie daemon`, and `pie serve`.
+The CLI is Effect `Command`. `--help` / `-h` and `--version` must work without a daemon. `--port`, `--cors-origin`, and `--allowed-host` are the same flags on `pie` and `pie daemon`.
 
 ## How to get to it
 
@@ -16,7 +16,7 @@ pnpm exec pie-verify cli run --version
 
 Proof:
 
-- `--help` lists `daemon`, `serve`, and `run`.
+- `--help` lists `daemon` and `run`, and not `serve`. `pie serve` exits non-zero with `Unknown subcommand`.
 - `daemon --help` lists `start`, `stop`, `status`. Bare `pie daemon` still shows `--port` / `--cors-origin` / `--allowed-host`; `daemon stop` and `daemon status` do not.
 - `--version` prints `pie v<version>` from `packages/pie/package.json`.
 - After `launch`, `pnpm exec pie-verify cli run nosuchcommand` exits non-zero with `Unknown subcommand` and does not spawn a second listener. Without a current run that same wrapper command fails with `no current run. Launch first.`

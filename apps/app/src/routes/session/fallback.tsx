@@ -48,8 +48,8 @@ function MissingWorktreeRoute() {
   const navigate = useNavigate();
   const ref = { projectId: search.projectId, sessionId: search.sessionId };
   const restore = useMutation({
-    mutationKey: orpcQueryUtils.agent.session.restoreWorktree.key(),
-    mutationFn: () => orpcQueryUtils.agent.session.restoreWorktree.call({ ref }),
+    mutationKey: orpcQueryUtils.session.restoreWorktree.key(),
+    mutationFn: () => orpcQueryUtils.session.restoreWorktree.call({ ref }),
     onSuccess: () => {
       void queryClient.invalidateQueries({
         queryKey: orpcQueryUtils.git.branch.queryOptions({ input: { ref } }).queryKey,

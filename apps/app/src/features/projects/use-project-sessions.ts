@@ -37,14 +37,14 @@ export function useProjectSessionTitle(ref: SessionRef | undefined): string | un
     [projectId, sessionId],
   );
   const active = useQuery({
-    ...orpcQueryUtils.agent.session.list.queryOptions({
+    ...orpcQueryUtils.session.ls.queryOptions({
       input: { projectId: projectId ?? "", archived: false },
     }),
     enabled,
     select,
   });
   const archived = useQuery({
-    ...orpcQueryUtils.agent.session.list.queryOptions({
+    ...orpcQueryUtils.session.ls.queryOptions({
       input: { projectId: projectId ?? "", archived: true },
     }),
     enabled: enabled && active.isSuccess && active.data === undefined,

@@ -1,3 +1,4 @@
+import type { SessionRef } from "@getpie/contract";
 import type { WithEffectContext } from "@orpc/experimental-effect";
 import type { FileSystem } from "effect/FileSystem";
 
@@ -18,7 +19,7 @@ import type { SkillService } from "../skills";
 import type { TerminalManager } from "../terminal";
 
 /** Services every RPC procedure may `yield*`. */
-export type RpcContext = WithEffectContext<
+export type RpcServices =
   | EventBus
   | SessionImageAssets
   | FileSystem
@@ -34,5 +35,11 @@ export type RpcContext = WithEffectContext<
   | GitService
   | PullRequestService
   | PullRequestCoordinator
-  | TerminalManager
->;
+  | TerminalManager;
+export type RpcContext = WithEffectContext<RpcServices> & {
+  /**
+   * The Session an in-process Pi is bound to. Set only by the MCP door from a
+   * per-process bearer, never from a request field, so a model cannot name it.
+   */
+  readonly mcpSession?: SessionRef;
+};

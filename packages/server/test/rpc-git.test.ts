@@ -87,7 +87,7 @@ describe("git router", () => {
     const harness = await makeRpcTestHarness(home);
     try {
       const project = await harness.client.project.create({ path: cwd });
-      const { ref } = await harness.client.agent.session.create({ projectId: project.id });
+      const { ref } = await harness.client.session.create({ projectId: project.id });
 
       const branch = await harness.client.git.branch({ ref });
       expect(branch.kind).toBe("repository");

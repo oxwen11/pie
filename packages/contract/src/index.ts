@@ -4,9 +4,9 @@ import { fsContract } from "./fs";
 import { gitContract } from "./git";
 import { packagesContract } from "./packages";
 import { projectContract } from "./project";
-import { pullRequestContract } from "./pull-request";
+import { prContract, pullRequestContract } from "./pull-request";
 import { scheduleContract } from "./schedule";
-import { sessionContract } from "./session";
+import { sessionContract, sessionRootContract } from "./session";
 import { settingsContract } from "./settings";
 import { skillsContract } from "./skills";
 import { terminalContract } from "./terminal";
@@ -32,6 +32,8 @@ export * from "./skills";
 export * from "./terminal";
 
 export const contract = {
+  ...sessionRootContract,
+  session: sessionContract,
   agent: agentContract,
   assets: assetsContract,
   project: projectContract,
@@ -41,6 +43,7 @@ export const contract = {
   settings: settingsContract,
   packages: packagesContract,
   skills: skillsContract,
+  pr: prContract,
   pullRequest: pullRequestContract,
   terminal: terminalContract,
 };
@@ -55,8 +58,10 @@ export {
   gitContract,
   packagesContract,
   projectContract,
+  prContract,
   pullRequestContract,
   sessionContract,
+  sessionRootContract,
   skillsContract,
   terminalContract,
 };

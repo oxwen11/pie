@@ -92,6 +92,10 @@ NodeRuntime.runMain(
       path.join(path.dirname(photonEntry), "photon_rs_bg.wasm"),
       path.join(outDir, "photon_rs_bg.wasm"),
     );
+    yield* fs.copy(
+      url.fileURLToPath(new URL("./src/pi/pie-mcp-extension.js", import.meta.url)),
+      path.join(outDir, "pie-mcp-extension.js"),
+    );
 
     // Sibling island — not inside pi-process/, so bun-build cannot inline
     // the fff FFI graph and the CLI artifact test can still diff that tree.

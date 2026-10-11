@@ -156,16 +156,16 @@ function AppRuntime({
   const chatManager = useStable(
     () =>
       new ChatManager((sessionRef) => {
-        const session = environmentRpc.for(sessionRef.environmentId).agent.session;
+        const session = environmentRpc.for(sessionRef.environmentId).session;
         return new OrpcChatSessionTransport(
           {
             session: {
-              prompt: session.prompt.call,
+              prompt: session.send.call,
               interrupt: session.interrupt.call,
-              replaceQueue: session.replaceQueue.call,
-              respondToAgentRequest: session.respondToAgentRequest.call,
+              replaceQueue: session.queue.call,
+              respondToAgentRequest: session.respond.call,
               getSnapshot: session.getSnapshot.call,
-              getMessages: session.getMessages.call,
+              getMessages: session.logs.call,
               subscribe: session.subscribe.call,
             },
           },

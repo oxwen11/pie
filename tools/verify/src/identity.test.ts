@@ -23,10 +23,8 @@ describe("identity roots", () => {
     expect(WEB.build).toBe("core");
     expect(WEB.vitePort).toBe(4190);
     expect(WEB.pidFiles).toEqual(["pids/server.pid", "pids/vite.pid"]);
-    expect(WEB.allowServe).toBe(false);
     expect(CLI.build).toBe("core");
-    expect(CLI.pidFiles).toEqual(["pids/serve.pid"]);
-    expect(CLI.allowServe).toBe(true);
+    expect(CLI.pidFiles).toEqual([]);
     expect(DESKTOP.build).toBe("server");
     expect(DESKTOP.cdpDefault).toBe(9223);
     expect(DESKTOP.pidFiles).toEqual(["pids/electron-vite.pid"]);

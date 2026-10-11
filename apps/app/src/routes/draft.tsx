@@ -121,12 +121,12 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
   const queryClient = useQueryClient();
   const [importOpen, setImportOpen] = useState(false);
 
-  // One project.list per connected Environment — same prefixed keys the
+  // One project.ls per connected Environment — same prefixed keys the
   // sidebar and Environment list sync use, so this subscribes to warm caches.
   const environments = useConnectedEnvironments();
   const projectLists = useQueries({
     queries: environments.map((environment) =>
-      environmentRpc.for(environment.environmentId).project.list.queryOptions(),
+      environmentRpc.for(environment.environmentId).project.ls.queryOptions(),
     ),
   });
 
@@ -147,19 +147,19 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
       : defaultModel;
 
   const startSession = useMutation({
-    mutationKey: orpcQueryUtils.agent.session.create.key(),
+    mutationKey: orpcQueryUtils.session.create.key(),
     mutationFn: async ({ text, worktree }: { text: string; worktree?: CreateWorktreeInput }) => {
       let projectId = selected?.project.id;
       if (projectId === undefined) {
         const allocated = await orpcQueryUtils.project.allocateChatProjectDir.call();
-        const projectListKey = orpcQueryUtils.project.list.queryOptions().queryKey;
+        const projectListKey = orpcQueryUtils.project.ls.queryOptions().queryKey;
         queryClient.setQueryData<ReadonlyArray<Project>>(projectListKey, (prev) => {
           if (prev?.some((project) => project.id === allocated.id)) return prev;
           return [...(prev ?? []), allocated];
         });
         projectId = allocated.id;
       }
-      const created = await orpcQueryUtils.agent.session.create.call({
+      const created = await orpcQueryUtils.session.create.call({
         projectId,
         ...(draftModel !== undefined
           ? { provider: draftModel.provider, modelId: draftModel.modelId }
@@ -169,7 +169,7 @@ function DraftPage({ environmentId }: { readonly environmentId: string }) {
       return { created, text };
     },
     onSuccess: ({ created, text }) => {
-      const listKey = orpcQueryUtils.agent.session.list.queryOptions({
+      const listKey = orpcQueryUtils.session.ls.queryOptions({
         input: { projectId: created.ref.projectId, archived: false },
       }).queryKey;
 

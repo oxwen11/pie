@@ -18,12 +18,16 @@ import type { ChatSessionTransport, ChatTransportEvent } from "./chat-transport-
 // reset by every successful attach.
 const defaultRetryDelayMs = exponentialBackoffMs(500, 10_000);
 
-type PieSessionClient = PieClient["agent"]["session"];
+type PieSessionClient = PieClient["session"];
 
-type SessionClient = Pick<
-  PieSessionClient,
-  "prompt" | "interrupt" | "replaceQueue" | "respondToAgentRequest" | "getSnapshot" | "getMessages"
-> & {
+// The transport keeps its own verbs; `app-interface` maps them onto `session.*`.
+type SessionClient = {
+  prompt: PieSessionClient["send"];
+  interrupt: PieSessionClient["interrupt"];
+  replaceQueue: PieSessionClient["queue"];
+  respondToAgentRequest: PieSessionClient["respond"];
+  getSnapshot: PieSessionClient["getSnapshot"];
+  getMessages: PieSessionClient["logs"];
   subscribe: (
     ...args: Parameters<PieSessionClient["subscribe"]>
   ) => Promise<AsyncIterable<SubscribeStreamEvent>>;

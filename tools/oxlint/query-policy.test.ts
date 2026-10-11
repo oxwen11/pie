@@ -16,7 +16,7 @@ tester.run("no-query-client-default-overrides", noQueryClientDefaultOverrides, {
     {
       filename,
       code: `import { useQuery } from "@tanstack/react-query";
-useQuery(orpc.project.list.queryOptions());`,
+useQuery(orpc.project.ls.queryOptions());`,
     },
     {
       filename,

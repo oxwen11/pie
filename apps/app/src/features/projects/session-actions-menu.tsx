@@ -8,7 +8,7 @@ import {
 import { SidebarMenuAction } from "@getpie/ui/components/sidebar";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "@tanstack/react-router";
-import { Archive, ArchiveRestore, Clock, Copy, FileText, Pencil } from "lucide-react";
+import { Archive, ArchiveRestore, Clock, Copy, FileText, Pencil, RefreshCw } from "lucide-react";
 import { useState, type ReactElement, type ReactNode } from "react";
 import { toast } from "sonner";
 
@@ -50,10 +50,32 @@ export function SessionActionsMenu({
   const queryClient = useQueryClient();
   const [renaming, setRenaming] = useState(false);
 
+  const reload = useMutation({
+    mutationKey: orpcQueryUtils.session.reload.key(),
+    mutationFn: () =>
+      orpcQueryUtils.session.reload.call({
+        ref: { projectId: session.projectId, sessionId: session.sessionId },
+      }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.agent.listModels.key(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.agent.commands.key(),
+      });
+      void queryClient.invalidateQueries({
+        queryKey: orpcQueryUtils.session.getModelState.key({
+          input: { ref: { projectId: session.projectId, sessionId: session.sessionId } },
+        }),
+      });
+    },
+    onError: (error) => toast.error(`Failed to reload session: ${error.message}`),
+  });
+
   const setArchived = useMutation({
-    mutationKey: orpcQueryUtils.agent.session.archive.key(),
+    mutationKey: orpcQueryUtils.session.archive.key(),
     mutationFn: (archived: boolean) =>
-      orpcQueryUtils.agent.session.archive.call({
+      orpcQueryUtils.session.archive.call({
         ref: {
           projectId: session.projectId,
           sessionId: session.sessionId,
@@ -62,7 +84,7 @@ export function SessionActionsMenu({
       }),
     onSuccess: (_, archived) => {
       const listKey = (isArchived: boolean) =>
-        orpcQueryUtils.agent.session.list.queryOptions({
+        orpcQueryUtils.session.ls.queryOptions({
           input: { projectId: session.projectId, archived: isArchived },
         }).queryKey;
       const refreshLists = Promise.all([
@@ -102,7 +124,7 @@ export function SessionActionsMenu({
           </ContextMenuItem>
           <ContextMenuItem
             onClick={() => {
-              void orpcQueryUtils.agent.session.transcriptPath
+              void orpcQueryUtils.session.transcriptPath
                 .call({
                   ref: { projectId: session.projectId, sessionId: session.sessionId },
                 })
@@ -149,6 +171,12 @@ export function SessionActionsMenu({
             >
               <Clock />
               Schedule…
+            </ContextMenuItem>
+          )}
+          {session.archived ? null : (
+            <ContextMenuItem disabled={reload.isPending} onClick={() => reload.mutate()}>
+              <RefreshCw />
+              Reload
             </ContextMenuItem>
           )}
           <ContextMenuItem

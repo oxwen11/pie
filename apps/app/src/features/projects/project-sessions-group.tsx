@@ -53,7 +53,7 @@ export function ProjectSessionsGroup({
   const isSessionActive = (ref: SessionRef) =>
     sameSessionRef({ environmentId, ref }, sessionRefFromRouterMatches(router.state.matches));
   const sessions = useQuery({
-    ...orpcQueryUtils.agent.session.list.queryOptions({
+    ...orpcQueryUtils.session.ls.queryOptions({
       input: { projectId: project.id, archived: false },
     }),
     select: selectNewestFirst,
@@ -61,7 +61,7 @@ export function ProjectSessionsGroup({
   const rows = sessions.data ?? EMPTY_SESSIONS;
   const refs = rows.map(({ projectId, sessionId }) => ({ projectId, sessionId }));
   const pullRequestStatuses = useQuery({
-    ...orpcQueryUtils.pullRequest.statuses.queryOptions({ input: { refs } }),
+    ...orpcQueryUtils.pr.ls.queryOptions({ input: { refs } }),
     enabled: refs.length > 0,
     placeholderData: keepPreviousData,
     select: selectPullRequestStatuses,

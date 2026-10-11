@@ -9,22 +9,12 @@ import {
   invokePie,
   readDaemonRecord,
   resolveCompatKey,
-  spawnPie,
   stopRecordedDaemon,
 } from "../runtime/daemon.ts";
 import { fail } from "../runtime/fail.ts";
 import { currentRun, readText, writeText } from "../runtime/fs.ts";
 import { fetchText, healthOk, ticketStatus, urlPort } from "../runtime/http.ts";
-import {
-  findRepoRoot,
-  killTree,
-  listenPids,
-  pidAlive,
-  readPidFile,
-  waitDead,
-  waitUntil,
-  writePidFile,
-} from "../runtime/process.ts";
+import { findRepoRoot, listenPids, pidAlive, waitUntil } from "../runtime/process.ts";
 import { expectLaunch, type LaunchCtx, type ProbeOk, type Surface } from "../surface.ts";
 
 export const cliSurface: Surface = {
@@ -40,36 +30,7 @@ async function startCli(ctx: LaunchCtx): Promise<void> {
     ...cli.env,
     PIE_DAEMON_COMPATIBILITY_KEY: await resolveCompatKey(cli.repo),
   };
-  if (cli.request.mode === "serve") {
-    await startServe(cli, env);
-    return;
-  }
   await startDaemon(cli, env);
-}
-
-async function startServe(
-  ctx: Extract<LaunchCtx, { surface: "cli" }>,
-  env: NodeJS.ProcessEnv,
-): Promise<void> {
-  const child = spawnPie(
-    ctx.repo,
-    ["serve", "--port", String(ctx.piePort)],
-    path.join(ctx.runDir, "logs/serve.log"),
-    env,
-  );
-  if (child.pid === undefined) {
-    throw new Error("failed to spawn pie serve");
-  }
-  writePidFile(path.join(ctx.runDir, "pids/serve.pid"), child.pid);
-  await waitUntil(`pie serve on ${ctx.piePort}`, () => healthOk(ctx.piePort), 60);
-  const address = `http://127.0.0.1:${ctx.piePort}`;
-  patchRunMeta(path.join(ctx.runDir, "meta.json"), "cli", { address });
-  console.log(`${CLI.logPrefix}: launched ${ctx.runId}`);
-  console.log("  mode    serve (foreground, no token)");
-  console.log(`  api     ${address}/api/health`);
-  console.log(`  home    ${ctx.pieHome}`);
-  console.log(`  logs    ${path.join(ctx.runDir, "logs")}`);
-  console.log(`  doctor  ${CLI.bin} doctor`);
 }
 
 async function startDaemon(
@@ -104,33 +65,6 @@ async function startDaemon(
 
 async function inspectCli(runDir: string, meta: RunMeta): Promise<ProbeOk> {
   const cli = expectMeta(meta, "cli");
-  if (cli.mode === "serve") {
-    const servePid = readPidFile(path.join(runDir, "pids/serve.pid"));
-    if (!pidAlive(servePid)) {
-      fail(`${CLI.logPrefix} FAIL — serve pid ${servePid} is not running`);
-    }
-    const address = `http://127.0.0.1:${cli.piePort}`;
-    if (!(await healthOk(address))) {
-      fail(`${CLI.logPrefix} FAIL — ${address}/api/health is not ok`);
-    }
-    const status = await ticketStatus(address);
-    if (status !== 200) {
-      fail(
-        `${CLI.logPrefix} FAIL — serve /api/ws-ticket returned ${status} (expected 200, no token)`,
-      );
-    }
-    return {
-      pids: servePid === undefined ? [] : [servePid],
-      lines: [
-        "  mode    serve",
-        `  api     ${address}/api/health`,
-        `  home    ${cli.pieHome}`,
-        `  serve   pid ${servePid}`,
-        "  ticket  /api/ws-ticket 200 (no token)",
-      ],
-    };
-  }
-
   const recordPath = daemonPidPath(cli.pieHome);
   if (!fs.existsSync(recordPath)) {
     fail(`${CLI.logPrefix} FAIL — missing ${recordPath}`);
@@ -144,9 +78,7 @@ async function inspectCli(runDir: string, meta: RunMeta): Promise<ProbeOk> {
   }
   const anon = await ticketStatus(record.address);
   if (anon !== 401) {
-    fail(
-      `${CLI.logPrefix} FAIL — /api/ws-ticket without token returned ${anon} (expected 401 — 200 means you hit pie serve)`,
-    );
+    fail(`${CLI.logPrefix} FAIL — /api/ws-ticket without token returned ${anon} (expected 401)`);
   }
   const auth = await ticketStatus(record.address, record.token);
   if (auth !== 200) {
@@ -171,13 +103,6 @@ async function inspectCli(runDir: string, meta: RunMeta): Promise<ProbeOk> {
 }
 
 async function stopCli(runDir: string, meta: RunMeta | undefined): Promise<void> {
-  if (meta?.surface === "cli" && meta.mode === "serve") {
-    const servePid = readPidFile(path.join(runDir, "pids/serve.pid"));
-    console.log(`${CLI.logPrefix}: stopping serve pid=${servePid ?? "none"}`);
-    killTree(servePid);
-    await waitDead(servePid);
-    return;
-  }
   if (meta?.surface === "cli") {
     await stopRecordedDaemon({
       repo: meta.repo,
@@ -205,19 +130,6 @@ export async function extraEvidence(
 }
 
 async function curlTranscript(cli: CliRunMeta): Promise<string> {
-  if (cli.mode === "serve") {
-    const address = `http://127.0.0.1:${cli.piePort}`;
-    const health = await fetchText(`${address}/api/health`);
-    const ticket = await ticketStatus(address);
-    return [
-      `GET ${address}/api/health`,
-      health?.body ?? "",
-      "",
-      `POST ${address}/api/ws-ticket (no token)`,
-      `status ${ticket ?? "error"}`,
-      "",
-    ].join("\n");
-  }
   const record = readDaemonRecord(daemonPidPath(cli.pieHome));
   const health = await fetchText(`${record.address.replace(/\/$/, "")}/api/health`);
   const anon = await ticketStatus(record.address);

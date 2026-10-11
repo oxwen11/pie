@@ -15,13 +15,13 @@ vi.mock("@/lib/environment-orpc", () => ({
           queryKey: ["agent", "listModels"],
         }),
       },
-      session: {
-        list: {
-          queryOptions: () => ({
-            queryFn: async () => [],
-            queryKey: ["agent", "session", "list"],
-          }),
-        },
+    },
+    session: {
+      ls: {
+        queryOptions: () => ({
+          queryFn: async () => [],
+          queryKey: ["session", "ls"],
+        }),
       },
     },
   }),

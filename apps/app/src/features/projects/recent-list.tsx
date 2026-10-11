@@ -24,7 +24,7 @@ export function RecentList() {
   // subscribes; it exists so the header can hide when every chat project is empty.
   const sessions = useQueries({
     queries: projects.map((project) =>
-      orpcQueryUtils.agent.session.list.queryOptions({
+      orpcQueryUtils.session.ls.queryOptions({
         input: { projectId: project.id, archived: false },
       }),
     ),

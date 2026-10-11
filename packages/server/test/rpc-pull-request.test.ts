@@ -93,15 +93,15 @@ describe("pull request RPC composition", () => {
     const harness = await makeRpcTestHarness(home, { pullRequestLayer: reader.layer });
     try {
       const project = await harness.client.project.create({ path: workspace });
-      const created = await harness.client.agent.session.create({ projectId: project.id });
-      await expect(harness.client.pullRequest.statuses({ refs: [created.ref] })).resolves.toEqual([
+      const created = await harness.client.session.create({ projectId: project.id });
+      await expect(harness.client.pr.ls({ refs: [created.ref] })).resolves.toEqual([
         { ref: created.ref, links: [], state: "unbound" },
       ]);
       expect(reader.calls).toEqual([]);
       await expect(harness.client.pullRequest.current({ ref: created.ref })).resolves.toEqual(
         snapshot,
       );
-      const statuses = await harness.client.pullRequest.statuses({ refs: [created.ref] });
+      const statuses = await harness.client.pr.ls({ refs: [created.ref] });
       expect(statuses[0]?.links).toEqual([]);
       expect(reader.calls).toEqual([{ type: "current", cwd: workspace }]);
     } finally {
@@ -118,7 +118,7 @@ describe("pull request RPC composition", () => {
     const harness = await makeRpcTestHarness(home, { pullRequestLayer: reader.layer });
     try {
       const project = await harness.client.project.create({ path: workspace });
-      const created = await harness.client.agent.session.create({
+      const created = await harness.client.session.create({
         projectId: project.id,
         worktree: {},
       });
@@ -126,7 +126,7 @@ describe("pull request RPC composition", () => {
         Effect.runPromise(harness.sessions.registerPullRequest(created.ref, snapshot.ref)),
       ).resolves.toBe("linked");
       expect(reader.calls).toEqual([]);
-      const cached = await harness.client.pullRequest.statuses({ refs: [created.ref] });
+      const cached = await harness.client.pr.ls({ refs: [created.ref] });
       expect(cached[0]?.links[0]?.snapshot).toBeNull();
       const refreshed = await harness.client.pullRequest.refresh({ ref: created.ref });
       expect(refreshed.links[0]?.snapshot?.title).toBe(snapshot.title);
@@ -138,11 +138,11 @@ describe("pull request RPC composition", () => {
       expect(reader.calls.find((call) => call.type === "discover")?.cwd).toBe(
         created.workspace.cwd,
       );
-      await harness.client.agent.session.archive({ ref: created.ref, archived: true });
+      await harness.client.session.archive({ ref: created.ref, archived: true });
       await expect(
         harness.client.pullRequest.detail({ ref: created.ref, pullRequest: snapshot.ref }),
       ).resolves.toEqual(snapshot);
-      await harness.client.pullRequest.exclude({ ref: created.ref, pullRequest: snapshot.ref });
+      await harness.client.pr.exclude({ ref: created.ref, pullRequest: snapshot.ref });
       await expect(
         harness.client.pullRequest.detail({ ref: created.ref, pullRequest: snapshot.ref }),
       ).rejects.toMatchObject({ code: "STALE_CONTEXT" });
@@ -165,7 +165,7 @@ describe("pull request RPC composition", () => {
         projectId: "00000000-0000-4000-8000-000000000001",
         sessionId: "00000000-0000-4000-8000-000000000002",
       };
-      const statuses = await harness.client.pullRequest.statuses({ refs: [ref] });
+      const statuses = await harness.client.pr.ls({ refs: [ref] });
       expect(statuses[0]?.state).toBe("error");
       await expect(
         harness.client.pullRequest.demand({ refs: [ref], version: 0 }),
@@ -206,7 +206,7 @@ describe("pull request RPC composition", () => {
     });
     try {
       const project = await harness.client.project.create({ path: workspace });
-      const created = await harness.client.agent.session.create({
+      const created = await harness.client.session.create({
         projectId: project.id,
         worktree: {},
       });
