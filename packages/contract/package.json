@@ -9,6 +9,7 @@
     "./domain": "./src/domain.ts",
     "./fs": "./src/fs.ts",
     "./git": "./src/git.ts",
+    "./hub": "./src/hub.ts",
     "./packages": "./src/packages.ts",
     "./skills": "./src/skills.ts",
     "./project": "./src/project.ts",

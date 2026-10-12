@@ -147,6 +147,14 @@ describe("events", () => {
 });
 
 describe("open", () => {
+  it("refuses a second connection to the same file", () => {
+    const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "hub-lock-")), "hub.sqlite");
+    const a = HubStore.open(file);
+    expect(() => HubStore.open(file)).toThrow(/locked/);
+    a.close();
+    HubStore.open(file).close();
+  });
+
   const dir = () => fs.mkdtempSync(path.join(os.tmpdir(), "hub-store-"));
 
   it("persists across reopen and refuses a database newer than the code", () => {
