@@ -1,6 +1,6 @@
 /**
  * Pie-owned Pi RPC child. Session construction uses the published SDK;
- * the JSONL loop is `./rpc-mode.ts` (vendored from Pi v1.0.2).
+ * the JSONL loop is `./rpc-mode.ts` (vendored from Pi v1.6.0).
  *
  * Do not import package `runRpcMode` or spawn `./rpc-entry`: pie owns
  * extension bind/UI/protocol here, and extension loading via
@@ -65,6 +65,9 @@ export const main = async (): Promise<void> => {
     const services = await createAgentSessionServices({
       cwd: options.cwd,
       agentDir: options.agentDir,
+      settingsManager: SettingsManager.create(options.cwd, options.agentDir ?? agentDir, {
+        projectTrusted: parsed.projectTrustOverride ?? true,
+      }),
       modelRuntimeSignal: AbortSignal.timeout(15_000),
       extensionFlagValues: FFF_OVERRIDE_FLAGS,
       resourceLoaderOptions: {
@@ -104,10 +107,11 @@ export const main = async (): Promise<void> => {
     sessionManager,
   });
 
+  // Consume startup diagnostics now so session rebinds do not repeat them.
+  for (const diagnostic of runtime.takeUnreportedDiagnostics()) {
+    console.error(`${diagnostic.type}: ${diagnostic.message}`);
+  }
   if (runtime.diagnostics.some((diagnostic) => diagnostic.type === "error")) {
-    for (const diagnostic of runtime.diagnostics) {
-      console.error(`${diagnostic.type}: ${diagnostic.message}`);
-    }
     process.exitCode = 1;
     return;
   }

@@ -597,16 +597,28 @@ writes which Pie intentionally does not own:
    case. Concurrent lookups use Pi's recursive mkdir; empty directories have no
    migration or cleanup and remain after Pie is downgraded or uninstalled.
 
+   In Pi `>= 1.5.1`, when `cacheWarming` is unset in `settings.json`, its
+   default `"idle"` mode keeps `CacheWarmer` active for up to 30 minutes after
+   `agent_settled` while a live `pie-pi-process` child remains open, sending
+   background 1-token cache-warming requests when expected prompt-cache savings
+   are at least `$0.05` and appending `"usage"` (`cache_warm`) entries to
+   `<session>.jsonl` (via the live child, never during daemon cold `open`).
+   Codemode's `image()` helper writes mode `0600` `wx` files under
+   `os.tmpdir()/pi-codemode-*`. Pi `>= 1.0.3` also renames the built-in
+   `"azure-openai-responses"` provider to `"azure"`; legacy session metadata or
+   user Pi configs still referencing `"azure-openai-responses"` fall back
+   through normal missing-model handling.
+
    **Daemon cold transcript open** is a Developer-approved exception: while a
    Pie session holds no live Pi child and none is starting, that session may
    call `SessionManager.findById` and then `SessionManager.open` in the daemon
    process (`packages/server/src/harness/session.ts`). Pi still owns the file
-   format. `open` is not read-only. On Pi 0.99.1 and 1.0.2 it may rewrite the
-   transcript when repairing or migrating it. Pi 1.0.2's `open` matches 0.99.1:
-   `dist/core/session-manager.js` is byte-identical, as are the modules it
-   depends on (`dist/core/messages.js`, `dist/utils/paths.js`), and the
-   `config.js` exports it uses (`getAgentDir`, `getSessionsDir`, `APP_NAME`)
-   are unchanged, so 1.0.2 adds no `open` side effects:
+   format. `open` is not read-only. On Pi 0.99.1 through 1.6.0 it may rewrite
+   the transcript when repairing or migrating it. Pi 1.6.0's cold `open` /
+   `findById` path keeps `CURRENT_SESSION_VERSION = 3`, leaves `migrations.js`
+   and `dist/core/messages.js` byte-identical, and keeps the `config.js` /
+   `paths.js` helpers used by `open` and `findById` free of new write side
+   effects, so 1.6.0 adds zero cold-open write side effects:
 
    | Property      | Current contract                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
    | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -616,7 +628,7 @@ writes which Pie intentionally does not own:
    | Repair writes | Only inside Pi's `open`, and only for these cases. A final parsed entry with no trailing newline is repaired by appending one `\n` (`appendFileSync`) after the header is validated. A header version below 3 (missing counts as 1) is migrated in memory and the whole file is rewritten by `_rewriteFile` (`openSync` with `"w"`, then one JSON line plus `\n` per entry). A zero-byte file is rewritten with a version-3 session header at that same path. A non-empty file that is not a Pi session throws and is left unchanged. |
    | Atomicity     | Newline repair is one append. `_rewriteFile` truncates then rewrites; it is not temp-file plus rename. A crash during that rewrite can leave a short file.                                                                                                                                                                                                                                                                                                                                                                            |
    | Concurrency   | One Pie session holds at most one daemon `SessionManager`. A held or still-starting Pi child is the only reader; the daemon does not `open` then. Starting or releasing the child drops the daemon handle first so the two do not both keep the file. There is no lock against another daemon or a user `pi` on the same file. A cold read that already opened may still fold its in-memory copy after the handle is dropped; it does not append.                                                                                     |
-   | Compatibility | Migrated files stay at version 3. Pie downgrade does not reverse the migration, the added newline, or a header written into a previously empty file. Older JSONL readers can still read the rewritten lines if they tolerate version 3. The comparison above covers Pi 1.0.2; it adds no `open` side effects. Further `open` side effects in a Pi newer than 1.0.2 need a new persistence decision.                                                                                                                                   |
+   | Compatibility | Migrated files stay at version 3. Pie downgrade does not reverse the migration, the added newline, or a header written into a previously empty file. Older JSONL readers can still read the rewritten lines if they tolerate version 3. The comparison above covers Pi 1.6.0; it adds no `open` side effects. Further `open` side effects in a Pi newer than 1.6.0 need a new persistence decision.                                                                                                                                   |
    | Retention     | Pie session delete and uninstall do not remove the transcript or directories `findById` created. Permissions follow the process umask. Transcripts may contain prompts and tool output; this path does not copy them into Pie logs.                                                                                                                                                                                                                                                                                                   |
 
    **MCP OAuth credentials** are Pi-owned state in
