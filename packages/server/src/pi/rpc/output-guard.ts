@@ -1,5 +1,5 @@
 /**
- * Vendored from @earendil-works/pi-coding-agent v1.0.2
+ * Vendored from @earendil-works/pi-coding-agent v1.6.0
  * (`packages/coding-agent/src/core/output-guard.ts`).
  * RPC JSONL must own stdout; agent console noise is redirected to stderr.
  */

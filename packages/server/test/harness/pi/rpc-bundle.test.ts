@@ -116,7 +116,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
               assert.equal(getModel("xai", "grok-4.6").provider, "xai");
               assert.ok(builtInExtensions.some((extension) => extension.name === "llama.cpp"));
               assert.equal(getPackageDir(), path.join(process.cwd(), "runtime"));
-              assert.equal(VERSION, "1.0.2");
+              assert.equal(VERSION, "1.6.0");
               for (const file of [getReadmePath(), path.join(getDocsPath(), "extensions.md"),
                 path.join(getExamplesPath(), "sdk/06-extensions.ts"),
                 path.join(getPackageDir(), "CHANGELOG.md")]) {
@@ -180,7 +180,7 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
               "--provider",
               provider,
               "--model",
-              provider === "xai" ? "grok-4.6" : "anthropic.claude-3-5-sonnet-20241022-v2:0",
+              provider === "xai" ? "grok-4.6" : "anthropic.claude-sonnet-4-5-20250929-v1:0",
             ],
             {
               cwd,
@@ -409,5 +409,109 @@ layer(NodeServices.layer, { excludeTestServices: true })("Pi RPC bundle", (it) =
         /"type":"queue_update","steering":\["rpc:one"\],"followUp":\["rpc:two"\]/,
       );
     }),
+  );
+
+  it.effect(
+    "fires session_start once on new_session and finishes dispose on stdin EOF + single SIGTERM",
+    () =>
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
+        const cwd = yield* fs.makeTempDirectoryScoped({ prefix: "pie-rpc-rebind-" });
+        const runtimeDir = path.join(cwd, "runtime");
+        yield* fs.copy(path.dirname(bundle), runtimeDir);
+        yield* fs.copy(builtIsland, path.join(cwd, "fff"));
+        yield* fs.makeDirectory(path.join(cwd, "extensions"));
+        const lifecycleLog = path.join(cwd, "lifecycle.log");
+        yield* fs.writeFileString(
+          path.join(cwd, "extensions/lifecycle.ts"),
+          `import fs from "node:fs";
+          export default function (pi) {
+            pi.on("session_start", (event, ctx) => {
+              const reason = event.reason ?? "startup";
+              fs.appendFileSync(${JSON.stringify(lifecycleLog)}, "start:" + reason + "\\n");
+              ctx.ui.setStatus("lifecycle", "start:" + reason);
+            });
+            pi.on("session_shutdown", async () => {
+              fs.appendFileSync(${JSON.stringify(lifecycleLog)}, "shutdown:begin\\n");
+              await new Promise((resolve) => setTimeout(resolve, 150));
+              fs.appendFileSync(${JSON.stringify(lifecycleLog)}, "shutdown:done\\n");
+            });
+          }`,
+        );
+
+        const newSessionDone = yield* Deferred.make<void>();
+        const child = yield* spawner.spawn(
+          ChildProcess.make(
+            "bun",
+            [
+              "--no-install",
+              path.join(runtimeDir, "pi-process.js"),
+              "--mode",
+              "rpc",
+              "--provider",
+              "xai",
+              "--model",
+              "grok-4.6",
+            ],
+            {
+              cwd,
+              env: {
+                PATH: process.env.PATH,
+                HOME: cwd,
+                PI_CODING_AGENT_DIR: cwd,
+                PI_OFFLINE: "1",
+              },
+              stdin: Stream.make('{"id":"n1","type":"new_session"}\n').pipe(
+                Stream.concat(Stream.fromEffect(Deferred.await(newSessionDone)).pipe(Stream.drain)),
+                Stream.encodeText,
+              ),
+            },
+          ),
+        );
+
+        const stdoutLines = yield* child.stdout.pipe(
+          Stream.decodeText(),
+          Stream.splitLines,
+          Stream.tap((line) => {
+            if (line.includes('"id":"n1"') && line.includes('"command":"new_session"')) {
+              return Deferred.succeed(newSessionDone, undefined).pipe(
+                Effect.andThen(
+                  Effect.sync(() => {
+                    // Simulate process manager closing stdin and sending a single SIGTERM right after.
+                    setTimeout(() => {
+                      try {
+                        process.kill(child.pid, "SIGTERM");
+                      } catch {
+                        // Already exited.
+                      }
+                    }, 30);
+                  }),
+                ),
+              );
+            }
+            return Effect.void;
+          }),
+          Stream.runCollect,
+        );
+        const exitCode = yield* child.exitCode;
+        assert.equal(exitCode, 0);
+
+        const stdout = Array.from(stdoutLines).join("\n");
+        assert.match(stdout, /"command":"new_session","success":true/);
+        const statusFrames = Array.from(stdoutLines).filter((line) =>
+          line.includes('"statusKey":"lifecycle"'),
+        );
+        assert.equal(statusFrames.length, 2, stdout);
+        assert.match(statusFrames[1] ?? "", /"statusText":"start:new"/);
+
+        const log = (yield* fs.readFileString(lifecycleLog)).trim().split("\n");
+        // 1 initial startup + 1 new_session (not 2 on new_session), and final dispose finishes cleanly.
+        assert.deepEqual(
+          log.filter((line) => line.startsWith("start:")),
+          ["start:startup", "start:new"],
+        );
+        assert.equal(log.at(-1), "shutdown:done");
+      }),
   );
 });

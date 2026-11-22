@@ -90,8 +90,8 @@ catalogs:
   # Pi packages move together. Exact pins: the coding-agent patch key below
   # is version-specific, and a caret would admit a release the patch misses.
   pi:
-    "@earendil-works/pi-coding-agent": 1.0.2
-    "@earendil-works/pi-tui": 1.0.2
+    "@earendil-works/pi-coding-agent": 1.6.0
+    "@earendil-works/pi-tui": 1.6.0
 overrides:
   # These overrides force TRANSITIVE deps onto the catalog version — the
   # catalog alone only governs workspace package.json entries. Load-bearing:
@@ -151,7 +151,15 @@ allowBuilds:
   # works inside git worktrees); the package's own postinstall would just fail.
   simple-git-hooks: false
 patchedDependencies:
-  "@earendil-works/pi-coding-agent@1.0.2": patches/@earendil-works__pi-coding-agent@1.0.2.patch
+  # Headless Pi RPC. Keep extension UI components and pi-tui. Drop
+  # InteractiveMode and highlight.js; inline builtin theme JSON.
+  # Keep Bun sandbox setup, static dispatcher/builtin extension exports, and
+  # relocatable image worker/WASM paths. Also re-export getShellEnv,
+  # killProcessTree, killTrackedDetachedChildren, waitForChildProcess, Type,
+  # bashSchema, and resolveSpawnContext for Pie's bash tool and RPC mode.
+  # On bump, re-check every patched file and run the isolated server RPC
+  # bundle tests after rebuilding.
+  "@earendil-works/pi-coding-agent@1.6.0": patches/@earendil-works__pi-coding-agent@1.6.0.patch
   # orpc-mcp imports `tryDecodeURIComponent` from @orpc/shared, which beta.42
   # dropped; the patch inlines it. On bump: drop the patch once orpc-mcp stops
   # importing it (dist/shared/orpc-mcp.*.mjs).
@@ -160,11 +168,4 @@ patchedDependencies:
   # opt out — the renderer CSP blocks it and logs an error on every launch. The
   # patch makes that one function return early; nothing else. On a react-scan
   # bump, re-check `dist/index.{js,mjs}` still define `checkReactGrabVersion`.
-  # Headless Pi RPC. Keep extension UI components and pi-tui. Drop
-  # InteractiveMode and highlight.js; inline builtin theme JSON.
-  # Keep Bun sandbox setup, static dispatcher/builtin extension exports, and
-  # relocatable image worker/WASM paths. Also re-export getShellEnv,
-  # killProcessTree, waitForChildProcess, Type, bashSchema, and resolveSpawnContext for Pie's bash tool.
-  # On bump, re-check every patched file and run the isolated server RPC
-  # bundle tests after rebuilding.
   react-scan@0.5.7: patches/react-scan@0.5.7.patch

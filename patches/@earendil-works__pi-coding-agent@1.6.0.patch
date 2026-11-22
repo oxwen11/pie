@@ -19,47 +19,16 @@ index 282e8d3d54897a7c032616542596be5221937d73..718f7067e5432179faaec935fca6971f
 +setEmbeddedQuickJSWasmPath(quickjsWasmPath.startsWith(".") ? fileURLToPath(new URL(quickjsWasmPath, import.meta.url)) : quickjsWasmPath);
  //# sourceMappingURL=runtime-setup.js.map
 \ No newline at end of file
-diff --git a/dist/core/agent-session.js b/dist/core/agent-session.js
-index 33338d518743ba2fd4ee2d710c5496a6ddcd1856..5cafd057a0fae8632caa4fae539917f199005500 100644
---- a/dist/core/agent-session.js
-+++ b/dist/core/agent-session.js
-@@ -200,6 +200,11 @@ export class AgentSession {
-         });
-         if (this._initialActiveToolNames === undefined)
-             this._restoreToolsFromTranscript();
-+        else if (this._usesDefaultTools) {
-+            // Resuming with the default tool set restores the transcript loadout (e.g. tools tool_search
-+            // loaded) and, like reload(), keeps extension tools that activate on registration.
-+            this._restoreToolsFromTranscript(this.getActiveToolNames().filter((name) => !this._baseToolDefinitions.has(name) && this._isActivatedOnRegistration(name)));
-+        }
-     }
-     get modelRuntime() {
-         return this._modelRuntime;
-@@ -1329,12 +1334,12 @@ export class AgentSession {
-      * Tools reachable only from other tools are never declared, but they do not depend on the active
-      * set, so the transcript's declarations are the whole loadout.
-      */
--    _restoreToolsFromTranscript() {
-+    _restoreToolsFromTranscript(keepToolNames = []) {
-         this._pendingToolNames.clear();
-         const current = getCurrentSystemMessage(this.sessionManager.buildSessionContext().messages);
-         if (!current)
-             return;
--        const names = (current.toolsAdded ?? []).map((tool) => tool.name);
-+        const names = [...(current.toolsAdded ?? []).map((tool) => tool.name), ...keepToolNames];
-         this._pendingToolNames = new Set(names.filter((name) => this._isAllowedTool(name)));
-         this._setActiveTools(names);
-     }
 diff --git a/dist/core/tools/bash.d.ts b/dist/core/tools/bash.d.ts
-index 64be599a321c7486ebe8c9a21608ad8ce61f7778..1c71ff8e9c3bebad9cdb0bdf8d22f3db3ce34ce0 100644
+index 27f12efdfda5720d774a5939a655663902a268f6..d873124d3119aeb242dc12c5f74b811a657a7f81 100644
 --- a/dist/core/tools/bash.d.ts
 +++ b/dist/core/tools/bash.d.ts
 @@ -1,9 +1,9 @@
- import type { AgentTool } from "@earendil-works/pi-agent-core";
  import { type Static, Type } from "typebox";
  import { type ShellConfig } from "../../utils/shell.ts";
 -import type { ToolDefinition } from "../extensions/types.ts";
 +import type { ExtensionContext, ToolDefinition } from "../extensions/types.ts";
+ import { type TypeBoxAgentTool } from "./tool-definition-wrapper.ts";
  import { type TruncationResult } from "./truncate.ts";
 -declare const bashSchema: Type.TObject<{
 +export declare const bashSchema: Type.TObject<{
@@ -75,7 +44,7 @@ index 64be599a321c7486ebe8c9a21608ad8ce61f7778..1c71ff8e9c3bebad9cdb0bdf8d22f3db
      /** Custom operations for command execution. Default: local shell */
      operations?: BashOperations;
 diff --git a/dist/core/tools/bash.js b/dist/core/tools/bash.js
-index e52c9d779bdb50667083810d946e11da6c7e29ba..8daaa4e2c3406f874b832a1ca9cb81419219bf3e 100644
+index 60e7b06fee585cad635d91e924ad7c8b2766fa3e..70460d9ecd60b4cbd0b3327ea85c30e3cff68952 100644
 --- a/dist/core/tools/bash.js
 +++ b/dist/core/tools/bash.js
 @@ -25,7 +25,7 @@ function resolveTimeoutMs(timeout) {
@@ -87,7 +56,7 @@ index e52c9d779bdb50667083810d946e11da6c7e29ba..8daaa4e2c3406f874b832a1ca9cb8141
      command: Type.String({ description: "Shell command to execute" }),
      timeout: Type.Optional(Type.Number({ description: "Timeout in seconds (optional, no default timeout)" })),
  });
-@@ -132,7 +132,7 @@ export function createLocalShellOperations(shellName, resolveShellConfig) {
+@@ -156,7 +156,7 @@ export function createLocalShellOperations(shellName, resolveShellConfig) {
  export function createLocalBashOperations(options) {
      return createLocalShellOperations("bash", () => getShellConfig(options?.shellPath));
  }
@@ -97,20 +66,20 @@ index e52c9d779bdb50667083810d946e11da6c7e29ba..8daaa4e2c3406f874b832a1ca9cb8141
      delete env.PI_SESSION_ID;
      delete env.PI_SESSION_FILE;
 diff --git a/dist/index.d.ts b/dist/index.d.ts
-index 9f9bd7370e5ecc288de58d20e81b2a0aadb6ea4b..aebc59f096bc11de244be342f46c8638d14bd8a7 100644
+index bb8acdb1b034f89e8fcb86a5933fa513d49a8ef3..385226c36acb7deae5372ef90f94e53b9311271a 100644
 --- a/dist/index.d.ts
 +++ b/dist/index.d.ts
 @@ -1,3 +1,9 @@
 +export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.ts";
 +export { builtInExtensions } from "./extensions/index.ts";
 +export { bashSchema, resolveSpawnContext } from "./core/tools/bash.ts";
-+export { getShellEnv, killProcessTree } from "./utils/shell.ts";
++export { getShellEnv, killProcessTree, killTrackedDetachedChildren } from "./utils/shell.ts";
 +export { waitForChildProcess } from "./utils/child-process.ts";
 +export { Type } from "typebox";
  export { type Args, parseArgs } from "./cli/args.ts";
  export { CONFIG_DIR_NAME, getAgentDir, getDocsPath, getExamplesPath, getPackageDir, getReadmePath, VERSION, } from "./config.ts";
  export { AgentSession, type AgentSessionConfig, type AgentSessionEvent, type AgentSessionEventListener, type ModelCycleResult, type ParsedSkillBlock, type PromptOptions, parseSkillBlock, type SessionStats, } from "./core/agent-session.ts";
-@@ -31,8 +37,7 @@ export type { CodemodeStoreEntryData, CodemodeToolDetails } from "./extensions/c
+@@ -32,8 +38,7 @@ export type { CodemodeStoreEntryData, CodemodeToolDetails } from "./extensions/c
  export type { LoadedMcpConfig, McpExposure, McpServerConfig, McpServerEntry } from "./extensions/mcp/config.ts";
  export { createMcpExtension, type McpExtensionOptions, type McpTransportFactory } from "./extensions/mcp/index.ts";
  export { createToolSearchExtension } from "./extensions/tool-search/index.ts";
@@ -121,20 +90,20 @@ index 9f9bd7370e5ecc288de58d20e81b2a0aadb6ea4b..aebc59f096bc11de244be342f46c8638
  export { getLanguageFromPath, getMarkdownTheme, getSelectListTheme, getSettingsListTheme, highlightCode, initTheme, Theme, type ThemeAppearance, type ThemeBg, type ThemeColor, type ThemeStyle, type ThemeToken, } from "./modes/interactive/theme/theme.ts";
  export { copyToClipboard } from "./utils/clipboard.ts";
 diff --git a/dist/index.js b/dist/index.js
-index c48934f78d61fd5f5f8008bc9e09d8c4558d330a..e4dca5d1fdf7234bfac8038f61fa151d3a37f558 100644
+index ab5cfccc3a90939e533b9118122189507a7af326..3e07e3db70e15acfcc0ad9bd27e8d999345cbb7b 100644
 --- a/dist/index.js
 +++ b/dist/index.js
 @@ -1,3 +1,9 @@
 +export { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.js";
 +export { builtInExtensions } from "./extensions/index.js";
 +export { bashSchema, resolveSpawnContext } from "./core/tools/bash.js";
-+export { getShellEnv, killProcessTree } from "./utils/shell.js";
++export { getShellEnv, killProcessTree, killTrackedDetachedChildren } from "./utils/shell.js";
 +export { waitForChildProcess } from "./utils/child-process.js";
 +export { Type } from "typebox";
  // Core session management
  export { parseArgs } from "./cli/args.js";
  // Config paths
-@@ -34,10 +40,8 @@ export { VIRTUAL_MODEL_STATE_ENTRY, } from "./core/virtual-models.js";
+@@ -35,10 +41,8 @@ export { VIRTUAL_MODEL_STATE_ENTRY, } from "./core/virtual-models.js";
  export { createCodemodeExtension } from "./extensions/codemode/index.js";
  export { createMcpExtension } from "./extensions/mcp/index.js";
  export { createToolSearchExtension } from "./extensions/tool-search/index.js";
@@ -147,19 +116,19 @@ index c48934f78d61fd5f5f8008bc9e09d8c4558d330a..e4dca5d1fdf7234bfac8038f61fa151d
  export { ArminComponent, AssistantMessageComponent, BashExecutionComponent, BorderedLoader, BranchSummaryMessageComponent, CompactionSummaryMessageComponent, CustomEditor, CustomMessageComponent, DynamicBorder, ExtensionEditorComponent, ExtensionInputComponent, ExtensionSelectorComponent, FooterComponent, keyHint, keyText, LoginDialogComponent, ModelSelectorComponent, OAuthSelectorComponent, rawKeyHint, renderDiff, SessionSelectorComponent, SettingsSelectorComponent, ShowImagesSelectorComponent, SkillInvocationMessageComponent, ThemeSelectorComponent, ThinkingSelectorComponent, ToolExecutionComponent, TreeSelectorComponent, truncateToVisualLines, UserMessageComponent, UserMessageSelectorComponent, } from "./modes/interactive/components/index.js";
  // Theme utilities for custom tools and extensions
 diff --git a/dist/modes/interactive/theme/theme.js b/dist/modes/interactive/theme/theme.js
-index 5cf3ad39087c5c7add9ec8a1381b4f68367972e7..f58da52db465c02b74c5e6408f3fb9567fa0e847 100644
+index a5d8838020b21a1322a62cb7fc42908437cf2dac..8e615a4009547ba149434cf4be8c4247cdb8ebb9 100644
 --- a/dist/modes/interactive/theme/theme.js
 +++ b/dist/modes/interactive/theme/theme.js
 @@ -6,6 +6,8 @@ import { getCustomThemesDir, getThemesDir } from "../../../config.js";
  import { closeWatcher, watchWithErrorHandler } from "../../../utils/fs-watch.js";
- import { highlight, supportsLanguage } from "../../../utils/syntax-highlight.js";
+ import { getHighlightLanguageCount, highlight, supportsLanguage } from "../../../utils/syntax-highlight.js";
  import { stripBom } from "../../../utils/text.js";
 +import darkThemeJson from "./dark.json" with { type: "json" };
 +import lightThemeJson from "./light.json" with { type: "json" };
  import { generateSystemThemeColors, SYSTEM_THEME_NAME, terminalAppearance } from "./system-theme.js";
+ import { THEME_TOKENS, } from "./theme-tokens.js";
  export { SYSTEM_THEME_NAME } from "./system-theme.js";
- let themeJsonValidator;
-@@ -271,13 +273,7 @@ export class Theme {
+@@ -272,13 +274,7 @@ export class Theme {
  let BUILTIN_THEMES;
  function getBuiltinThemes() {
      if (!BUILTIN_THEMES) {
@@ -175,16 +144,16 @@ index 5cf3ad39087c5c7add9ec8a1381b4f68367972e7..f58da52db465c02b74c5e6408f3fb956
      return BUILTIN_THEMES;
  }
 diff --git a/dist/utils/image-resize.js b/dist/utils/image-resize.js
-index 686c9f32ea6ae5858ab560014bdfe102edd78804..b07fabb23ea2ffa4db1d5896a609f357302e1586 100644
+index 30e6aa48991be62746362158780a28485f5953fa..a42ae215413829a203530d9dec475a5cd8e8f222 100644
 --- a/dist/utils/image-resize.js
 +++ b/dist/utils/image-resize.js
 @@ -1,4 +1,5 @@
  import { Worker } from "node:worker_threads";
 +import { isBunBinary } from "../config.js";
- import { resizeImageInProcess } from "./image-resize-core.js";
+ import { IMAGE_RESIZE_WORKER_RESPONSE_TYPE, resizeImageInProcess, } from "./image-resize-core.js";
  function toTransferableBytes(input) {
      // Transfer detaches the buffer, so transfer a worker-owned copy and leave the
-@@ -70,7 +71,7 @@ export async function resizeImage(inputBytes, mimeType, options) {
+@@ -71,7 +72,7 @@ export async function resizeImage(inputBytes, mimeType, options) {
      // Bun compiled executables resolve worker entrypoints by string path, not via
      // new URL(..., import.meta.url). Try the string path first under Bun so the
      // release binary uses the embedded worker instead of falling back in-process.
@@ -206,10 +175,10 @@ index 3078895bedba898ce26c439b6123425834ca2586..586fab202f3bae969c0d44fd67a7db84
          path.join(execDir, "photon", WASM_FILENAME),
          path.join(process.cwd(), WASM_FILENAME),
 diff --git a/dist/utils/syntax-highlight.js b/dist/utils/syntax-highlight.js
-index 7c40360ce63bc65d8eff063379bfce8646e9389b..a445a5f73bd4f129faaddc6db761c3e947823e1f 100644
+index 43884cec78c7966987d7c3e70337263c76d533ed..cb1e0a9636cf59324a700534ce3914c9cd1171bb 100644
 --- a/dist/utils/syntax-highlight.js
 +++ b/dist/utils/syntax-highlight.js
-@@ -1,179 +1,4 @@
+@@ -1,191 +1,5 @@
 -import hljs from "highlight.js/lib/core.js";
 -import bash from "highlight.js/lib/languages/bash.js";
 -import c from "highlight.js/lib/languages/c.js";
@@ -338,7 +307,12 @@ index 7c40360ce63bc65d8eff063379bfce8646e9389b..a445a5f73bd4f129faaddc6db761c3e9
 -            return;
 -        }
 -        const formatter = getActiveFormatter(scopes, theme);
--        output += formatter ? formatter(textBuffer) : textBuffer;
+-        output += formatter
+-            ? textBuffer
+-                .split("\n")
+-                .map((line) => (line ? formatter(line) : line))
+-                .join("\n")
+-            : textBuffer;
 -        textBuffer = "";
 -    };
 -    let index = 0;
@@ -388,26 +362,31 @@ index 7c40360ce63bc65d8eff063379bfce8646e9389b..a445a5f73bd4f129faaddc6db761c3e9
 -export function supportsLanguage(name) {
 -    return hljs.getLanguage(name) !== undefined;
 -}
+-/**
+- * Number of registered grammars. It grows when the deferred grammars load, which can change the highlighting of
+- * code that embeds another language, such as HTML in a JavaScript template literal.
+- */
+-export function getHighlightLanguageCount() {
+-    return hljs.listLanguages().length;
+-}
 -//# sourceMappingURL=syntax-highlight.js.map
 \ No newline at end of file
 +export function loadAllHighlightLanguages() { return Promise.resolve(); }
 +export function renderHighlightedHtml(html, _theme = {}) { return html; }
 +export function highlight(code, _options = {}) { return String(code ?? ""); }
 +export function supportsLanguage(_name) { return false; }
++export function getHighlightLanguageCount() { return 0; }
 diff --git a/examples/extensions/custom-provider-anthropic/package-lock.json b/examples/extensions/custom-provider-anthropic/package-lock.json
 deleted file mode 100644
-index bd05ded4a4e3fa90b71cd5167e46fba1060c1822..0000000000000000000000000000000000000000
+index 5546fd2f2b682858931503b065db44293f6ae97e..0000000000000000000000000000000000000000
 diff --git a/examples/extensions/gondolin/package-lock.json b/examples/extensions/gondolin/package-lock.json
 deleted file mode 100644
-index cd411a5c669fa5020451ee5df7abea0fdf92b903..0000000000000000000000000000000000000000
-diff --git a/examples/extensions/sandbox/package-lock.json b/examples/extensions/sandbox/package-lock.json
-deleted file mode 100644
-index 8966a1ac64e89bbf59340c3eab342432926f5886..0000000000000000000000000000000000000000
+index 77f48bd1a82ad5b3108f6fcbe18367af0e9d34bd..0000000000000000000000000000000000000000
 diff --git a/examples/extensions/with-deps/package-lock.json b/examples/extensions/with-deps/package-lock.json
 deleted file mode 100644
-index dff4bb95909145d4d7677322458af92b48f39371..0000000000000000000000000000000000000000
+index 5efeb4e916389bd788141fbb8165ab10f71e11d0..0000000000000000000000000000000000000000
 diff --git a/package.json b/package.json
-index 90f4c62dcd7e5ce51134f5da9f69937eba7da02d..01ece5041cc8017d99562f279054e908d7bdae6f 100644
+index e1a43e9b4854747fd3f728c5542a6748b1ac6416..b79e84d7eb21f7443d73cb68118a691dfdb4bbea 100644
 --- a/package.json
 +++ b/package.json
 @@ -16,6 +16,14 @@
@@ -424,4 +403,4 @@ index 90f4c62dcd7e5ce51134f5da9f69937eba7da02d..01ece5041cc8017d99562f279054e908
 +		},
  		"./rpc-entry": {
  			"import": "./dist/bundle/rpc-entry.js"
- 		},
+ 		}
